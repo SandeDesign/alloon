@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import EmployeeLayout from './components/layout/EmployeeLayout';
@@ -19,7 +19,7 @@ import NotFound from './pages/NotFound';
 import { AppProvider } from './contexts/AppContext';
 import { ToastContainer } from './components/ui/Toast';
 import EmployeeDashboard from './pages/EmployeeDashboard';
-import { useAuth } from './contexts/AuthContext';
+import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
 // Placeholder components for routes not yet implemented
 const Hours = () => (
@@ -100,67 +100,97 @@ const EmployeeHours = () => (
   </div>
 );
 
-// Protected Route wrapper that determines layout based on user role
-const ProtectedRouteWithLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userRole } = useAuth();
+const AppContent: React.FC = () => {
+  const { user, userRole, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   return (
-    <ProtectedRoute>
-      {userRole === 'employee' ? (
-        <EmployeeLayout>{children}</EmployeeLayout>
-      ) : (
-        <Layout>{children}</Layout>
-      )}
-    </ProtectedRoute>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      
+      {/* Protected routes */}
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <Routes>
+              {userRole === 'admin' && (
+                <Route
+                  path="/*"
+                  element={
+                    <Layout>
+                      <Routes>
+                        <Route index element={<Dashboard />} />
+                        <Route path="companies" element={<Companies />} />
+                        <Route path="employees" element={<EmployeesNew />} />
+                        <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
+                        <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
+                        <Route path="hours" element={<Hours />} />
+                        <Route path="payroll" element={<Payroll />} />
+                        <Route path="payslips" element={<Payslips />} />
+                        <Route path="regulations" element={<Regulations />} />
+                        <Route path="export" element={<Export />} />
+                        <Route path="settings" element={<Settings />} />
+                        <Route path="employee-dashboard/*" element={<Navigate to="/" replace />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Layout>
+                  }
+                />
+              )}
+              
+              {userRole === 'employee' && (
+                <>
+                  <Route path="/" element={<Navigate to="/employee-dashboard" replace />} />
+                  <Route
+                    path="/employee-dashboard/*"
+                    element={
+                      <EmployeeLayout>
+                        <Routes>
+                          <Route index element={<EmployeeDashboard />} />
+                          <Route path="leave" element={<Leave />} />
+                          <Route path="absence" element={<Absence />} />
+                          <Route path="expenses" element={<Expenses />} />
+                          <Route path="hours" element={<EmployeeHours />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </EmployeeLayout>
+                    }
+                  />
+                </>
+              )}
+              
+              {!userRole && (
+                <Route path="*" element={<LoadingSpinner />} />
+              )}
+            </Routes>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 };
+
 function App() {
   return (
     <AuthProvider>
       <AppProvider>
-      <Router>
-        <div className="App">
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* Protected routes */}
-            <Route
-              path="/*"
-              element={
-                <ProtectedRouteWithLayout>
-                  <Routes>
-                    {/* Admin routes */}
-                    <Route index element={<Dashboard />} />
-                    <Route path="companies" element={<Companies />} />
-                    <Route path="employees" element={<EmployeesNew />} />
-                    <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
-                    <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
-                    <Route path="hours" element={<Hours />} />
-                    <Route path="payroll" element={<Payroll />} />
-                    <Route path="payslips" element={<Payslips />} />
-                    <Route path="regulations" element={<Regulations />} />
-                    <Route path="export" element={<Export />} />
-                    <Route path="settings" element={<Settings />} />
-                    
-                    {/* Employee routes */}
-                    <Route path="employee-dashboard" element={<EmployeeDashboard />} />
-                    <Route path="employee-dashboard/leave" element={<Leave />} />
-                    <Route path="employee-dashboard/absence" element={<Absence />} />
-                    <Route path="employee-dashboard/expenses" element={<Expenses />} />
-                    <Route path="employee-dashboard/hours" element={<EmployeeHours />} />
-                    
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </ProtectedRouteWithLayout>
-              }
-            />
-          </Routes>
-          <ToastContainer />
-        </div>
-      </Router>
+        <Router>
+          <div className="App">
+            <AppContent />
+            <ToastContainer />
+          </div>
+        </Router>
       </AppProvider>
     </AuthProvider>
   );
