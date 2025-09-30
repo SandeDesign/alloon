@@ -531,22 +531,18 @@ const Employees: React.FC = () => {
         },
         leaveInfo: {
           holidayDays: {
-            statutory: data.statutoryHolidayDays,
-            extraStatutory: data.extraStatutoryHolidayDays,
-            accumulated: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
-            taken: 0,
+            remaining: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
+            expiryDate: new Date(new Date().getFullYear() + 5, 11, 31) // 5 years from now
           },
           advDays: (data.advDaysAccumulated !== undefined && data.advDaysAccumulated !== null) ? {
-            accumulated: data.advDays,
-            taken: 0,
-            remaining: data.advDays,
-          } : undefined,
-          seniorDays: data.seniorDays || undefined,
-          snipperDays: data.snipperDays || undefined,
+            accumulated: data.advDaysAccumulated,
+            taken: data.advDaysTaken || 0,
+            remaining: (data.advDaysAccumulated || 0) - (data.advDaysTaken || 0)
+          } : undefined
         },
         status: 'active',
-        salaryHistory: data.salaryHistory ? (Array.isArray(data.salaryHistory) ? data.salaryHistory : []) : [],
       };
+      
       console.log('Employee data being sent to Firebase:', employeeData);
 
       if (editingEmployee) {
