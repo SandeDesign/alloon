@@ -197,7 +197,6 @@ const Employees: React.FC = () => {
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, trigger, formState: { errors } } = useForm<EmployeeFormData>({
-    resolver: yupResolver(employeeSchema)
   });
 
   // Debug logging for user role
@@ -205,10 +204,18 @@ const Employees: React.FC = () => {
     console.log('=== USER ROLE DEBUG ===');
     console.log('Current user:', user);
     console.log('User role:', userRole);
-    console.log('User UID:', user?.uid);
-    console.log('User email:', user?.email);
+    resolver: yupResolver(employeeSchema)
   });
   
+  // Debug logging for user role
+  useEffect(() => {
+    console.log('=== USER ROLE DEBUG ===');
+    console.log('Current user:', user);
+    console.log('User role:', userRole);
+    console.log('User UID:', user?.uid);
+    console.log('User email:', user?.email);
+  }, [user, userRole]);
+
   const selectedCompanyId = watch('companyId');
   const selectedCAO = watch('cao');
   const paymentType = watch('paymentType');
@@ -283,7 +290,12 @@ const Employees: React.FC = () => {
       // Get available branches for this company
       const availableBranches = branches.filter(b => b.companyId === defaultCompany.id);
       if (availableBranches.length === 0) {
-        error('Geen vestigingen', `Voeg eerst een vestiging toe aan ${defaultCompany.name} voordat je werknemers kunt aanmaken`);
+        error('Geen vestigingen', `Voeg eerst een vestiging toe aan ${defaultCompany.name} voordat je werknemers kunt
+        )
+      }
+    }
+  }
+} aanmaken`);
         return;
       }
       
@@ -493,7 +505,6 @@ const Employees: React.FC = () => {
           caoCode: data.caoCode || undefined,
           contractStatus: data.contractStatus,
           noticeDate: data.noticeDate ? new Date(data.noticeDate) : undefined,
-        },
         salaryInfo: {
           salaryScale: data.salaryScale,
           paymentType: data.paymentType,
@@ -531,18 +542,21 @@ const Employees: React.FC = () => {
         },
         leaveInfo: {
           holidayDays: {
-            remaining: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
-            expiryDate: new Date(new Date().getFullYear() + 5, 11, 31) // 5 years from now
-          },
+            statutory: data.statutoryHolidayDays,
+            extraStatutory: data.extraStatutoryHolidayDays,
+            accumulated: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
+            taken: 0,
           advDays: (data.advDaysAccumulated !== undefined && data.advDaysAccumulated !== null) ? {
-            accumulated: data.advDaysAccumulated,
-            taken: data.advDaysTaken || 0,
-            remaining: (data.advDaysAccumulated || 0) - (data.advDaysTaken || 0)
-          } : undefined
+            accumulated: data.advDays,
+            taken: 0,
+            remaining: data.advDays,
+          } : undefined,
+          seniorDays: data.seniorDays || undefined,
+          snipperDays: data.snipperDays || undefined,
         },
         status: 'active',
+        salaryHistory: data.salaryHistory ? (Array.isArray(data.salaryHistory) ? data.salaryHistory : []) : [],
       };
-      
       console.log('Employee data being sent to Firebase:', employeeData);
 
       if (editingEmployee) {
@@ -634,7 +648,9 @@ const Employees: React.FC = () => {
   const copyPasswordToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(generatedPassword);
-      success('Gekopieerd!', 'Wachtwoord is gekopieerd naar klembord');
+      success('Gekopieerd!', 'Wachtwoord i
+  }
+}s gekopieerd naar klembord');
     } catch (err) {
       error('Kopiëren mislukt', 'Kon wachtwoord niet kopiëren');
     }
