@@ -26,7 +26,7 @@ function Table<T extends Record<string, any>>({
           <tr>
             {columns.map((column) => (
               <th
-                key={String(column.key)}
+                key={`header-${String(column.key)}`}
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
               >
                 {column.label}
@@ -35,9 +35,11 @@ function Table<T extends Record<string, any>>({
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-          {data.map((row, index) => (
+          {data.map((row, index) => {
+            const rowKey = row.id || `row-${index}`;
+            return (
             <tr
-              key={index}
+              key={rowKey}
               className={`${
                 onRowClick
                   ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -47,7 +49,7 @@ function Table<T extends Record<string, any>>({
             >
               {columns.map((column) => (
                 <td
-                  key={String(column.key)}
+                  key={`${rowKey}-${String(column.key)}`}
                   className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300"
                 >
                   {column.render
@@ -56,7 +58,8 @@ function Table<T extends Record<string, any>>({
                 </td>
               ))}
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
     </div>
