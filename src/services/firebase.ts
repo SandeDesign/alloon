@@ -585,10 +585,13 @@ export const getLeaveRequests = async (userId: string, employeeId?: string): Pro
   }
 
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
+  const requests = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...convertTimestamps(doc.data())
   } as LeaveRequest));
+  
+  console.log(`Found ${requests.length} leave requests for user ${userId}`);
+  return requests;
 };
 
 export const createLeaveRequest = async (userId: string, request: Omit<LeaveRequest, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -713,10 +716,13 @@ export const getSickLeaveRecords = async (userId: string, employeeId?: string): 
   }
 
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
+  const records = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...convertTimestamps(doc.data())
   } as SickLeave));
+  
+  console.log(`Found ${records.length} sick leave records for user ${userId}`);
+  return records;
 };
 
 export const createSickLeave = async (userId: string, sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -883,10 +889,13 @@ export const getExpenses = async (userId: string, employeeId?: string): Promise<
   }
 
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
+  const expenses = querySnapshot.docs.map(doc => ({
     id: doc.id,
     ...convertTimestamps(doc.data())
   } as Expense));
+  
+  console.log(`Found ${expenses.length} expenses for user ${userId}`);
+  return expenses;
 };
 
 export const createExpense = async (userId: string, expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {

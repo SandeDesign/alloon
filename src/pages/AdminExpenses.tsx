@@ -34,16 +34,15 @@ const AdminExpenses: React.FC = () => {
     try {
       setLoading(true);
       
-      // Get all expenses for this user
+      // Get ALL expenses for this user
       const allExpenseRecords = await firebaseService.getExpenses(user.uid);
       setAllExpenses(allExpenseRecords);
       
-      // Filter for pending expenses (submitted status)
+      // Filter for submitted expenses that need approval
       const pendingExpenseRecords = allExpenseRecords.filter(expense => 
         expense.status === 'submitted'
       );
       setPendingExpenses(pendingExpenseRecords);
-
     } catch (err) {
       console.error('Error loading expenses:', err);
       showError('Fout bij laden', 'Kon declaraties niet laden');

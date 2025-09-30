@@ -31,32 +31,10 @@ const AdminLeaveApprovals: React.FC = () => {
 
     try {
       setLoading(true);
-      const allRequests: LeaveRequest[] = [];
-
-      // Get all leave requests for this user
+      // Get ALL leave requests for this user and filter for pending
       const allLeaveRequests = await firebaseService.getLeaveRequests(user.uid);
-      
-      // Filter for pending requests
-      const pendingRequests = allLeaveRequests.filter(request => request.status === 'pending');
-      
-      allRequests.push(...pendingRequests);
-      
-      // Also try company-specific queries if companies are loaded
-      if (companies.length > 0) {
-        try {
-          const defaultRequests = await firebaseService.getPendingLeaveApprovals('default-company', user.uid);
-          // Only add if not already in the list
-          defaultRequests.forEach(req => {
-            if (!allRequests.find(existing => existing.id === req.id)) {
-              allRequests.push(req);
-            }
-          });
-        } catch (err) {
-          console.log('No requests found for default company');
-        }
-      }
-
-      setPendingRequests(allRequests);
+      const pending = allLeaveRequests.filter(request => request.status === 'pending');
+      setPendingRequests(pending);
     } catch (err) {
       console.error('Error loading pending requests:', err);
       showError('Fout bij laden', 'Kon verlofaanvragen niet laden');

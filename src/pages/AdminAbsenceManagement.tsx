@@ -28,34 +28,12 @@ const AdminAbsenceManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      const allSickLeave: SickLeave[] = [];
-
-      // Get all sick leave records for this user
+      // Get ALL sick leave records for this user and filter for active
       const allSickLeaveRecords = await firebaseService.getSickLeaveRecords(user.uid);
-      
-      // Filter for active sick leave
-      const activeSickLeaveRecords = allSickLeaveRecords.filter(record => 
+      const active = allSickLeaveRecords.filter(record => 
         record.status === 'active' || record.status === 'partially_recovered'
       );
-      
-      allSickLeave.push(...activeSickLeaveRecords);
-      
-      // Also try company-specific queries if companies are loaded
-      if (companies.length > 0) {
-        try {
-          const defaultSickLeave = await firebaseService.getActiveSickLeave('default-company', user.uid);
-          // Only add if not already in the list
-          defaultSickLeave.forEach(record => {
-            if (!allSickLeave.find(existing => existing.id === record.id)) {
-              allSickLeave.push(record);
-            }
-          });
-        } catch (err) {
-          console.log('No sick leave found for default company');
-        }
-      }
-
-      setActiveSickLeave(allSickLeave);
+      setActiveSickLeave(active);
     } catch (err) {
       console.error('Error loading active sick leave:', err);
       showError('Fout bij laden', 'Kon verzuimgegevens niet laden');
