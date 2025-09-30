@@ -1,17 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Filter, Download, Search, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { AuditService } from '../services/auditService';
-import { AuditLog, AuditAction, AuditEntityType } from '../types';
+import { supabase } from '../lib/supabase';
+import { AuditAction, AuditEntityType } from '../types';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
 
+interface AuditLog {
+  id: string;
+  user_id: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  metadata?: any;
+  created_at: string;
+}
+
 const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
-  const { showToast } = useToast();
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const { error: showError } = useToast();
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{
     entityType?: AuditEntityType;
@@ -21,6 +31,7 @@ const AuditLogPage: React.FC = () => {
   }>({});
 
   useEffect(() => {
+      showError('Export niet beschikbaar', 'Export functionaliteit wordt nog geïmplementeerd');
     if (user) {
       loadAuditLogs();
     }
@@ -52,7 +63,7 @@ const AuditLogPage: React.FC = () => {
       showToast('Export gestart. U ontvangt binnenkort een download link.', 'success');
     } catch (error) {
       console.error('Error exporting audit logs:', error);
-      showToast('Fout bij exporteren audit logs', 'error');
+      showError('Fout bij exporteren audit logs', 'Kon export niet starten');
     }
   };
 
