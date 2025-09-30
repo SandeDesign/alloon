@@ -18,6 +18,16 @@ interface AuditLog {
   created_at: string;
 }
 
+interface AuditLog {
+  id: string;
+  user_id: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  metadata?: any;
+  created_at: string;
+}
+
 const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
   const { error: showError } = useToast();
@@ -49,7 +59,7 @@ const AuditLogPage: React.FC = () => {
       setAuditLogs(logs);
     } catch (error) {
       console.error('Error loading audit logs:', error);
-      showToast('Fout bij laden audit logs', 'error');
+      showError('Fout bij laden audit logs', 'error');
     } finally {
       setLoading(false);
     }
@@ -60,7 +70,7 @@ const AuditLogPage: React.FC = () => {
 
     try {
       const exportId = await AuditService.exportAuditLogs(user.uid, '', 'excel', filters);
-      showToast('Export gestart. U ontvangt binnenkort een download link.', 'success');
+      success('Export gestart. U ontvangt binnenkort een download link.');
     } catch (error) {
       console.error('Error exporting audit logs:', error);
       showError('Fout bij exporteren audit logs', 'Kon export niet starten');
