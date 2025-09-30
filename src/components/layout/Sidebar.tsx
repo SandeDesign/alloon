@@ -27,6 +27,7 @@ const navigation = [
   { name: 'Werknemers', href: '/employees', icon: Users },
   { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar },
   { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse },
+  { name: 'Declaraties', href: '/admin/expenses', icon: Receipt },
   { name: 'Uren', href: '/hours', icon: Clock },
   { name: 'Loonberekening', href: '/payroll', icon: Calculator },
   { name: 'Loonstroken', href: '/payslips', icon: FileText },

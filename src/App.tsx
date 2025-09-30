@@ -12,6 +12,7 @@ import Absence from './pages/Absence';
 import Expenses from './pages/Expenses';
 import AdminLeaveApprovals from './pages/AdminLeaveApprovals';
 import AdminAbsenceManagement from './pages/AdminAbsenceManagement';
+import AdminExpenses from './pages/AdminExpenses';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -136,6 +137,7 @@ function App() {
                           <Route path="employees" element={<EmployeesNew />} />
                           <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
                           <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
+                          <Route path="admin/expenses" element={<AdminExpenses />} />
                           <Route path="hours" element={<Hours />} />
                           <Route path="payroll" element={<Payroll />} />
                           <Route path="payslips" element={<Payslips />} />
