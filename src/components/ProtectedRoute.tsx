@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, userRole, loading } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+  
+  // Redirect employees to their dashboard
+  if (userRole === 'employee') {
+    return <Navigate to="/employee-dashboard" replace />;
   }
 
   return <>{children}</>;

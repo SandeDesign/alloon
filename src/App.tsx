@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import { AppProvider } from './contexts/AppContext';
 import { ToastContainer } from './components/ui/Toast';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 
 // Placeholder components for routes not yet implemented
 const Hours = () => (
@@ -91,6 +92,9 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Employee Dashboard - separate from admin routes */}
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
             
             {/* Protected routes */}
             <Route

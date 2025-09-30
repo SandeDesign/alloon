@@ -558,3 +558,11 @@ export const DUTCH_CAOS: CAO[] = [
     lastUpdated: new Date('2025-01-01')
   }
 ];
+
+export interface UserRole {
+  uid: string;
+  role: 'admin' | 'employee';
+  employeeId?: string; // Link to employee record if role is 'employee'
+  createdAt: Date;
+  updatedAt: Date;
+}

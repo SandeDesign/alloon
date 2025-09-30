@@ -10,9 +10,12 @@ import {
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useToast } from '../hooks/useToast';
+import { getUserRole } from '../services/firebase';
+import { UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
+  userRole: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
@@ -24,12 +27,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { success, error } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      
+      if (user) {
+        // Load user role
+        try {
+          const roleData = await getUserRole(user.uid);
+          setUserRole(roleData?.role || null);
+        } catch (err) {
+          console.error('Error loading user role:', err);
+          setUserRole(null);
+        }
+      } else {
+        setUserRole(null);
+      }
+      
       setLoading(false);
     });
 
@@ -68,6 +86,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(user, { displayName });
+      
+      // Create admin role for new signups (company owners)
+      const { createUserRole } = await import('../services/firebase');
+      await createUserRole(user.uid, 'admin');
+      setUserRole('admin');
+      
       success('Account aangemaakt!', 'Je kunt nu beginnen met het beheren van je loonadministratie');
     } catch (err: any) {
       console.error('Sign up error:', err);
@@ -93,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
+      setUserRole(null);
       success('Tot ziens!', 'Je bent uitgelogd');
     } catch (err: any) {
       console.error('Sign out error:', err);
@@ -127,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        userRole,
         loading,
         signIn,
         signUp,

@@ -14,7 +14,7 @@ import {
 import { db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { Company, Branch, Employee, TimeEntry } from '../types';
+import { Company, Branch, Employee, TimeEntry, UserRole } from '../types';
 
 // Helper function to convert Firestore timestamps to Date objects
 const convertTimestamps = (data: any) => {
@@ -398,6 +398,38 @@ export const updateTimeEntry = async (id: string, userId: string, updates: Parti
   await updateDoc(docRef, updateData);
 };
 
+// User Roles
+export const createUserRole = async (uid: string, role: 'admin' | 'employee', employeeId?: string): Promise<void> => {
+  const roleData = convertToTimestamps({
+    uid,
+    role,
+    employeeId: employeeId || null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+  
+  await addDoc(collection(db, 'users'), roleData);
+};
+
+export const getUserRole = async (uid: string): Promise<UserRole | null> => {
+  const q = query(
+    collection(db, 'users'),
+    where('uid', '==', uid)
+  );
+  
+  const querySnapshot = await getDocs(q);
+  
+  if (querySnapshot.empty) {
+    return null;
+  }
+  
+  const doc = querySnapshot.docs[0];
+  return {
+    id: doc.id,
+    ...convertTimestamps(doc.data())
+  } as UserRole;
+};
+
 // Employee Account Management
 export const createEmployeeAuthAccount = async (
   employeeId: string, 
@@ -426,6 +458,9 @@ export const createEmployeeAuthAccount = async (
     });
     
     await updateDoc(employeeRef, updateData);
+    
+    // Create user role for the new employee
+    await createUserRole(newUserId, 'employee', employeeId);
     
     return newUserId;
   } catch (error) {
