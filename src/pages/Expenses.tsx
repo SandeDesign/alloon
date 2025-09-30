@@ -1,0 +1,214 @@
+import React, { useEffect, useState } from 'react';
+import { Receipt, Plus, Filter } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Expense } from '../types';
+import { expenseService } from '../services/supabaseService';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
+import { formatExpenseType } from '../utils/leaveCalculations';
+
+const Expenses: React.FC = () => {
+  const { user } = useAuth();
+  const { success, error: showError } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  useEffect(() => {
+    if (user) {
+      loadExpenses();
+    }
+  }, [user]);
+
+  const loadExpenses = async () => {
+    try {
+      setLoading(true);
+      const data = await expenseService.getExpenses(user!.uid);
+      setExpenses(data);
+    } catch (err) {
+      console.error('Error loading expenses:', err);
+      showError('Fout bij laden', 'Kan declaraties niet laden');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
+      case 'submitted':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
+      case 'paid':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      draft: 'Concept',
+      submitted: 'Ingediend',
+      approved: 'Goedgekeurd',
+      rejected: 'Afgewezen',
+      paid: 'Uitbetaald',
+    };
+    return statusMap[status] || status;
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('nl-NL', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(amount);
+  };
+
+  const filteredExpenses = expenses.filter(expense => {
+    if (filterStatus === 'all') return true;
+    return expense.status === filterStatus;
+  });
+
+  const totalByStatus = {
+    draft: expenses.filter(e => e.status === 'draft').reduce((sum, e) => sum + e.amount, 0),
+    submitted: expenses.filter(e => e.status === 'submitted').reduce((sum, e) => sum + e.amount, 0),
+    approved: expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + e.amount, 0),
+    paid: expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0),
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Declaraties</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Beheer je onkostendeclaraties
+          </p>
+        </div>
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Nieuwe Declaratie
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Concept</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {formatCurrency(totalByStatus.draft)}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ingediend</p>
+          <p className="text-2xl font-bold text-yellow-600">
+            {formatCurrency(totalByStatus.submitted)}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Goedgekeurd</p>
+          <p className="text-2xl font-bold text-green-600">
+            {formatCurrency(totalByStatus.approved)}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Uitbetaald</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {formatCurrency(totalByStatus.paid)}
+          </p>
+        </Card>
+      </div>
+
+      <Card>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Mijn Declaraties
+            </h2>
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="all">Alle statussen</option>
+                <option value="draft">Concept</option>
+                <option value="submitted">Ingediend</option>
+                <option value="approved">Goedgekeurd</option>
+                <option value="paid">Uitbetaald</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {filteredExpenses.length === 0 ? (
+          <EmptyState
+            icon={Receipt}
+            title="Geen declaraties"
+            description="Je hebt nog geen declaraties ingediend"
+            actionLabel="Nieuwe Declaratie"
+            onAction={() => {}}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Datum
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Beschrijving
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Bedrag
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredExpenses.map((expense) => (
+                  <tr key={expense.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {new Date(expense.date).toLocaleDateString('nl-NL')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {formatExpenseType(expense.type)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      {expense.description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(expense.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(expense.status)}`}>
+                        {getStatusText(expense.status)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+export default Expenses;

@@ -562,7 +562,11 @@ export const DUTCH_CAOS: CAO[] = [
 export interface UserRole {
   uid: string;
   role: 'admin' | 'employee';
-  employeeId?: string; // Link to employee record if role is 'employee'
+  employeeId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export * from './leave';
+export * from './absence';
+export * from './expense';

@@ -6,6 +6,9 @@ import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import EmployeesNew from './pages/EmployeesNew';
+import Leave from './pages/Leave';
+import Absence from './pages/Absence';
+import Expenses from './pages/Expenses';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -106,6 +109,9 @@ function App() {
                       <Route index element={<Dashboard />} />
                       <Route path="companies" element={<Companies />} />
                       <Route path="employees" element={<EmployeesNew />} />
+                      <Route path="leave" element={<Leave />} />
+                      <Route path="absence" element={<Absence />} />
+                      <Route path="expenses" element={<Expenses />} />
                       <Route path="hours" element={<Hours />} />
                       <Route path="payroll" element={<Payroll />} />
                       <Route path="payslips" element={<Payslips />} />
