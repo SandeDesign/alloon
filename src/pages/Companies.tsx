@@ -1,496 +1,337 @@
-import React, { useState } from 'react';
-import { Plus, Building2, CreditCard as Edit, Trash2, MapPin, Phone, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Filter, Download, Search, Calendar } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { AuditAction, AuditEntityType } from '../types';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Table from '../components/ui/Table';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { EmptyState } from '../components/ui/EmptyState';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { useForm } from 'react-hook-form';
-import { Company, Branch, DUTCH_CAOS } from '../types';
-import { useAuth } from '../contexts/AuthContext';
-import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { createCompany, updateCompany, deleteCompany, createBranch } from '../services/firebase';
 
-interface CompanyFormData {
-  name: string;
-  kvk: string;
-  taxNumber: string;
-  street: string;
-  city: string;
-  zipCode: string;
-  email: string;
-  phone: string;
-  website?: string;
-  defaultCAO: string;
-  travelAllowancePerKm: number;
-  standardWorkWeek: number;
-  holidayAllowancePercentage: number;
-  pensionContributionPercentage: number;
+interface AuditLog {
+  id: string;
+  user_id: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  metadata?: any;
+  created_at: string;
 }
 
-const Companies: React.FC = () => {
+interface AuditLog {
+  id: string;
+  user_id: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  metadata?: any;
+  created_at: string;
+}
+
+const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
-  const { companies, refreshCompanies, loading } = useApp();
-  const [companyBranches, setCompanyBranches] = useState<Branch[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const { success, error } = useToast();
+  const { error: showError } = useToast();
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<{
+    entityType?: AuditEntityType;
+    action?: AuditAction;
+    startDate?: Date;
+    endDate?: Date;
+  }>({});
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<CompanyFormData>();
-
-  const openModal = (company?: Company) => {
-    if (company) {
-      setEditingCompany(company);
-      setValue('name', company.name);
-      setValue('kvk', company.kvk);
-      setValue('taxNumber', company.taxNumber);
-      setValue('street', company.address.street);
-      setValue('city', company.address.city);
-      setValue('zipCode', company.address.zipCode);
-      setValue('email', company.contactInfo.email);
-      setValue('phone', company.contactInfo.phone);
-      setValue('website', company.contactInfo.website || '');
-      setValue('defaultCAO', company.settings.defaultCAO);
-      setValue('travelAllowancePerKm', company.settings.travelAllowancePerKm);
-      setValue('standardWorkWeek', company.settings.standardWorkWeek);
-      setValue('holidayAllowancePercentage', company.settings.holidayAllowancePercentage);
-      setValue('pensionContributionPercentage', company.settings.pensionContributionPercentage);
-    } else {
-      setEditingCompany(null);
-      reset();
-      // Set default values for new company
-      setValue('travelAllowancePerKm', 0.23);
-      setValue('standardWorkWeek', 40);
-      setValue('holidayAllowancePercentage', 8);
-      setValue('pensionContributionPercentage', 20);
+  useEffect(() => {
+            {company.contactInfo.email}
+      showError('Export niet beschikbaar', 'Export functionaliteit wordt nog geïmplementeerd');
+    if (user) {
+      loadAuditLogs();
     }
-    setIsModalOpen(true);
-  };
+  }, [user, filters]);
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingCompany(null);
-    setCompanyBranches([]);
-    reset();
-  };
-
-  const onSubmit = async (data: CompanyFormData) => {
+  const loadAuditLogs = async () => {
     if (!user) return;
-    
-    setSubmitting(true);
+
     try {
-      const companyData = {
-        name: data.name,
-        kvk: data.kvk,
-        taxNumber: data.taxNumber,
-        address: {
-          street: data.street,
-          city: data.city,
-          zipCode: data.zipCode,
-          country: 'Nederland',
-        },
-        contactInfo: {
-          email: data.email,
-          phone: data.phone,
-          website: data.website || '',
-        },
-        settings: {
-          defaultCAO: data.defaultCAO,
-          travelAllowancePerKm: data.travelAllowancePerKm,
-          standardWorkWeek: data.standardWorkWeek,
-          holidayAllowancePercentage: data.holidayAllowancePercentage,
-          pensionContributionPercentage: data.pensionContributionPercentage,
-        },
-      };
-
-      if (editingCompany) {
-        // Update existing company
-        await updateCompany(editingCompany.id, user.uid, companyData);
-        success('Bedrijf bijgewerkt', `${data.name} is succesvol bijgewerkt`);
-      } else {
-        // Create new company with initial branch
-        // Get branch data from form elements
-        const branchNameElement = document.querySelector('input[name="branchName"]') as HTMLInputElement;
-        const branchLocationElement = document.querySelector('input[name="branchLocation"]') as HTMLInputElement;
-        const branchCostCenterElement = document.querySelector('input[name="branchCostCenter"]') as HTMLInputElement;
-        
-        const branchName = branchNameElement?.value;
-        const branchLocation = branchLocationElement?.value;
-        const branchCostCenter = branchCostCenterElement?.value;
-        
-        if (!branchName || !branchLocation || !branchCostCenter) {
-          error('Ontbrekende gegevens', 'Vestigingsgegevens zijn verplicht voor een nieuw bedrijf');
-          return;
-        }
-        
-        const companyId = await createCompany(user.uid, {
-          ...companyData,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        // Create the initial branch
-        const branchData = {
-          companyId: companyId,
-          name: branchName,
-          location: branchLocation,
-          costCenter: branchCostCenter,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        
-        const branchId = await createBranch(user.uid, branchData);
-        
-        // Update company with main branch ID
-        await updateCompany(companyId, user.uid, { mainBranchId: branchId });
-        
-        success('Bedrijf aangemaakt', `${data.name} is succesvol toegevoegd`);
-      }
-
-      await refreshCompanies();
-      closeModal();
-    } catch (err) {
-      console.error('Error saving company:', err);
-      error('Er is een fout opgetreden', 'Probeer het opnieuw');
+      setLoading(true);
+      const logs = await AuditService.getAuditLogs(user.uid, {
+        ...filters,
+        limit: 100,
+      });
+      setAuditLogs(logs);
+    } catch (error) {
+      console.error('Error loading audit logs:', error);
+      showToast('Fout bij laden audit logs', 'error');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleDeleteCompany = async (company: Company) => {
+  const handleExport = async () => {
     if (!user) return;
-    
-    if (window.confirm(`Weet je zeker dat je ${company.name} wilt verwijderen?`)) {
-      try {
-        await deleteCompany(company.id, user.uid);
-        await refreshCompanies();
-        success('Bedrijf verwijderd', `${company.name} is succesvol verwijderd`);
-      } catch (err) {
-        console.error('Error deleting company:', err);
-        error('Fout bij verwijderen', 'Kon bedrijf niet verwijderen');
-      }
+
+    try {
+      const exportId = await AuditService.exportAuditLogs(user.uid, '', 'excel', filters);
+      showToast('Export gestart. U ontvangt binnenkort een download link.', 'success');
+    } catch (error) {
+      console.error('Error exporting audit logs:', error);
+      showError('Fout bij exporteren audit logs', 'Kon export niet starten');
     }
   };
 
-  const columns = [
-    {
-      key: 'name' as keyof Company,
-      label: 'Bedrijfsnaam',
-      render: (value: string) => (
-        <div className="flex items-center">
-          <Building2 className="h-5 w-5 text-gray-400 mr-2" />
-          <span className="font-medium">{value}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'kvk' as keyof Company,
-      label: 'KVK Nummer',
-    },
-    {
-      key: 'address' as keyof Company,
-      label: 'Locatie',
-      render: (address: Company['address']) => (
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-          <MapPin className="h-4 w-4 mr-1" />
-          {address.city}, {address.zipCode}
-        </div>
-      ),
-    },
-    {
-      key: 'contactInfo' as keyof Company,
-      label: 'Contact',
-      render: (contact: Company['contactInfo']) => (
-        <div className="space-y-1">
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Mail className="h-4 w-4 mr-1" />
-            {contact.email}
-          </div>
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Phone className="h-4 w-4 mr-1" />
-            {contact.phone}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'actions' as keyof Company,
-      label: 'Acties',
-      render: (value: any, company: Company) => (
-        <div className="flex space-x-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              openModal(company);
-            }}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteCompany(company);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  const getActionLabel = (action: AuditAction): string => {
+    const labels: Record<AuditAction, string> = {
+      create: 'Aangemaakt',
+      update: 'Bijgewerkt',
+      delete: 'Verwijderd',
+      view: 'Bekeken',
+      export: 'Geëxporteerd',
+      submit: 'Ingediend',
+      approve: 'Goedgekeurd',
+      reject: 'Afgewezen',
+    };
+    return labels[action];
+  };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  const getEntityTypeLabel = (entityType: AuditEntityType): string => {
+    const labels: Record<AuditEntityType, string> = {
+      employee: 'Werknemer',
+      company: 'Bedrijf',
+      branch: 'Vestiging',
+      payroll: 'Loonverwerking',
+      tax_return: 'Loonaangifte',
+      leave_request: 'Verlofaanvraag',
+      sick_leave: 'Ziekteverlof',
+      expense: 'Declaratie',
+      time_entry: 'Ureninvoer',
+      settings: 'Instellingen',
+      user: 'Gebruiker',
+    };
+    return labels[entityType];
+  };
+
+  const getSeverityColor = (severity: AuditLog['severity']): string => {
+    const colors: Record<AuditLog['severity'], string> = {
+      info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
+      warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+      critical: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+    };
+    return colors[severity];
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Bedrijven
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Beheer uw bedrijven en hun instellingen
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Audit Log</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Bekijk alle acties die zijn uitgevoerd in het systeem
           </p>
         </div>
-        <Button onClick={() => openModal()}>
-          <Plus className="h-5 w-5 mr-2" />
-          Nieuw Bedrijf
+        <Button variant="outline" onClick={handleExport}>
+          <Download className="h-5 w-5 mr-2" />
+          Exporteren
         </Button>
       </div>
 
-      {/* Companies Table */}
       <Card>
-        {companies.length === 0 ? (
-          <EmptyState
-            icon={Building2}
-            title="Geen bedrijven"
-            description="Maak je eerste bedrijf aan om te beginnen met je loonadministratie"
-            actionLabel="Bedrijf Toevoegen"
-            onAction={() => openModal()}
-          />
-        ) : (
-          <Table data={companies} columns={columns} />
-        )}
-      </Card>
-
-      {/* Company Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        title={editingCompany ? 'Bedrijf Bewerken' : 'Nieuw Bedrijf'}
-        size="lg"
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Bedrijfsnaam *"
-              {...register('name', { required: 'Bedrijfsnaam is verplicht' })}
-              error={errors.name?.message}
-            />
-            <Input
-              label="KVK Nummer *"
-              {...register('kvk', { required: 'KVK nummer is verplicht' })}
-              error={errors.kvk?.message}
-            />
-            <Input
-              label="Fiscaal Nummer *"
-              {...register('taxNumber', { required: 'Fiscaal nummer is verplicht' })}
-              error={errors.taxNumber?.message}
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Standaard CAO *
+        <div className="p-6">
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Filter className="h-4 w-4 inline mr-2" />
+                Type entiteit
               </label>
               <select
-                {...register('defaultCAO', { required: 'Standaard CAO is verplicht' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                value={filters.entityType || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    entityType: e.target.value ? (e.target.value as AuditEntityType) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
               >
-                <option value="">Selecteer CAO...</option>
-                {DUTCH_CAOS.map(cao => (
-                  <option key={cao.id} value={cao.name}>
-                    {cao.name}
-                  </option>
-                ))}
+                <option value="">Alle types</option>
+                <option value="employee">Werknemer</option>
+                <option value="company">Bedrijf</option>
+                <option value="payroll">Loonverwerking</option>
+                <option value="tax_return">Loonaangifte</option>
+                <option value="leave_request">Verlofaanvraag</option>
+                <option value="expense">Declaratie</option>
               </select>
-              {errors.defaultCAO && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                  {errors.defaultCAO.message}
-                </p>
-              )}
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Actie
+              </label>
+              <select
+                value={filters.action || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    action: e.target.value ? (e.target.value as AuditAction) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
+              >
+                <option value="">Alle acties</option>
+                <option value="create">Aangemaakt</option>
+                <option value="update">Bijgewerkt</option>
+                <option value="delete">Verwijderd</option>
+                <option value="approve">Goedgekeurd</option>
+                <option value="reject">Afgewezen</option>
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Calendar className="h-4 w-4 inline mr-2" />
+                Start datum
+              </label>
+              <input
+                type="date"
+                value={filters.startDate?.toISOString().split('T')[0] || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    startDate: e.target.value ? new Date(e.target.value) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Eind datum
+              </label>
+              <input
+                type="date"
+                value={filters.endDate?.toISOString().split('T')[0] || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    endDate: e.target.value ? new Date(e.target.value) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
+              />
             </div>
           </div>
 
-          {/* Eerste vestiging - alleen bij nieuw bedrijf */}
-          {!editingCompany && (
-            <div className="space-y-4">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Hoofdvestiging
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Elke bedrijf heeft minimaal één vestiging. Deze wordt automatisch de hoofdvestiging.
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center py-12">
+              <Shield className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">
+                Geen audit logs gevonden voor de geselecteerde filters
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vestigingsnaam *
-                  </label>
-                  <input
-                    name="branchName"
-                    type="text"
-                    placeholder="bijv. Hoofdkantoor, Vestiging Amsterdam"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Locatie *
-                  </label>
-                  <input
-                    name="branchLocation"
-                    type="text"
-                    placeholder="bijv. Amsterdam, Rotterdam"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Kostenplaats *
-                  </label>
-                  <input
-                    name="branchCostCenter"
-                    type="text"
-                    placeholder="bijv. 001, HK01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
-                  />
-                </div>
-              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Datum/Tijd
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Gebruiker
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actie
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Entiteit ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Ernst
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {log.createdAt.toLocaleString('nl-NL')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {log.performedBy.name || log.performedBy.email}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {log.performedBy.role}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {getActionLabel(log.action)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {getEntityTypeLabel(log.entityType)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">
+                        {log.entityId.substring(0, 8)}...
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getSeverityColor(
+                            log.severity
+                          )}`}
+                        >
+                          {log.severity}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+        </div>
+      </Card>
 
-          {/* Address */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-              Adresgegevens
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <Input
-                  label="Straat en Huisnummer *"
-                  {...register('street', { required: 'Adres is verplicht' })}
-                  error={errors.street?.message}
-                />
-              </div>
-              <Input
-                label="Postcode *"
-                {...register('zipCode', { required: 'Postcode is verplicht' })}
-                error={errors.zipCode?.message}
-              />
-              <Input
-                label="Plaats *"
-                {...register('city', { required: 'Plaats is verplicht' })}
-                error={errors.city?.message}
-              />
+      <Card>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Statistieken
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Totaal acties
+              </p>
+              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                {auditLogs.length}
+              </p>
             </div>
-          </div>
-
-          {/* Contact Info */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-              Contactgegevens
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="E-mailadres *"
-                type="email"
-                {...register('email', { required: 'E-mailadres is verplicht' })}
-                error={errors.email?.message}
-              />
-              <Input
-                label="Telefoonnummer *"
-                {...register('phone', { required: 'Telefoonnummer is verplicht' })}
-                error={errors.phone?.message}
-              />
-              <Input
-                label="Website"
-                type="url"
-                {...register('website')}
-              />
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Kritieke acties
+              </p>
+              <p className="mt-2 text-3xl font-bold text-red-600 dark:text-red-400">
+                {auditLogs.filter((log) => log.severity === 'critical').length}
+              </p>
             </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Unieke gebruikers
+              </p>
+              <p className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">
+                {new Set(auditLogs.map((log) => log.performedBy.uid)).size}
+              </p>
+            {company.contactInfo.phone}
           </div>
-
-          {/* Settings */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-              Loon Instellingen
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Reiskostenvergoeding per km (€)"
-                type="number"
-                step="0.01"
-                {...register('travelAllowancePerKm', { 
-                  required: 'Reiskostenvergoeding is verplicht',
-                  valueAsNumber: true 
-                })}
-                error={errors.travelAllowancePerKm?.message}
-              />
-              <Input
-                label="Standaard werkweek (uren)"
-                type="number"
-                {...register('standardWorkWeek', { 
-                  required: 'Standaard werkweek is verplicht',
-                  valueAsNumber: true 
-                })}
-                error={errors.standardWorkWeek?.message}
-              />
-              <Input
-                label="Vakantietoeslag (%)"
-                type="number"
-                step="0.1"
-                {...register('holidayAllowancePercentage', { 
-                  required: 'Vakantietoeslag percentage is verplicht',
-                  valueAsNumber: true 
-                })}
-                error={errors.holidayAllowancePercentage?.message}
-              />
-              <Input
-                label="Pensioenpremie totaal (%)"
-                type="number"
-                step="0.1"
-                {...register('pensionContributionPercentage', { 
-                  required: 'Pensioenpremie percentage is verplicht',
-                  valueAsNumber: true 
-                })}
-                error={errors.pensionContributionPercentage?.message}
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <Button type="button" variant="secondary" onClick={closeModal}>
-              Annuleren
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {editingCompany ? 'Bijwerken' : 'Aanmaken'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      </Card>
     </div>
   );
 };
 
-export default Companies;
+export default AuditLogPage;

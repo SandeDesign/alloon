@@ -1,770 +1,326 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, CreditCard as Edit, Trash2, Mail, Phone, Building2, MapPin, UserPlus, CheckCircle, Copy, RefreshCw } from 'lucide-react';
+import { Shield, Filter, Download, Search, Calendar } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { AuditAction, AuditEntityType } from '../types';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Table from '../components/ui/Table';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { EmptyState } from '../components/ui/EmptyState';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { useForm } from 'react-hook-form';
-import { Employee, Company, Branch, DUTCH_CAOS } from '../types';
-import { useAuth } from '../contexts/AuthContext';
-import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { createEmployee, updateEmployee, deleteEmployee, getBranches, createEmployeeAuthAccount, generateSecurePassword } from '../services/firebase';
 
-interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
-  initials: string;
-  bsn: string;
-  dateOfBirth: string;
-  email: string;
-  phone: string;
-  street: string;
-  city: string;
-  zipCode: string;
-  bankAccount: string;
-  companyId: string;
-  branchId: string;
-  contractType: 'permanent' | 'temporary' | 'zero_hours' | 'on_call';
-  startDate: string;
-  position: string;
-  hoursPerWeek: number;
-  cao: string;
-  salaryScale: string;
-  monthlySalary: number;
+interface AuditLog {
+  id: string;
+  user_id: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string;
+  metadata?: any;
+  created_at: string;
 }
 
-const EmployeesNew: React.FC = () => {
+const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
-  const { employees, companies, refreshEmployees, loading } = useApp();
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [generatedPassword, setGeneratedPassword] = useState('');
-  const [passwordCopied, setPasswordCopied] = useState(false);
-  const [creatingAccount, setCreatingAccount] = useState(false);
-  const { success, error } = useToast();
-
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<EmployeeFormData>();
-
-  const selectedCompanyId = watch('companyId');
+  const { error: showError } = useToast();
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<{
+    entityType?: AuditEntityType;
+    action?: AuditAction;
+    startDate?: Date;
+    endDate?: Date;
+  }>({});
 
   useEffect(() => {
+      showError('Export niet beschikbaar', 'Export functionaliteit wordt nog geïmplementeerd');
     if (user) {
-      loadBranches();
+      loadAuditLogs();
     }
-  }, [user]);
+  }, [user, filters]);
 
-  const loadBranches = async () => {
+  const loadAuditLogs = async () => {
     if (!user) return;
 
     try {
-      const data = await getBranches(user.uid);
-      setBranches(data);
-    } catch (err) {
-      console.error('Error loading branches:', err);
-    }
-  };
-
-  const openModal = (employee?: Employee) => {
-    if (employee) {
-      setEditingEmployee(employee);
-      setValue('firstName', employee.personalInfo.firstName);
-      setValue('lastName', employee.personalInfo.lastName);
-      setValue('initials', employee.personalInfo.initials || '');
-      setValue('bsn', employee.personalInfo.bsn);
-      setValue('dateOfBirth', employee.personalInfo.dateOfBirth?.toISOString()?.split('T')[0] || '');
-      setValue('email', employee.personalInfo.contactInfo.email);
-      setValue('phone', employee.personalInfo.contactInfo.phone);
-      setValue('street', employee.personalInfo.address.street);
-      setValue('city', employee.personalInfo.address.city);
-      setValue('zipCode', employee.personalInfo.address.postalCode || employee.personalInfo.address.zipCode || '');
-      setValue('bankAccount', employee.personalInfo.bankAccount);
-      setValue('companyId', employee.companyId);
-      setValue('branchId', employee.branchId);
-      setValue('contractType', employee.contractInfo.type);
-      setValue('startDate', employee.contractInfo.startDate?.toISOString()?.split('T')[0] || '');
-      setValue('position', employee.contractInfo.position);
-      setValue('hoursPerWeek', employee.contractInfo.hoursPerWeek || 40);
-      setValue('cao', employee.contractInfo.cao || '');
-      setValue('salaryScale', employee.salaryInfo.salaryScale);
-      setValue('monthlySalary', employee.salaryInfo.monthlySalary || 0);
-    } else {
-      setEditingEmployee(null);
-      reset();
-
-      if (companies.length > 0) {
-        setValue('companyId', companies[0].id);
-        const availableBranches = branches.filter(b => b.companyId === companies[0].id);
-        if (availableBranches.length > 0) {
-          setValue('branchId', availableBranches[0].id);
-        }
-      }
-
-      setValue('contractType', 'permanent');
-      setValue('hoursPerWeek', 40);
-      setValue('monthlySalary', 0);
-    }
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingEmployee(null);
-    reset();
-  };
-
-  const onSubmit = async (data: EmployeeFormData) => {
-    if (!user) return;
-
-    setSubmitting(true);
-    try {
-      const employeeData = {
-        companyId: data.companyId,
-        branchId: data.branchId,
-        personalInfo: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          initials: data.initials,
-          bsn: data.bsn,
-          dateOfBirth: new Date(data.dateOfBirth),
-          placeOfBirth: '',
-          nationality: 'Nederlandse',
-          maritalStatus: 'single' as const,
-          address: {
-            street: data.street,
-            houseNumber: '',
-            houseNumberAddition: '',
-            postalCode: data.zipCode,
-            city: data.city,
-            country: 'Nederland',
-          },
-          contactInfo: {
-            email: data.email,
-            phone: data.phone,
-          },
-          bankAccount: data.bankAccount,
-        },
-        contractInfo: {
-          type: data.contractType,
-          startDate: new Date(data.startDate),
-          hoursPerWeek: data.hoursPerWeek,
-          position: data.position,
-          cao: data.cao,
-          contractStatus: 'active' as const,
-        },
-        salaryInfo: {
-          salaryScale: data.salaryScale,
-          paymentType: 'monthly' as const,
-          paymentFrequency: 'monthly' as const,
-          monthlySalary: data.monthlySalary,
-          allowances: {
-            overtime: 150,
-            irregular: 130,
-            shift: 120,
-            weekend: 150,
-            evening: 115,
-            night: 130,
-            sunday: 170,
-            callDuty: 125,
-          },
-          holidayAllowancePercentage: 8,
-          travelAllowance: {
-            type: 'per_km' as const,
-            amountPerKm: 0.23,
-          },
-          pensionContribution: 0,
-          pensionEmployerContribution: 0,
-          taxCredit: true,
-          taxTable: 'white' as const,
-        },
-        leaveInfo: {
-          holidayDays: {
-            statutory: 0,
-            extraStatutory: 0,
-            accumulated: 0,
-            taken: 0,
-          },
-        },
-        status: 'active',
-        salaryHistory: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        hasAccount: false,
-      };
-
-      if (editingEmployee) {
-        await updateEmployee(editingEmployee.id, user.uid, employeeData);
-        success('Werknemer bijgewerkt', `${data.firstName} ${data.lastName} is succesvol bijgewerkt`);
-      } else {
-        await createEmployee(user.uid, employeeData);
-        success('Werknemer aangemaakt', `${data.firstName} ${data.lastName} is succesvol toegevoegd`);
-      }
-
-      await refreshEmployees();
-      closeModal();
-    } catch (err) {
-      console.error('Error saving employee:', err);
-      error('Er is een fout opgetreden', 'Probeer het opnieuw');
+      setLoading(true);
+      const logs = await AuditService.getAuditLogs(user.uid, {
+        ...filters,
+        limit: 100,
+      });
+      setAuditLogs(logs);
+    } catch (error) {
+      console.error('Error loading audit logs:', error);
+      showToast('Fout bij laden audit logs', 'error');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleDeleteEmployee = async (employee: Employee) => {
+  const handleExport = async () => {
     if (!user) return;
 
-    const fullName = `${employee.personalInfo.firstName} ${employee.personalInfo.lastName}`;
-    if (window.confirm(`Weet je zeker dat je ${fullName} wilt verwijderen?`)) {
-      try {
-        await deleteEmployee(employee.id, user.uid);
-        await refreshEmployees();
-        success('Werknemer verwijderd', `${fullName} is succesvol verwijderd`);
-      } catch (err) {
-        console.error('Error deleting employee:', err);
-        error('Fout bij verwijderen', 'Kon werknemer niet verwijderen');
-      }
-    }
-  };
-
-  const openAccountModal = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    const password = generateSecurePassword();
-    setGeneratedPassword(password);
-    setPasswordCopied(false);
-    setIsAccountModalOpen(true);
-  };
-
-  const closeAccountModal = () => {
-    setIsAccountModalOpen(false);
-    setSelectedEmployee(null);
-    setGeneratedPassword('');
-    setPasswordCopied(false);
-  };
-
-  const handleGenerateNewPassword = () => {
-    const password = generateSecurePassword();
-    setGeneratedPassword(password);
-    setPasswordCopied(false);
-  };
-
-  const handleCopyPassword = async () => {
     try {
-      await navigator.clipboard.writeText(generatedPassword);
-      setPasswordCopied(true);
-      success('Gekopieerd', 'Wachtwoord is naar klembord gekopieerd');
-      setTimeout(() => setPasswordCopied(false), 3000);
-    } catch (err) {
-      console.error('Error copying password:', err);
-      error('Kopiëren mislukt', 'Kon wachtwoord niet kopiëren');
+      const exportId = await AuditService.exportAuditLogs(user.uid, '', 'excel', filters);
+      showToast('Export gestart. U ontvangt binnenkort een download link.', 'success');
+    } catch (error) {
+      console.error('Error exporting audit logs:', error);
+      showError('Fout bij exporteren audit logs', 'Kon export niet starten');
     }
   };
 
-  const handleCreateAccount = async () => {
-    if (!user || !selectedEmployee) return;
-
-    setCreatingAccount(true);
-    try {
-      await createEmployeeAuthAccount(
-        selectedEmployee.id,
-        user.uid,
-        selectedEmployee.personalInfo.contactInfo.email,
-        generatedPassword
-      );
-
-      await refreshEmployees();
-      const fullName = `${selectedEmployee.personalInfo.firstName} ${selectedEmployee.personalInfo.lastName}`;
-      success('Account aangemaakt', `Account voor ${fullName} is succesvol aangemaakt`);
-      closeAccountModal();
-    } catch (err: any) {
-      console.error('Error creating account:', err);
-      let errorMessage = 'Er is een fout opgetreden bij het aanmaken van het account';
-
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'Er bestaat al een account met dit e-mailadres';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Ongeldig e-mailadres';
-      }
-
-      error('Account aanmaken mislukt', errorMessage);
-    } finally {
-      setCreatingAccount(false);
-    }
+  const getActionLabel = (action: AuditAction): string => {
+    const labels: Record<AuditAction, string> = {
+      create: 'Aangemaakt',
+      update: 'Bijgewerkt',
+      delete: 'Verwijderd',
+      view: 'Bekeken',
+      export: 'Geëxporteerd',
+      submit: 'Ingediend',
+      approve: 'Goedgekeurd',
+      reject: 'Afgewezen',
+    };
+    return labels[action];
   };
 
-  const getCompanyName = (companyId: string) => {
-    return companies.find(c => c.id === companyId)?.name || 'Onbekend';
+  const getEntityTypeLabel = (entityType: AuditEntityType): string => {
+    const labels: Record<AuditEntityType, string> = {
+      employee: 'Werknemer',
+      company: 'Bedrijf',
+      branch: 'Vestiging',
+      payroll: 'Loonverwerking',
+      tax_return: 'Loonaangifte',
+      leave_request: 'Verlofaanvraag',
+      sick_leave: 'Ziekteverlof',
+      expense: 'Declaratie',
+      time_entry: 'Ureninvoer',
+      settings: 'Instellingen',
+      user: 'Gebruiker',
+    };
+    return labels[entityType];
   };
 
-  const getBranchName = (branchId: string) => {
-    return branches.find(b => b.id === branchId)?.name || 'Onbekend';
+  const getSeverityColor = (severity: AuditLog['severity']): string => {
+    const colors: Record<AuditLog['severity'], string> = {
+      info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
+      warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+      critical: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+    };
+    return colors[severity];
   };
-
-  const getAvailableBranches = () => {
-    return branches.filter(b => b.companyId === selectedCompanyId);
-  };
-
-  const maskBSN = (bsn: string) => {
-    if (bsn.length !== 9) return bsn;
-    return `***-**-${bsn.slice(-3)}`;
-  };
-
-  const contractTypeLabels = {
-    permanent: 'Vast',
-    temporary: 'Tijdelijk',
-    zero_hours: '0-uren',
-    on_call: 'Oproep',
-  };
-
-  const columns = [
-    {
-      key: 'personalInfo' as keyof Employee,
-      label: 'Naam',
-      render: (personalInfo: Employee['personalInfo'], employee: Employee) => (
-        <div className="flex items-center">
-          <User className="h-5 w-5 text-gray-400 mr-2" />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">
-                {personalInfo.firstName} {personalInfo.lastName}
-              </span>
-              {employee.hasAccount && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Account
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              BSN: {maskBSN(personalInfo.bsn)}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'companyId' as keyof Employee,
-      label: 'Bedrijf',
-      render: (companyId: string, employee: Employee) => (
-        <div>
-          <div className="flex items-center text-sm">
-            <Building2 className="h-4 w-4 text-gray-400 mr-1" />
-            {getCompanyName(companyId)}
-          </div>
-          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-            <MapPin className="h-4 w-4 mr-1" />
-            {getBranchName(employee.branchId)}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'contractInfo' as keyof Employee,
-      label: 'Contract',
-      render: (contractInfo: Employee['contractInfo']) => (
-        <div>
-          <div className="text-sm font-medium">
-            {contractTypeLabels[contractInfo.type as keyof typeof contractTypeLabels] || contractInfo.type}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {contractInfo.position}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'personalInfo' as keyof Employee,
-      label: 'Contact',
-      render: (personalInfo: Employee['personalInfo']) => (
-        <div className="space-y-1">
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Mail className="h-4 w-4 mr-1" />
-            {personalInfo.contactInfo.email}
-          </div>
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Phone className="h-4 w-4 mr-1" />
-            {personalInfo.contactInfo.phone}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'actions' as keyof Employee,
-      label: 'Acties',
-      render: (value: any, employee: Employee) => (
-        <div className="flex space-x-2">
-          {!employee.hasAccount && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                openAccountModal(employee);
-              }}
-              title="Account aanmaken"
-            >
-              <UserPlus className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              openModal(employee);
-            }}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteEmployee(employee);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Werknemers
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Beheer uw werknemers en hun contractgegevens
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Audit Log</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Bekijk alle acties die zijn uitgevoerd in het systeem
           </p>
         </div>
-        <Button onClick={() => openModal()}>
-          <Plus className="h-5 w-5 mr-2" />
-          Nieuwe Werknemer
+        <Button variant="outline" onClick={handleExport}>
+          <Download className="h-5 w-5 mr-2" />
+          Exporteren
         </Button>
       </div>
 
       <Card>
-        {employees.length === 0 ? (
-          <EmptyState
-            icon={User}
-            title="Geen werknemers"
-            description="Voeg je eerste werknemer toe om te beginnen met loonadministratie"
-            actionLabel="Werknemer Toevoegen"
-            onAction={() => openModal()}
-          />
-        ) : (
-          <Table data={employees} columns={columns} />
-        )}
-      </Card>
+        <div className="p-6">
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Filter className="h-4 w-4 inline mr-2" />
+                Type entiteit
+              </label>
+              <select
+                value={filters.entityType || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    entityType: e.target.value ? (e.target.value as AuditEntityType) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
+              >
+                <option value="">Alle types</option>
+                <option value="employee">Werknemer</option>
+                <option value="company">Bedrijf</option>
+                <option value="payroll">Loonverwerking</option>
+                <option value="tax_return">Loonaangifte</option>
+                <option value="leave_request">Verlofaanvraag</option>
+                <option value="expense">Declaratie</option>
+              </select>
+            </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        title={editingEmployee ? 'Werknemer Bewerken' : 'Nieuwe Werknemer'}
-        size="lg"
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-              Persoonlijke Gegevens
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Voornaam *"
-                {...register('firstName', { required: 'Voornaam is verplicht' })}
-                error={errors.firstName?.message}
-              />
-              <Input
-                label="Achternaam *"
-                {...register('lastName', { required: 'Achternaam is verplicht' })}
-                error={errors.lastName?.message}
-              />
-              <Input
-                label="Initialen *"
-                {...register('initials', { required: 'Initialen zijn verplicht' })}
-                error={errors.initials?.message}
-              />
-              <Input
-                label="BSN *"
-                {...register('bsn', { required: 'BSN is verplicht' })}
-                error={errors.bsn?.message}
-              />
-              <Input
-                label="Geboortedatum *"
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Actie
+              </label>
+              <select
+                value={filters.action || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    action: e.target.value ? (e.target.value as AuditAction) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
+              >
+                <option value="">Alle acties</option>
+                <option value="create">Aangemaakt</option>
+                <option value="update">Bijgewerkt</option>
+                <option value="delete">Verwijderd</option>
+                <option value="approve">Goedgekeurd</option>
+                <option value="reject">Afgewezen</option>
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Calendar className="h-4 w-4 inline mr-2" />
+                Start datum
+              </label>
+              <input
                 type="date"
-                {...register('dateOfBirth', { required: 'Geboortedatum is verplicht' })}
-                error={errors.dateOfBirth?.message}
-              />
-              <Input
-                label="E-mailadres *"
-                type="email"
-                {...register('email', { required: 'E-mailadres is verplicht' })}
-                error={errors.email?.message}
-              />
-              <Input
-                label="Telefoonnummer *"
-                {...register('phone', { required: 'Telefoonnummer is verplicht' })}
-                error={errors.phone?.message}
-              />
-              <Input
-                label="Straat *"
-                {...register('street', { required: 'Straat is verplicht' })}
-                error={errors.street?.message}
-              />
-              <Input
-                label="Postcode *"
-                {...register('zipCode', { required: 'Postcode is verplicht' })}
-                error={errors.zipCode?.message}
-              />
-              <Input
-                label="Plaats *"
-                {...register('city', { required: 'Plaats is verplicht' })}
-                error={errors.city?.message}
-              />
-              <Input
-                label="IBAN *"
-                {...register('bankAccount', { required: 'IBAN is verplicht' })}
-                error={errors.bankAccount?.message}
+                value={filters.startDate?.toISOString().split('T')[0] || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    startDate: e.target.value ? new Date(e.target.value) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
               />
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-              Contract Informatie
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Bedrijf *
-                </label>
-                <select
-                  {...register('companyId', { required: 'Bedrijf is verplicht' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="">Selecteer bedrijf...</option>
-                  {companies.map(company => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.companyId && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {errors.companyId.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Vestiging *
-                </label>
-                <select
-                  {...register('branchId', { required: 'Vestiging is verplicht' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="">Selecteer vestiging...</option>
-                  {getAvailableBranches().map(branch => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name} - {branch.location}
-                    </option>
-                  ))}
-                </select>
-                {errors.branchId && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {errors.branchId.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Contracttype *
-                </label>
-                <select
-                  {...register('contractType', { required: 'Contracttype is verplicht' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="permanent">Vast</option>
-                  <option value="temporary">Tijdelijk</option>
-                  <option value="zero_hours">0-uren</option>
-                  <option value="on_call">Oproep</option>
-                </select>
-                {errors.contractType && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {errors.contractType.message}
-                  </p>
-                )}
-              </div>
-              <Input
-                label="Startdatum *"
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Eind datum
+              </label>
+              <input
                 type="date"
-                {...register('startDate', { required: 'Startdatum is verplicht' })}
-                error={errors.startDate?.message}
-              />
-              <Input
-                label="Functie *"
-                {...register('position', { required: 'Functie is verplicht' })}
-                error={errors.position?.message}
-              />
-              <Input
-                label="Uren per week *"
-                type="number"
-                {...register('hoursPerWeek', { required: 'Uren per week is verplicht', valueAsNumber: true })}
-                error={errors.hoursPerWeek?.message}
-              />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  CAO *
-                </label>
-                <select
-                  {...register('cao', { required: 'CAO is verplicht' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="">Selecteer CAO...</option>
-                  {DUTCH_CAOS.map(cao => (
-                    <option key={cao.id} value={cao.name}>
-                      {cao.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.cao && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {errors.cao.message}
-                  </p>
-                )}
-              </div>
-              <Input
-                label="Loonschaal *"
-                {...register('salaryScale', { required: 'Loonschaal is verplicht' })}
-                error={errors.salaryScale?.message}
-              />
-              <Input
-                label="Maandsalaris (€) *"
-                type="number"
-                step="0.01"
-                {...register('monthlySalary', { required: 'Maandsalaris is verplicht', valueAsNumber: true })}
-                error={errors.monthlySalary?.message}
+                value={filters.endDate?.toISOString().split('T')[0] || ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    endDate: e.target.value ? new Date(e.target.value) : undefined,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-gray-900 dark:text-white"
               />
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <Button type="button" variant="secondary" onClick={closeModal}>
-              Annuleren
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {editingEmployee ? 'Bijwerken' : 'Aanmaken'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isAccountModalOpen}
-        onClose={closeAccountModal}
-        title="Account Aanmaken voor Werknemer"
-        size="md"
-      >
-        {selectedEmployee && (
-          <div className="space-y-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex items-start">
-                <User className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
-                <div>
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    {selectedEmployee.personalInfo.firstName} {selectedEmployee.personalInfo.lastName}
-                  </h4>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                    {selectedEmployee.personalInfo.contactInfo.email}
-                  </p>
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  E-mailadres
-                </label>
-                <Input
-                  value={selectedEmployee.personalInfo.contactInfo.email}
-                  disabled
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Wachtwoord
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    value={generatedPassword}
-                    readOnly
-                    className="font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleCopyPassword}
-                    title="Kopieer wachtwoord"
-                  >
-                    {passwordCopied ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleGenerateNewPassword}
-                    title="Genereer nieuw wachtwoord"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>Let op:</strong> Bewaar dit wachtwoord veilig en deel het op een veilige manier met de werknemer.
-                Het wachtwoord wordt na het sluiten van dit venster niet meer getoond.
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center py-12">
+              <Shield className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">
+                Geen audit logs gevonden voor de geselecteerde filters
               </p>
             </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Datum/Tijd
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Gebruiker
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actie
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Entiteit ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Ernst
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {log.createdAt.toLocaleString('nl-NL')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {log.performedBy.name || log.performedBy.email}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {log.performedBy.role}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {getActionLabel(log.action)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {getEntityTypeLabel(log.entityType)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">
+                        {log.entityId.substring(0, 8)}...
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getSeverityColor(
+                            log.severity
+                          )}`}
+                        >
+                          {log.severity}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Card>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button type="button" variant="secondary" onClick={closeAccountModal}>
-                Annuleren
-              </Button>
-              <Button
-                type="button"
-                onClick={handleCreateAccount}
-                loading={creatingAccount}
-              >
-                Account Aanmaken
-              </Button>
+      <Card>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Statistieken
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Totaal acties
+              </p>
+              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                {auditLogs.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Kritieke acties
+              </p>
+              <p className="mt-2 text-3xl font-bold text-red-600 dark:text-red-400">
+                {auditLogs.filter((log) => log.severity === 'critical').length}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Unieke gebruikers
+              </p>
+              <p className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">
+                {new Set(auditLogs.map((log) => log.performedBy.uid)).size}
+              </p>
             </div>
           </div>
-        )}
-      </Modal>
+        </div>
+      </Card>
     </div>
   );
 };
 
-export default EmployeesNew;
+export default AuditLogPage;
