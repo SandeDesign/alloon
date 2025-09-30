@@ -570,3 +570,6 @@ export interface UserRole {
 export * from './leave';
 export * from './absence';
 export * from './expense';
+export * from './taxReturn';
+export * from './notification';
+export * from './audit';

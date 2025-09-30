@@ -16,10 +16,12 @@ import {
   Moon,
   Sun,
   LogOut,
+  Shield,
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -31,8 +33,9 @@ const navigation = [
   { name: 'Uren', href: '/hours', icon: Clock },
   { name: 'Loonberekening', href: '/payroll', icon: Calculator },
   { name: 'Loonstroken', href: '/payslips', icon: FileText },
-  { name: 'Regelgeving', href: '/regulations', icon: BookOpen },
+  { name: 'Loonaangiftes', href: '/tax-returns', icon: BookOpen },
   { name: 'Export', href: '/export', icon: Download },
+  { name: 'Audit Log', href: '/audit-log', icon: Shield },
   { name: 'Instellingen', href: '/settings', icon: Settings },
 ];
 
@@ -50,6 +53,7 @@ const Sidebar: React.FC = () => {
             AlloonApp
           </span>
         </div>
+        <NotificationCenter />
       </div>
 
       {/* User Info */}

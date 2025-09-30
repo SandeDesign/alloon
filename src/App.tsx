@@ -17,6 +17,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
+import Settings from './pages/Settings';
+import TaxReturns from './pages/TaxReturns';
+import AuditLogPage from './pages/AuditLog';
 import { AppProvider } from './contexts/AppContext';
 import { ToastContainer } from './components/ui/Toast';
 import EmployeeDashboard from './pages/EmployeeDashboard';
@@ -78,16 +81,6 @@ const Export = () => (
   </div>
 );
 
-const Settings = () => (
-  <div className="text-center py-12">
-    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-      Instellingen
-    </h1>
-    <p className="text-gray-600 dark:text-gray-400">
-      Deze functionaliteit wordt binnenkort toegevoegd
-    </p>
-  </div>
-);
 
 // Employee Hours placeholder
 const EmployeeHours = () => (
@@ -144,6 +137,8 @@ function App() {
                           <Route path="regulations" element={<Regulations />} />
                           <Route path="export" element={<Export />} />
                           <Route path="settings" element={<Settings />} />
+                          <Route path="tax-returns" element={<TaxReturns />} />
+                          <Route path="audit-log" element={<AuditLogPage />} />
                           <Route path="employee-dashboard/*" element={<Navigate to="/" replace />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
