@@ -856,8 +856,18 @@ export const getExpenses = async (userId: string, employeeId?: string): Promise<
 };
 
 export const createExpense = async (userId: string, expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const expenseData = convertToTimestamps({
+  // Clean up undefined values that Firestore doesn't accept
+  const cleanExpense = {
     ...expense,
+    travelDetails: expense.travelDetails || null,
+    vatAmount: expense.vatAmount || 0,
+    project: expense.project || null,
+    costCenter: expense.costCenter || null,
+    paidInPayroll: expense.paidInPayroll || null,
+  };
+
+  const expenseData = convertToTimestamps({
+    ...cleanExpense,
     userId,
     createdAt: new Date(),
     updatedAt: new Date()
