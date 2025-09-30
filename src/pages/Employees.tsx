@@ -548,8 +548,8 @@ const Employees: React.FC = () => {
           snipperDays: data.snipperDays || undefined,
         },
         status: 'active',
-      };
         salaryHistory: data.salaryHistory ? (Array.isArray(data.salaryHistory) ? data.salaryHistory : []) : [],
+      };
       console.log('Employee data being sent to Firebase:', employeeData);
 
       if (editingEmployee) {
