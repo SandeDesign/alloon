@@ -21,13 +21,10 @@ const AdminLeaveApprovals: React.FC = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && companies.length > 0) {
-      loadPendingRequests();
-    } else if (user) {
-      // Also try to load if user exists but no companies yet
+    if (user) {
       loadPendingRequests();
     }
-  }, [user, companies]);
+  }, [user]);
 
   const loadPendingRequests = async () => {
     if (!user) return;
@@ -36,19 +33,21 @@ const AdminLeaveApprovals: React.FC = () => {
       setLoading(true);
       const allRequests: LeaveRequest[] = [];
 
-      if (companies.length > 0) {
-        // Get pending requests for all companies
-        for (const company of companies) {
+      // Always try default-company first
+      try {
+        const defaultRequests = await firebaseService.getPendingLeaveApprovals('default-company', user.uid);
+        allRequests.push(...defaultRequests);
+      } catch (err) {
+        console.log('No requests found for default company');
+      }
+
+      // Then try all loaded companies
+      for (const company of companies) {
+        try {
           const requests = await firebaseService.getPendingLeaveApprovals(company.id, user.uid);
           allRequests.push(...requests);
-        }
-      } else {
-        // Try to get requests with default company if no companies loaded
-        try {
-          const requests = await firebaseService.getPendingLeaveApprovals('default-company', user.uid);
-          allRequests.push(...requests);
         } catch (err) {
-          console.log('No requests found for default company');
+          console.log(`No requests found for company ${company.id}`);
         }
       }
 

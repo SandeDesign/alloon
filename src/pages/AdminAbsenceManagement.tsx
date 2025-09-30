@@ -18,13 +18,10 @@ const AdminAbsenceManagement: React.FC = () => {
   const [activeSickLeave, setActiveSickLeave] = useState<SickLeave[]>([]);
 
   useEffect(() => {
-    if (user && companies.length > 0) {
-      loadActiveSickLeave();
-    } else if (user) {
-      // Also try to load if user exists but no companies yet
+    if (user) {
       loadActiveSickLeave();
     }
-  }, [user, companies]);
+  }, [user]);
 
   const loadActiveSickLeave = async () => {
     if (!user) return;
@@ -33,19 +30,21 @@ const AdminAbsenceManagement: React.FC = () => {
       setLoading(true);
       const allSickLeave: SickLeave[] = [];
 
-      if (companies.length > 0) {
-        // Get active sick leave for all companies
-        for (const company of companies) {
+      // Always try default-company first
+      try {
+        const defaultSickLeave = await firebaseService.getActiveSickLeave('default-company', user.uid);
+        allSickLeave.push(...defaultSickLeave);
+      } catch (err) {
+        console.log('No sick leave found for default company');
+      }
+
+      // Then try all loaded companies
+      for (const company of companies) {
+        try {
           const sickLeave = await firebaseService.getActiveSickLeave(company.id, user.uid);
           allSickLeave.push(...sickLeave);
-        }
-      } else {
-        // Try to get sick leave with default company if no companies loaded
-        try {
-          const sickLeave = await firebaseService.getActiveSickLeave('default-company', user.uid);
-          allSickLeave.push(...sickLeave);
         } catch (err) {
-          console.log('No sick leave found for default company');
+          console.log(`No sick leave found for company ${company.id}`);
         }
       }
 

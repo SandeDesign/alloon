@@ -76,6 +76,23 @@ const convertToTimestamps = (data: any) => {
     converted.date = Timestamp.fromDate(converted.date);
   }
   
+  // Convert leave request dates
+  if (converted.startDate instanceof Date) {
+    converted.startDate = Timestamp.fromDate(converted.startDate);
+  }
+  if (converted.endDate instanceof Date) {
+    converted.endDate = Timestamp.fromDate(converted.endDate);
+  }
+  if (converted.approvedAt instanceof Date) {
+    converted.approvedAt = Timestamp.fromDate(converted.approvedAt);
+  }
+  if (converted.reportedAt instanceof Date) {
+    converted.reportedAt = Timestamp.fromDate(converted.reportedAt);
+  }
+  if (converted.actualReturnDate instanceof Date) {
+    converted.actualReturnDate = Timestamp.fromDate(converted.actualReturnDate);
+  }
+  
   // Convert nested dates in personalInfo
   if (converted.personalInfo?.dateOfBirth instanceof Date) {
     converted.personalInfo.dateOfBirth = Timestamp.fromDate(converted.personalInfo.dateOfBirth);
