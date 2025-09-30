@@ -12,7 +12,7 @@ import { Company, Branch, DUTCH_CAOS } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { createCompany, updateCompany, deleteCompany, getBranches } from '../services/firebase';
+import { createCompany, updateCompany, deleteCompany, getBranches, createBranch } from '../services/firebase';
 
 interface CompanyFormData {
   name: string;
@@ -30,6 +30,10 @@ interface CompanyFormData {
   holidayAllowancePercentage: number;
   pensionContributionPercentage: number;
   mainBranchId: string;
+  // Eerste vestiging (alleen bij nieuw bedrijf)
+  branchName: string;
+  branchLocation: string;
+  branchCostCenter: string;
 }
 
 const Companies: React.FC = () => {
@@ -60,9 +64,15 @@ const Companies: React.FC = () => {
       setValue('standardWorkWeek', company.settings.standardWorkWeek);
       setValue('holidayAllowancePercentage', company.settings.holidayAllowancePercentage);
       setValue('pensionContributionPercentage', company.settings.pensionContributionPercentage);
+      setValue('mainBranchId', company.mainBranchId || '');
     } else {
       setEditingCompany(null);
       reset();
+      // Set default values for new company
+      setValue('travelAllowancePerKm', 0.23);
+      setValue('standardWorkWeek', 40);
+      setValue('holidayAllowancePercentage', 8);
+      setValue('pensionContributionPercentage', 20);
     }
     setIsModalOpen(true);
   };
@@ -101,14 +111,33 @@ const Companies: React.FC = () => {
           holidayAllowancePercentage: data.holidayAllowancePercentage,
           pensionContributionPercentage: data.pensionContributionPercentage,
         },
-        mainBranchId: data.mainBranchId || undefined,
       };
 
       if (editingCompany) {
-        await updateCompany(editingCompany.id, user.uid, companyData);
+        // Update existing company
+        const updateData = {
+          ...companyData,
+          mainBranchId: data.mainBranchId || undefined,
+        };
+        await updateCompany(editingCompany.id, user.uid, updateData);
         success('Bedrijf bijgewerkt', `${data.name} is succesvol bijgewerkt`);
       } else {
-        await createCompany(user.uid, companyData);
+        // Create new company with initial branch
+        const companyId = await createCompany(user.uid, companyData);
+        
+        // Create the initial branch
+        const branchData = {
+          companyId: companyId,
+          name: data.branchName,
+          location: data.branchLocation,
+          costCenter: data.branchCostCenter,
+        };
+        
+        const branchId = await createBranch(user.uid, branchData);
+        
+        // Update company with main branch ID
+        await updateCompany(companyId, user.uid, { mainBranchId: branchId });
+        
         success('Bedrijf aangemaakt', `${data.name} is succesvol toegevoegd`);
       }
 
@@ -292,6 +321,38 @@ const Companies: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Eerste vestiging - alleen bij nieuw bedrijf */}
+          {!editingCompany && (
+            <div className="space-y-4">
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                Hoofdvestiging
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Elke bedrijf heeft minimaal één vestiging. Deze wordt automatisch de hoofdvestiging.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Vestigingsnaam *"
+                  {...register('branchName', { required: 'Vestigingsnaam is verplicht' })}
+                  error={errors.branchName?.message}
+                  placeholder="bijv. Hoofdkantoor, Vestiging Amsterdam"
+                />
+                <Input
+                  label="Locatie *"
+                  {...register('branchLocation', { required: 'Locatie is verplicht' })}
+                  error={errors.branchLocation?.message}
+                  placeholder="bijv. Amsterdam, Rotterdam"
+                />
+                <Input
+                  label="Kostenplaats *"
+                  {...register('branchCostCenter', { required: 'Kostenplaats is verplicht' })}
+                  error={errors.branchCostCenter?.message}
+                  placeholder="bijv. 001, HK01"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Address */}
           <div className="space-y-4">
