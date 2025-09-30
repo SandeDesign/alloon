@@ -43,6 +43,9 @@ const convertTimestamps = (data: any) => {
   if (converted.contractInfo?.endDate && typeof converted.contractInfo.endDate.toDate === 'function') {
     converted.contractInfo.endDate = converted.contractInfo.endDate.toDate();
   }
+  if (converted.contractInfo?.noticeDate && typeof converted.contractInfo.noticeDate.toDate === 'function') {
+    converted.contractInfo.noticeDate = converted.contractInfo.noticeDate.toDate();
+  }
   
   // Convert nested timestamps in leaveInfo
   if (converted.leaveInfo?.holidayDays?.expiryDate && typeof converted.leaveInfo.holidayDays.expiryDate.toDate === 'function') {
@@ -83,6 +86,9 @@ const convertToTimestamps = (data: any) => {
   }
   if (converted.contractInfo?.endDate instanceof Date) {
     converted.contractInfo.endDate = Timestamp.fromDate(converted.contractInfo.endDate);
+  }
+  if (converted.contractInfo?.noticeDate instanceof Date) {
+    converted.contractInfo.noticeDate = Timestamp.fromDate(converted.contractInfo.noticeDate);
   }
   
   // Convert nested dates in leaveInfo

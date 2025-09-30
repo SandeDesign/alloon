@@ -24,27 +24,27 @@ interface EmployeeFormData {
   initials: string;
   bsn: string;
   dateOfBirth: string;
-  placeOfBirth: string;
-  nationality: string;
+  placeOfBirth?: string;
+  nationality?: string;
   maritalStatus: 'single' | 'married' | 'registered_partnership' | 'divorced' | 'widowed';
   
   // Adres
   street: string;
-  houseNumber: string;
-  houseNumberAddition: string;
+  houseNumber?: string;
+  houseNumberAddition?: string;
   city: string;
   zipCode: string;
   
   // Contact
   email: string;
   phone: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-  emergencyContactRelation: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   
   // Bank & Identiteit
   bankAccount: string;
-  identityDocument: string;
+  identityDocument?: string;
   
   // Bedrijf & Vestiging
   companyId: string;
@@ -53,23 +53,23 @@ interface EmployeeFormData {
   // Contract
   contractType: 'permanent' | 'temporary' | 'zero_hours' | 'on_call' | 'intern' | 'dga' | 'payroll' | 'freelance';
   startDate: string;
-  endDate: string;
-  probationPeriod: number;
+  endDate?: string;
+  probationPeriod?: number;
   hoursPerWeek: number;
   position: string;
-  department: string;
-  costCenter: string;
+  department?: string;
+  costCenter?: string;
   cao: string;
-  caoCode: string;
+  caoCode?: string;
   contractStatus: 'active' | 'notice_period' | 'ended' | 'suspended';
   
   // Salaris
   salaryScale: string;
   paymentType: 'hourly' | 'monthly' | 'annual';
   paymentFrequency: 'monthly' | 'four_weekly' | 'weekly';
-  hourlyRate: number;
-  monthlySalary: number;
-  annualSalary: number;
+  hourlyRate?: number;
+  monthlySalary?: number;
+  annualSalary?: number;
   
   // Toeslagen
   overtimeAllowance: number;
@@ -83,31 +83,31 @@ interface EmployeeFormData {
   
   // Vergoedingen
   holidayAllowancePercentage: number;
-  thirteenthMonth: boolean;
-  endOfYearBonus: number;
+  thirteenthMonth?: boolean;
+  endOfYearBonus?: number;
   travelAllowanceType: 'per_km' | 'public_transport' | 'fixed';
-  travelAllowancePerKm: number;
-  travelAllowanceFixed: number;
-  phoneAllowance: number;
-  homeWorkAllowance: number;
-  clothingAllowance: number;
+  travelAllowancePerKm?: number;
+  travelAllowanceFixed?: number;
+  phoneAllowance?: number;
+  homeWorkAllowance?: number;
+  clothingAllowance?: number;
   
   // Pensioen
-  pensionScheme: string;
+  pensionScheme?: string;
   pensionContribution: number;
   pensionEmployerContribution: number;
-  pensionFund: string;
+  pensionFund?: string;
   
   // Fiscaal
   taxCredit: boolean;
   taxTable: 'white' | 'green' | 'special';
   
   // Verlof
-  statutoryHolidayDays: number;
-  extraStatutoryHolidayDays: number;
-  advDays: number;
-  seniorDays: number;
-  snipperDays: number;
+  statutoryHolidayDays?: number;
+  extraStatutoryHolidayDays?: number;
+  advDays?: number;
+  seniorDays?: number;
+  snipperDays?: number;
 }
 
 // Validatie schema
@@ -218,7 +218,7 @@ const Employees: React.FC = () => {
       setValue('lastName', employee.personalInfo.lastName);
       setValue('initials', employee.personalInfo.initials || '');
       setValue('bsn', employee.personalInfo.bsn);
-      setValue('dateOfBirth', employee.personalInfo.dateOfBirth.toISOString().split('T')[0]);
+      setValue('dateOfBirth', employee.personalInfo.dateOfBirth?.toISOString()?.split('T')[0] || '');
       setValue('placeOfBirth', employee.personalInfo.placeOfBirth || '');
       setValue('nationality', employee.personalInfo.nationality || 'Nederlandse');
       setValue('maritalStatus', employee.personalInfo.maritalStatus || 'single');
@@ -245,8 +245,8 @@ const Employees: React.FC = () => {
       
       // Contract
       setValue('contractType', employee.contractInfo.type);
-      setValue('startDate', employee.contractInfo.startDate.toISOString().split('T')[0]);
-      setValue('endDate', employee.contractInfo.endDate ? employee.contractInfo.endDate.toISOString().split('T')[0] : '');
+      setValue('startDate', employee.contractInfo.startDate?.toISOString()?.split('T')[0] || '');
+      setValue('endDate', employee.contractInfo.endDate?.toISOString()?.split('T')[0] || '');
       setValue('probationPeriod', employee.contractInfo.probationPeriod || 0);
       setValue('hoursPerWeek', employee.contractInfo.hoursPerWeek || 0);
       setValue('position', employee.contractInfo.position);
