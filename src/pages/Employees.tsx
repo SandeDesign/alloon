@@ -182,6 +182,7 @@ const employeeSchema = yup.object({
 
 const Employees: React.FC = () => {
   const { user } = useAuth();
+  const { userRole } = useAuth();
   const { employees, companies, refreshEmployees, loading } = useApp();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -196,6 +197,16 @@ const Employees: React.FC = () => {
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, trigger, formState: { errors } } = useForm<EmployeeFormData>({
+  // Debug logging for user role
+  useEffect(() => {
+    console.log('=== USER ROLE DEBUG ===');
+    console.log('Current user:', user);
+    console.log('User role:', userRole);
+    console.log('User UID:', user?.uid);
+    console.log('User email:', user?.email);
+    console.log('======================');
+  }, [user, userRole]);
+
     resolver: yupResolver(employeeSchema)
   });
   
