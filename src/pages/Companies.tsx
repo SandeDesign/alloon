@@ -23,17 +23,17 @@ interface CompanyFormData {
   zipCode: string;
   email: string;
   phone: string;
-  website: string;
+  website?: string;
   defaultCAO: string;
   travelAllowancePerKm: number;
   standardWorkWeek: number;
   holidayAllowancePercentage: number;
   pensionContributionPercentage: number;
-  mainBranchId: string;
+  mainBranchId?: string;
   // Eerste vestiging (alleen bij nieuw bedrijf)
-  branchName: string;
-  branchLocation: string;
-  branchCostCenter: string;
+  branchName?: string;
+  branchLocation?: string;
+  branchCostCenter?: string;
 }
 
 const Companies: React.FC = () => {
@@ -102,7 +102,7 @@ const Companies: React.FC = () => {
         contactInfo: {
           email: data.email,
           phone: data.phone,
-          website: data.website,
+          website: data.website || '',
         },
         settings: {
           defaultCAO: data.defaultCAO,
@@ -123,6 +123,11 @@ const Companies: React.FC = () => {
         success('Bedrijf bijgewerkt', `${data.name} is succesvol bijgewerkt`);
       } else {
         // Create new company with initial branch
+        if (!data.branchName || !data.branchLocation || !data.branchCostCenter) {
+          error('Ontbrekende gegevens', 'Vestigingsgegevens zijn verplicht voor een nieuw bedrijf');
+          return;
+        }
+        
         const companyId = await createCompany(user.uid, companyData);
         
         // Create the initial branch
@@ -334,19 +339,19 @@ const Companies: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
                   label="Vestigingsnaam *"
-                  {...register('branchName', { required: 'Vestigingsnaam is verplicht' })}
+                  {...register('branchName', { required: !editingCompany ? 'Vestigingsnaam is verplicht' : false })}
                   error={errors.branchName?.message}
                   placeholder="bijv. Hoofdkantoor, Vestiging Amsterdam"
                 />
                 <Input
                   label="Locatie *"
-                  {...register('branchLocation', { required: 'Locatie is verplicht' })}
+                  {...register('branchLocation', { required: !editingCompany ? 'Locatie is verplicht' : false })}
                   error={errors.branchLocation?.message}
                   placeholder="bijv. Amsterdam, Rotterdam"
                 />
                 <Input
                   label="Kostenplaats *"
-                  {...register('branchCostCenter', { required: 'Kostenplaats is verplicht' })}
+                  {...register('branchCostCenter', { required: !editingCompany ? 'Kostenplaats is verplicht' : false })}
                   error={errors.branchCostCenter?.message}
                   placeholder="bijv. 001, HK01"
                 />

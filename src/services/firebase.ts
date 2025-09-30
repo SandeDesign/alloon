@@ -21,27 +21,37 @@ const convertTimestamps = (data: any) => {
   const converted = { ...data };
   
   // Convert top-level timestamps
-  if (converted.createdAt?.toDate) {
+  if (converted.createdAt && typeof converted.createdAt.toDate === 'function') {
     converted.createdAt = converted.createdAt.toDate();
   }
-  if (converted.updatedAt?.toDate) {
+  if (converted.updatedAt && typeof converted.updatedAt.toDate === 'function') {
     converted.updatedAt = converted.updatedAt.toDate();
   }
-  if (converted.date?.toDate) {
+  if (converted.date && typeof converted.date.toDate === 'function') {
     converted.date = converted.date.toDate();
   }
   
   // Convert nested timestamps in personalInfo
-  if (converted.personalInfo?.dateOfBirth?.toDate) {
+  if (converted.personalInfo?.dateOfBirth && typeof converted.personalInfo.dateOfBirth.toDate === 'function') {
     converted.personalInfo.dateOfBirth = converted.personalInfo.dateOfBirth.toDate();
   }
   
   // Convert nested timestamps in contractInfo
-  if (converted.contractInfo?.startDate?.toDate) {
+  if (converted.contractInfo?.startDate && typeof converted.contractInfo.startDate.toDate === 'function') {
     converted.contractInfo.startDate = converted.contractInfo.startDate.toDate();
   }
-  if (converted.contractInfo?.endDate?.toDate) {
+  if (converted.contractInfo?.endDate && typeof converted.contractInfo.endDate.toDate === 'function') {
     converted.contractInfo.endDate = converted.contractInfo.endDate.toDate();
+  }
+  
+  // Convert nested timestamps in leaveInfo
+  if (converted.leaveInfo?.holidayDays?.expiryDate && typeof converted.leaveInfo.holidayDays.expiryDate.toDate === 'function') {
+    converted.leaveInfo.holidayDays.expiryDate = converted.leaveInfo.holidayDays.expiryDate.toDate();
+  }
+  
+  // Convert accountCreatedAt if present
+  if (converted.accountCreatedAt && typeof converted.accountCreatedAt.toDate === 'function') {
+    converted.accountCreatedAt = converted.accountCreatedAt.toDate();
   }
   
   return converted;
@@ -73,6 +83,16 @@ const convertToTimestamps = (data: any) => {
   }
   if (converted.contractInfo?.endDate instanceof Date) {
     converted.contractInfo.endDate = Timestamp.fromDate(converted.contractInfo.endDate);
+  }
+  
+  // Convert nested dates in leaveInfo
+  if (converted.leaveInfo?.holidayDays?.expiryDate instanceof Date) {
+    converted.leaveInfo.holidayDays.expiryDate = Timestamp.fromDate(converted.leaveInfo.holidayDays.expiryDate);
+  }
+  
+  // Convert accountCreatedAt if present
+  if (converted.accountCreatedAt instanceof Date) {
+    converted.accountCreatedAt = Timestamp.fromDate(converted.accountCreatedAt);
   }
   
   return converted;
