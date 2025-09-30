@@ -197,6 +197,8 @@ const Employees: React.FC = () => {
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, trigger, formState: { errors } } = useForm<EmployeeFormData>({
+  });
+
   // Debug logging for user role
   useEffect(() => {
     console.log('=== USER ROLE DEBUG ===');
@@ -204,7 +206,6 @@ const Employees: React.FC = () => {
     console.log('User role:', userRole);
     console.log('User UID:', user?.uid);
     console.log('User email:', user?.email);
-    console.log('======================');
   }, [user, userRole]);
 
     resolver: yupResolver(employeeSchema)
