@@ -268,7 +268,8 @@ const Companies: React.FC = () => {
             />
             <Input
               label="Standaard CAO"
-              {...register('defaultCAO')}
+              {...register('defaultCAO', { required: 'Standaard CAO is verplicht' })}
+              error={errors.defaultCAO?.message}
             />
           </div>
 
