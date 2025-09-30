@@ -1137,13 +1137,13 @@ const Employees: React.FC = () => {
                     error={errors.probationPeriod?.message}
                   />
                   <Input
-                    label="Uren per week *"
+                    label="Uren per week"
                     type="number"
                     {...register('hoursPerWeek')}
                     error={errors.hoursPerWeek?.message}
                   />
                   <Input
-                    label="Functie *"
+                    label="Functie"
                     {...register('position')}
                     error={errors.position?.message}
                   />
@@ -1159,7 +1159,7 @@ const Employees: React.FC = () => {
                   />
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      CAO *
+                      CAO
                     </label>
                     <select
                       {...register('cao')}
@@ -1178,6 +1178,318 @@ const Employees: React.FC = () => {
                       </p>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 2 && (
+              <div className="space-y-6">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Salaris & Toeslagen
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Loonschaal"
+                    {...register('salaryScale')}
+                    error={errors.salaryScale?.message}
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Betalingstype
+                    </label>
+                    <select
+                      {...register('paymentType')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="hourly">Per uur</option>
+                      <option value="monthly">Per maand</option>
+                      <option value="annual">Per jaar</option>
+                    </select>
+                    {errors.paymentType && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        {errors.paymentType.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Betalingsfrequentie
+                    </label>
+                    <select
+                      {...register('paymentFrequency')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="monthly">Maandelijks</option>
+                      <option value="four_weekly">4-wekelijks</option>
+                      <option value="weekly">Wekelijks</option>
+                    </select>
+                    {errors.paymentFrequency && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        {errors.paymentFrequency.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {paymentType === 'hourly' && (
+                    <Input
+                      label="Uurloon (€)"
+                      type="number"
+                      step="0.01"
+                      {...register('hourlyRate')}
+                      error={errors.hourlyRate?.message}
+                    />
+                  )}
+                  {paymentType === 'monthly' && (
+                    <Input
+                      label="Maandsalaris (€)"
+                      type="number"
+                      step="0.01"
+                      {...register('monthlySalary')}
+                      error={errors.monthlySalary?.message}
+                    />
+                  )}
+                  {paymentType === 'annual' && (
+                    <Input
+                      label="Jaarsalaris (€)"
+                      type="number"
+                      step="0.01"
+                      {...register('annualSalary')}
+                      error={errors.annualSalary?.message}
+                    />
+                  )}
+                </div>
+
+                <h5 className="text-md font-medium text-gray-900 dark:text-white">
+                  Toeslagen (%)
+                </h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Overwerk (%)"
+                    type="number"
+                    {...register('overtimeAllowance')}
+                    error={errors.overtimeAllowance?.message}
+                  />
+                  <Input
+                    label="Onregelmatig (%)"
+                    type="number"
+                    {...register('irregularAllowance')}
+                    error={errors.irregularAllowance?.message}
+                  />
+                  <Input
+                    label="Ploegendienst (%)"
+                    type="number"
+                    {...register('shiftAllowance')}
+                    error={errors.shiftAllowance?.message}
+                  />
+                  <Input
+                    label="Weekend (%)"
+                    type="number"
+                    {...register('weekendAllowance')}
+                    error={errors.weekendAllowance?.message}
+                  />
+                  <Input
+                    label="Avond (%)"
+                    type="number"
+                    {...register('eveningAllowance')}
+                    error={errors.eveningAllowance?.message}
+                  />
+                  <Input
+                    label="Nacht (%)"
+                    type="number"
+                    {...register('nightAllowance')}
+                    error={errors.nightAllowance?.message}
+                  />
+                  <Input
+                    label="Zondag (%)"
+                    type="number"
+                    {...register('sundayAllowance')}
+                    error={errors.sundayAllowance?.message}
+                  />
+                  <Input
+                    label="Consignatie (%)"
+                    type="number"
+                    {...register('callDutyAllowance')}
+                    error={errors.callDutyAllowance?.message}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 3 && (
+              <div className="space-y-6">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Vergoedingen & Fiscaal
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Vakantietoeslag (%)"
+                    type="number"
+                    step="0.1"
+                    {...register('holidayAllowancePercentage')}
+                    error={errors.holidayAllowancePercentage?.message}
+                  />
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      {...register('thirteenthMonth')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-900 dark:text-white">
+                      13e maand
+                    </label>
+                  </div>
+                  <Input
+                    label="Eindejaarsuitkering (€)"
+                    type="number"
+                    step="0.01"
+                    {...register('endOfYearBonus')}
+                    error={errors.endOfYearBonus?.message}
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Reiskostenvergoeding
+                    </label>
+                    <select
+                      {...register('travelAllowanceType')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="per_km">Per kilometer</option>
+                      <option value="public_transport">OV vergoeding</option>
+                      <option value="fixed">Vast bedrag</option>
+                    </select>
+                  </div>
+                  <Input
+                    label="Reisvergoeding per km (€)"
+                    type="number"
+                    step="0.01"
+                    {...register('travelAllowancePerKm')}
+                    error={errors.travelAllowancePerKm?.message}
+                  />
+                  <Input
+                    label="Telefoonvergoeding (€)"
+                    type="number"
+                    step="0.01"
+                    {...register('phoneAllowance')}
+                    error={errors.phoneAllowance?.message}
+                  />
+                  <Input
+                    label="Thuiswerkvergoeding (€)"
+                    type="number"
+                    step="0.01"
+                    {...register('homeWorkAllowance')}
+                    error={errors.homeWorkAllowance?.message}
+                  />
+                  <Input
+                    label="Kledingvergoeding (€)"
+                    type="number"
+                    step="0.01"
+                    {...register('clothingAllowance')}
+                    error={errors.clothingAllowance?.message}
+                  />
+                </div>
+
+                <h5 className="text-md font-medium text-gray-900 dark:text-white">
+                  Pensioen
+                </h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Pensioenregeling"
+                    {...register('pensionScheme')}
+                    error={errors.pensionScheme?.message}
+                  />
+                  <Input
+                    label="Pensioenpremie werknemer (%)"
+                    type="number"
+                    step="0.1"
+                    {...register('pensionContribution')}
+                    error={errors.pensionContribution?.message}
+                  />
+                  <Input
+                    label="Pensioenpremie werkgever (%)"
+                    type="number"
+                    step="0.1"
+                    {...register('pensionEmployerContribution')}
+                    error={errors.pensionEmployerContribution?.message}
+                  />
+                  <Input
+                    label="Pensioenfonds"
+                    {...register('pensionFund')}
+                    error={errors.pensionFund?.message}
+                  />
+                </div>
+
+                <h5 className="text-md font-medium text-gray-900 dark:text-white">
+                  Fiscale Instellingen
+                </h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      {...register('taxCredit')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-900 dark:text-white">
+                      Loonheffingskorting toepassen
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Loontabel
+                    </label>
+                    <select
+                      {...register('taxTable')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="white">Witte tabel</option>
+                      <option value="green">Groene tabel</option>
+                      <option value="special">Bijzondere tabel</option>
+                    </select>
+                    {errors.taxTable && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        {errors.taxTable.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 4 && (
+              <div className="space-y-6">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Verlof & Vakantiedagen
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Wettelijke vakantiedagen"
+                    type="number"
+                    {...register('statutoryHolidayDays')}
+                    error={errors.statutoryHolidayDays?.message}
+                  />
+                  <Input
+                    label="Bovenwettelijke vakantiedagen"
+                    type="number"
+                    {...register('extraStatutoryHolidayDays')}
+                    error={errors.extraStatutoryHolidayDays?.message}
+                  />
+                  <Input
+                    label="ADV dagen"
+                    type="number"
+                    {...register('advDays')}
+                    error={errors.advDays?.message}
+                  />
+                  <Input
+                    label="Senioren dagen"
+                    type="number"
+                    {...register('seniorDays')}
+                    error={errors.seniorDays?.message}
+                  />
+                  <Input
+                    label="Snipperdagen"
+                    type="number"
+                    {...register('snipperDays')}
+                    error={errors.snipperDays?.message}
+                  />
                 </div>
               </div>
             )}
