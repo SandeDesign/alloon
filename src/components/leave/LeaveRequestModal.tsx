@@ -7,7 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
 import { useToast } from '../../hooks/useToast';
 import { createLeaveRequest, getLeaveBalance } from '../../services/firebase';
-import { LeaveBalance } from '../../types';
+import { LeaveBalance, Employee } from '../../types';
+import { User } from 'lucide-react';
 
 interface LeaveRequestFormData {
   type: 'vacation' | 'compensation' | 'unpaid' | 'special' | 'parental' | 'care';
@@ -30,11 +31,32 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
   const [submitting, setSubmitting] = useState(false);
   const [calculatedDays, setCalculatedDays] = useState(0);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [employeeError, setEmployeeError] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<LeaveRequestFormData>();
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
+
+  useEffect(() => {
+    if (employeeId && employees.length > 0) {
+      const employee = employees.find(e => e.id === employeeId);
+      if (employee) {
+        setCurrentEmployee(employee);
+        setEmployeeError(null);
+      } else {
+        setCurrentEmployee(null);
+        setEmployeeError('Werknemersgegevens niet gevonden. Probeer de pagina te vernieuwen.');
+      }
+    } else if (employeeId && employees.length === 0) {
+      setCurrentEmployee(null);
+      setEmployeeError('Werknemersgegevens worden geladen...');
+    } else {
+      setCurrentEmployee(null);
+      setEmployeeError(null);
+    }
+  }, [employeeId, employees]);
 
   useEffect(() => {
     if (user && employeeId) {
@@ -98,16 +120,14 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
 
     setSubmitting(true);
     try {
-      const employee = employees.find(e => e.id === employeeId);
-      if (!employee) {
-        showError('Werknemer niet gevonden', 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
-        setSubmitting(false);
+      if (!currentEmployee) {
+        showError('Werknemer niet gevonden', employeeError || 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
         return;
       }
 
       await createLeaveRequest(user.uid, {
         employeeId,
-        companyId: employee.companyId,
+        companyId: currentEmployee.companyId,
         type: data.type,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
@@ -132,12 +152,29 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
   const handleClose = () => {
     reset();
     setCalculatedDays(0);
+    setEmployeeError(null);
     onClose();
   };
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Verlof Aanvragen" size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {currentEmployee && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <User className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  {currentEmployee.personalInfo.firstName} {currentEmployee.personalInfo.lastName}
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  {currentEmployee.contractInfo.position}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {leaveBalance && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
@@ -234,7 +271,11 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
           <Button type="button" variant="secondary" onClick={handleClose}>
             Annuleren
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button 
+            type="submit" 
+            loading={submitting}
+            disabled={!currentEmployee || !!employeeError}
+          >
             Aanvragen
           </Button>
         </div>

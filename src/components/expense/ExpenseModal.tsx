@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
 import { useToast } from '../../hooks/useToast';
 import { createExpense, calculateTravelExpense } from '../../services/firebase';
+import { Employee } from '../../types';
+import { User } from 'lucide-react';
 
 interface ExpenseFormData {
   date: string;
@@ -30,6 +32,8 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
   const { success, error: showError } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [travelRatePerKm, setTravelRatePerKm] = useState(0.23);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [employeeError, setEmployeeError] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<ExpenseFormData>({
     defaultValues: {
@@ -42,16 +46,34 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
   const kilometers = watch('kilometers');
 
   useEffect(() => {
-    if (user && employeeId && employees.length > 0) {
+    if (employeeId && employees.length > 0) {
       const employee = employees.find(e => e.id === employeeId);
       if (employee) {
-        const company = companies.find(c => c.id === employee.companyId);
+        setCurrentEmployee(employee);
+        setEmployeeError(null);
+      } else {
+        setCurrentEmployee(null);
+        setEmployeeError('Werknemersgegevens niet gevonden. Probeer de pagina te vernieuwen.');
+      }
+    } else if (employeeId && employees.length === 0) {
+      setCurrentEmployee(null);
+      setEmployeeError('Werknemersgegevens worden geladen...');
+    } else {
+      setCurrentEmployee(null);
+      setEmployeeError(null);
+    }
+  }, [employeeId, employees]);
+
+  useEffect(() => {
+    if (user && employeeId && employees.length > 0) {
+      if (currentEmployee) {
+        const company = companies.find(c => c.id === currentEmployee.companyId);
         if (company?.settings?.travelAllowancePerKm) {
           setTravelRatePerKm(company.settings.travelAllowancePerKm);
         }
       }
     }
-  }, [user, employeeId, employees, companies]);
+  }, [user, employeeId, currentEmployee, companies]);
 
   useEffect(() => {
     if (expenseType === 'travel' && kilometers && kilometers > 0) {
@@ -73,16 +95,14 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
 
     setSubmitting(true);
     try {
-      const employee = employees.find(e => e.id === employeeId);
-      if (!employee) {
-        showError('Werknemer niet gevonden', 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
-        setSubmitting(false);
+      if (!currentEmployee) {
+        showError('Werknemer niet gevonden', employeeError || 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
         return;
       }
 
       await createExpense(user.uid, {
         employeeId,
-        companyId: employee.companyId,
+        companyId: currentEmployee.companyId,
         date: new Date(data.date),
         type: data.type,
         description: data.description,
@@ -116,12 +136,29 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
 
   const handleClose = () => {
     reset();
+    setEmployeeError(null);
     onClose();
   };
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Nieuwe Declaratie" size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {currentEmployee && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <User className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  {currentEmployee.personalInfo.firstName} {currentEmployee.personalInfo.lastName}
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  {currentEmployee.contractInfo.position}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="Datum *"
@@ -213,7 +250,11 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
           <Button type="button" variant="secondary" onClick={handleClose}>
             Annuleren
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button 
+            type="submit" 
+            loading={submitting}
+            disabled={!currentEmployee || !!employeeError}
+          >
             Opslaan als Concept
           </Button>
         </div>

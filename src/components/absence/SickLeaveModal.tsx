@@ -7,7 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
 import { useToast } from '../../hooks/useToast';
 import { createSickLeave } from '../../services/firebase';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, User } from 'lucide-react';
+import { Employee } from '../../types';
 
 interface SickLeaveFormData {
   startDate: string;
@@ -27,6 +28,8 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
   const { employees } = useApp();
   const { success, error: showError } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [employeeError, setEmployeeError] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SickLeaveFormData>({
     defaultValues: {
@@ -34,6 +37,25 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
       workCapacityPercentage: 0,
     }
   });
+
+  useEffect(() => {
+    if (employeeId && employees.length > 0) {
+      const employee = employees.find(e => e.id === employeeId);
+      if (employee) {
+        setCurrentEmployee(employee);
+        setEmployeeError(null);
+      } else {
+        setCurrentEmployee(null);
+        setEmployeeError('Werknemersgegevens niet gevonden. Probeer de pagina te vernieuwen.');
+      }
+    } else if (employeeId && employees.length === 0) {
+      setCurrentEmployee(null);
+      setEmployeeError('Werknemersgegevens worden geladen...');
+    } else {
+      setCurrentEmployee(null);
+      setEmployeeError(null);
+    }
+  }, [employeeId, employees]);
 
   const onSubmit = async (data: SickLeaveFormData) => {
     if (!user || !employeeId) {
@@ -43,16 +65,14 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
 
     setSubmitting(true);
     try {
-      const employee = employees.find(e => e.id === employeeId);
-      if (!employee) {
-        showError('Werknemer niet gevonden', 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
-        setSubmitting(false);
+      if (!currentEmployee) {
+        showError('Werknemer niet gevonden', employeeError || 'Kon werknemersgegevens niet laden. Probeer de pagina te vernieuwen.');
         return;
       }
 
       await createSickLeave(user.uid, {
         employeeId,
-        companyId: employee.companyId,
+        companyId: currentEmployee.companyId,
         startDate: new Date(data.startDate),
         reportedAt: new Date(),
         reportedBy: user.displayName || user.email || 'Werknemer',
@@ -79,12 +99,29 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
 
   const handleClose = () => {
     reset();
+    setEmployeeError(null);
     onClose();
   };
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Ziek Melden" size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {currentEmployee && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <User className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
+              <div>
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  {currentEmployee.personalInfo.firstName} {currentEmployee.personalInfo.lastName}
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  {currentEmployee.contractInfo.position}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
           <div className="flex items-start">
             <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 mr-3" />
@@ -115,21 +152,13 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
             min="0"
             max="100"
             step="10"
-            {...register('workCapacityPercentage', {
-              required: 'Arbeidsgeschiktheid is verplicht',
-              valueAsNumber: true,
-            })}
+            {...register('workCapacityPercentage', { valueAsNumber: true })}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
           />
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
             <span>0% (volledig arbeidsongeschikt)</span>
             <span>100% (volledig arbeidsgeschikt)</span>
           </div>
-          {errors.workCapacityPercentage && (
-            <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-              {errors.workCapacityPercentage.message}
-            </p>
-          )}
         </div>
 
         <div>
@@ -148,7 +177,11 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
           <Button type="button" variant="secondary" onClick={handleClose}>
             Annuleren
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button 
+            type="submit" 
+            loading={submitting}
+            disabled={!currentEmployee || !!employeeError}
+          >
             Ziek Melden
           </Button>
         </div>
