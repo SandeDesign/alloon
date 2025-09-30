@@ -5,7 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
-import Employees from './pages/Employees';
+import EmployeesNew from './pages/EmployeesNew';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -105,7 +105,7 @@ function App() {
                     <Routes>
                       <Route index element={<Dashboard />} />
                       <Route path="companies" element={<Companies />} />
-                      <Route path="employees" element={<Employees />} />
+                      <Route path="employees" element={<EmployeesNew />} />
                       <Route path="hours" element={<Hours />} />
                       <Route path="payroll" element={<Payroll />} />
                       <Route path="payslips" element={<Payslips />} />
