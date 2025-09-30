@@ -34,9 +34,15 @@ const Leave: React.FC = () => {
       setLoading(true);
       const currentYear = new Date().getFullYear();
 
+      // Get employee data to find the admin userId
+      const currentEmployee = await firebaseService.getEmployeeById(currentEmployeeId);
+      if (!currentEmployee) {
+        throw new Error('Employee not found');
+      }
+
       const [requests, balance] = await Promise.all([
-        firebaseService.getLeaveRequests(user.uid, currentEmployeeId),
-        firebaseService.getLeaveBalance(currentEmployeeId, user.uid, currentYear),
+        firebaseService.getLeaveRequests(currentEmployee.userId, currentEmployeeId),
+        firebaseService.getLeaveBalance(currentEmployeeId, currentEmployee.userId, currentYear),
       ]);
 
       setLeaveRequests(requests);

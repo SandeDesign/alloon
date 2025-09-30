@@ -592,20 +592,20 @@ export const generateSecurePassword = (): string => {
 };
 
 // Leave Requests
-export const getLeaveRequests = async (userId: string, employeeId?: string): Promise<LeaveRequest[]> => {
+export const getLeaveRequests = async (adminUserId: string, employeeId?: string): Promise<LeaveRequest[]> => {
   let q;
 
   if (employeeId) {
     q = query(
       collection(db, 'leaveRequests'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       where('employeeId', '==', employeeId),
       orderBy('createdAt', 'desc')
     );
   } else {
     q = query(
       collection(db, 'leaveRequests'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       orderBy('createdAt', 'desc')
     );
   }
@@ -616,15 +616,15 @@ export const getLeaveRequests = async (userId: string, employeeId?: string): Pro
     ...convertTimestamps(doc.data())
   } as LeaveRequest));
   
-  console.log(`Found ${requests.length} leave requests for user ${userId}`);
+  console.log(`Found ${requests.length} leave requests for admin ${adminUserId}`);
   return requests;
 };
 
-export const createLeaveRequest = async (currentUserId: string, request: Omit<LeaveRequest, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createLeaveRequest = async (adminUserId: string, request: Omit<LeaveRequest, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   
   const requestData = convertToTimestamps({
     ...request,
-    userId: currentUserId,
+    userId: adminUserId,
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -724,20 +724,20 @@ export const updateLeaveBalance = async (employeeId: string, userId: string, yea
 };
 
 // Sick Leave
-export const getSickLeaveRecords = async (userId: string, employeeId?: string): Promise<SickLeave[]> => {
+export const getSickLeaveRecords = async (adminUserId: string, employeeId?: string): Promise<SickLeave[]> => {
   let q;
 
   if (employeeId) {
     q = query(
       collection(db, 'sickLeave'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       where('employeeId', '==', employeeId),
       orderBy('startDate', 'desc')
     );
   } else {
     q = query(
       collection(db, 'sickLeave'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       orderBy('startDate', 'desc')
     );
   }
@@ -748,18 +748,18 @@ export const getSickLeaveRecords = async (userId: string, employeeId?: string): 
     ...convertTimestamps(doc.data())
   } as SickLeave));
   
-  console.log(`Found ${records.length} sick leave records for user ${userId}`);
+  console.log(`Found ${records.length} sick leave records for admin ${adminUserId}`);
   return records;
 };
 
-export const createSickLeave = async (currentUserId: string, sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createSickLeave = async (adminUserId: string, sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   
   const shouldActivate = shouldActivatePoortwachter(sickLeave.startDate);
   const milestones = shouldActivate ? generatePoortwachterMilestones(sickLeave.startDate) : null;
 
   const sickLeaveData = convertToTimestamps({
     ...sickLeave,
-    userId: currentUserId,
+    userId: adminUserId,
     poortwachterActive: shouldActivate,
     poortwachterMilestones: milestones,
     createdAt: new Date(),
@@ -898,20 +898,20 @@ export const calculateAbsenceStats = async (employeeId: string, companyId: strin
 };
 
 // Expenses
-export const getExpenses = async (userId: string, employeeId?: string): Promise<Expense[]> => {
+export const getExpenses = async (adminUserId: string, employeeId?: string): Promise<Expense[]> => {
   let q;
 
   if (employeeId) {
     q = query(
       collection(db, 'expenses'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       where('employeeId', '==', employeeId),
       orderBy('date', 'desc')
     );
   } else {
     q = query(
       collection(db, 'expenses'),
-      where('userId', '==', userId),
+      where('userId', '==', adminUserId),
       orderBy('date', 'desc')
     );
   }
@@ -922,11 +922,11 @@ export const getExpenses = async (userId: string, employeeId?: string): Promise<
     ...convertTimestamps(doc.data())
   } as Expense));
   
-  console.log(`Found ${expenses.length} expenses for user ${userId}`);
+  console.log(`Found ${expenses.length} expenses for admin ${adminUserId}`);
   return expenses;
 };
 
-export const createExpense = async (currentUserId: string, expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createExpense = async (adminUserId: string, expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   
   // Clean up undefined values that Firestore doesn't accept
   const cleanExpense = {
@@ -940,7 +940,7 @@ export const createExpense = async (currentUserId: string, expense: Omit<Expense
 
   const expenseData = convertToTimestamps({
     ...cleanExpense,
-    userId: currentUserId,
+    userId: adminUserId,
     createdAt: new Date(),
     updatedAt: new Date()
   });

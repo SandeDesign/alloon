@@ -30,7 +30,14 @@ const Expenses: React.FC = () => {
     
     try {
       setLoading(true);
-      const data = await firebaseService.getExpenses(user.uid, currentEmployeeId);
+      
+      // Get employee data to find the admin userId
+      const currentEmployee = await firebaseService.getEmployeeById(currentEmployeeId);
+      if (!currentEmployee) {
+        throw new Error('Employee not found');
+      }
+      
+      const data = await firebaseService.getExpenses(currentEmployee.userId, currentEmployeeId);
       setExpenses(data);
     } catch (err) {
       console.error('Error loading expenses:', err);

@@ -78,7 +78,7 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({
 
     setSubmitting(true);
     try {
-      await createSickLeave(user.uid, {
+      await createSickLeave(currentEmployee.userId, {
         employeeId,
         companyId: currentEmployee?.companyId || '',
         startDate: new Date(formData.startDate),

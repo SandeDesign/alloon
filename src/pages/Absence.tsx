@@ -34,9 +34,15 @@ const Absence: React.FC = () => {
       setLoading(true);
       const currentYear = new Date().getFullYear();
 
+      // Get employee data to find the admin userId
+      const currentEmployee = await firebaseService.getEmployeeById(currentEmployeeId);
+      if (!currentEmployee) {
+        throw new Error('Employee not found');
+      }
+
       const [records, stats] = await Promise.all([
-        firebaseService.getSickLeaveRecords(user.uid, currentEmployeeId),
-        firebaseService.getAbsenceStatistics(currentEmployeeId, user.uid, currentYear),
+        firebaseService.getSickLeaveRecords(currentEmployee.userId, currentEmployeeId),
+        firebaseService.getAbsenceStatistics(currentEmployeeId, currentEmployee.userId, currentYear),
       ]);
 
       setSickLeaveRecords(records);
