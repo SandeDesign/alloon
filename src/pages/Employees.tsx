@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, CreditCard as Edit, Trash2, Mail, Phone, Building2, MapPin } from 'lucide-react';
+import { Plus, User, CreditCard as Edit, Trash2, Mail, Phone, Building2, MapPin, UserPlus, Copy, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Table from '../components/ui/Table';
@@ -14,7 +14,7 @@ import { Employee, Company, Branch, DUTCH_CAOS } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { createEmployee, updateEmployee, deleteEmployee, getBranches } from '../services/firebase';
+import { createEmployee, updateEmployee, deleteEmployee, getBranches, createEmployeeAuthAccount, generateSecurePassword } from '../services/firebase';
 import { validateBSN, validateIBAN, validatePostalCode, validatePhone } from '../utils/validation';
 
 interface EmployeeFormData {
@@ -167,6 +167,11 @@ const Employees: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<EmployeeFormData>({
@@ -468,6 +473,63 @@ const Employees: React.FC = () => {
     }
   };
 
+  const handleCreateEmployeeAccount = async (employee: Employee) => {
+    if (!user) return;
+    
+    setCreatingAccount(true);
+    try {
+      // Generate secure password
+      const password = generateSecurePassword();
+      
+      // Create Firebase Auth account
+      await createEmployeeAuthAccount(
+        employee.id,
+        user.uid,
+        employee.personalInfo.contactInfo.email,
+        password
+      );
+      
+      // Show password modal
+      setSelectedEmployee(employee);
+      setGeneratedPassword(password);
+      setShowPasswordModal(true);
+      
+      // Refresh employees list
+      await refreshEmployees();
+      
+      success('Account aangemaakt', `Account voor ${employee.personalInfo.firstName} ${employee.personalInfo.lastName} is succesvol aangemaakt`);
+    } catch (err: any) {
+      console.error('Error creating employee account:', err);
+      let message = 'Er is een fout opgetreden bij het aanmaken van het account';
+      
+      if (err.code === 'auth/email-already-in-use') {
+        message = 'Er bestaat al een account met dit e-mailadres';
+      } else if (err.code === 'auth/invalid-email') {
+        message = 'Ongeldig e-mailadres';
+      }
+      
+      error('Account aanmaken mislukt', message);
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
+  const copyPasswordToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedPassword);
+      success('Gekopieerd!', 'Wachtwoord is gekopieerd naar klembord');
+    } catch (err) {
+      error('Kopiëren mislukt', 'Kon wachtwoord niet kopiëren');
+    }
+  };
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setGeneratedPassword('');
+    setSelectedEmployee(null);
+    setShowPassword(false);
+  };
+
   const getCompanyName = (companyId: string) => {
     return companies.find(c => c.id === companyId)?.name || 'Onbekend';
   };
@@ -609,6 +671,20 @@ const Employees: React.FC = () => {
       label: 'Acties',
       render: (value: any, employee: Employee) => (
         <div className="flex space-x-2">
+          {!employee.hasAccount && (
+            <Button
+              size="sm"
+              variant="success"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCreateEmployeeAccount(employee);
+              }}
+              loading={creatingAccount}
+              title="Account aanmaken voor werknemer"
+            >
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -654,758 +730,3 @@ const Employees: React.FC = () => {
           <Plus className="h-5 w-5 mr-2" />
           Nieuwe Werknemer
         </Button>
-      </div>
-
-      {/* Employees Table */}
-      <Card>
-        {employees.length === 0 ? (
-          companies.length === 0 ? (
-            <EmptyState
-              icon={Building2}
-              title="Geen bedrijven"
-              description="Maak eerst een bedrijf aan voordat je werknemers kunt toevoegen"
-              actionLabel="Bedrijf Toevoegen"
-              onAction={() => window.location.href = '/companies'}
-            />
-          ) : (
-            <EmptyState
-              icon={User}
-              title="Geen werknemers"
-              description="Voeg je eerste werknemer toe om te beginnen met loonadministratie"
-              actionLabel="Werknemer Toevoegen"
-              onAction={() => openModal()}
-            />
-          )
-        ) : (
-          <Table data={employees} columns={columns} />
-        )}
-      </Card>
-
-      {/* Employee Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        title={editingEmployee ? 'Werknemer Bewerken' : 'Nieuwe Werknemer'}
-        size="xl"
-      >
-        <div className="mb-6">
-          {/* Tabs */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => {
-                const IconComponent = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap flex items-center ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    <IconComponent className="h-4 w-4 mr-2" />
-                    {tab.name}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Tab Content */}
-          {activeTab === 0 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Persoonlijke Gegevens
-              </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Voornaam *"
-                  {...register('firstName')}
-                  error={errors.firstName?.message}
-                />
-                <Input
-                  label="Achternaam *"
-                  {...register('lastName')}
-                  error={errors.lastName?.message}
-                />
-                <Input
-                  label="Initialen *"
-                  {...register('initials')}
-                  error={errors.initials?.message}
-                  placeholder="J.P."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="BSN *"
-                  {...register('bsn')}
-                  error={errors.bsn?.message}
-                  placeholder="123456789"
-                />
-                <Input
-                  label="Geboortedatum *"
-                  type="date"
-                  {...register('dateOfBirth')}
-                  error={errors.dateOfBirth?.message}
-                />
-                <Input
-                  label="Geboorteplaats *"
-                  {...register('placeOfBirth')}
-                  error={errors.placeOfBirth?.message}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nationaliteit *"
-                  {...register('nationality')}
-                  error={errors.nationality?.message}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Burgerlijke staat *
-                  </label>
-                  <select
-                    {...register('maritalStatus')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    {Object.entries(maritalStatusLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.maritalStatus && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      {errors.maritalStatus.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Adresgegevens
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-2">
-                  <Input
-                    label="Straat *"
-                    {...register('street')}
-                    error={errors.street?.message}
-                  />
-                </div>
-                <Input
-                  label="Huisnummer *"
-                  {...register('houseNumber')}
-                  error={errors.houseNumber?.message}
-                />
-                <Input
-                  label="Toevoeging"
-                  {...register('houseNumberAddition')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Postcode *"
-                  {...register('zipCode')}
-                  error={errors.zipCode?.message}
-                  placeholder="1234 AB"
-                />
-                <Input
-                  label="Plaats *"
-                  {...register('city')}
-                  error={errors.city?.message}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Contactgegevens
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="E-mailadres *"
-                  type="email"
-                  {...register('email')}
-                  error={errors.email?.message}
-                />
-                <Input
-                  label="Telefoonnummer *"
-                  {...register('phone')}
-                  error={errors.phone?.message}
-                  placeholder="06-12345678"
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Noodcontact
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Naam"
-                  {...register('emergencyContactName')}
-                />
-                <Input
-                  label="Telefoonnummer"
-                  {...register('emergencyContactPhone')}
-                />
-                <Input
-                  label="Relatie"
-                  {...register('emergencyContactRelation')}
-                  placeholder="Partner, Ouder, etc."
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Bank & Identiteit
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="IBAN *"
-                  {...register('bankAccount')}
-                  error={errors.bankAccount?.message}
-                  placeholder="NL91 ABNA 0417 1643 00"
-                />
-                <Input
-                  label="Identiteitsdocument"
-                  {...register('identityDocument')}
-                  placeholder="Bestandsnaam of referentie"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 1 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Contract Informatie
-              </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Bedrijf *
-                  </label>
-                  <select
-                    {...register('companyId')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="">Selecteer bedrijf...</option>
-                    {companies.map(company => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.companyId && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      {errors.companyId.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Vestiging *
-                  </label>
-                  <select
-                    {...register('branchId')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                    disabled={!selectedCompanyId}
-                  >
-                    <option value="">Selecteer vestiging...</option>
-                    {getAvailableBranches().map(branch => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.branchId && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      {errors.branchId.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Contracttype *
-                  </label>
-                  <select
-                    {...register('contractType')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="">Selecteer type...</option>
-                    {Object.entries(contractTypeLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.contractType && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      {errors.contractType.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Contract status
-                  </label>
-                  <select
-                    {...register('contractStatus')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="active">Actief</option>
-                    <option value="notice_period">Opzegtermijn</option>
-                    <option value="ended">Beëindigd</option>
-                    <option value="suspended">Geschorst</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Startdatum *"
-                  type="date"
-                  {...register('startDate')}
-                  error={errors.startDate?.message}
-                />
-                <Input
-                  label="Einddatum"
-                  type="date"
-                  {...register('endDate')}
-                  helperText="Alleen bij tijdelijke contracten"
-                />
-                <Input
-                  label="Proeftijd (maanden)"
-                  type="number"
-                  {...register('probationPeriod')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Uren per week"
-                  type="number"
-                  step="0.1"
-                  {...register('hoursPerWeek')}
-                />
-                <Input
-                  label="Functie *"
-                  {...register('position')}
-                  error={errors.position?.message}
-                />
-                <Input
-                  label="Afdeling"
-                  {...register('department')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Kostenplaats"
-                  {...register('costCenter')}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    CAO *
-                  </label>
-                  <select
-                    {...register('cao')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="">Selecteer CAO...</option>
-                    {DUTCH_CAOS.map(cao => (
-                      <option key={cao.id} value={cao.name}>
-                        {cao.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.cao && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      {errors.cao.message}
-                    </p>
-                  )}
-                </div>
-                <Input
-                  label="CAO Code"
-                  {...register('caoCode')}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 2 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Salaris & Toeslagen
-              </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Loonschaal *"
-                  {...register('salaryScale')}
-                  error={errors.salaryScale?.message}
-                  placeholder="A, B, C, etc."
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Betalingstype *
-                  </label>
-                  <select
-                    {...register('paymentType')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="hourly">Per uur</option>
-                    <option value="monthly">Per maand</option>
-                    <option value="annual">Per jaar</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Betalingsfrequentie *
-                  </label>
-                  <select
-                    {...register('paymentFrequency')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="monthly">Maandelijks</option>
-                    <option value="four_weekly">4-wekelijks</option>
-                    <option value="weekly">Wekelijks</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {paymentType === 'hourly' && (
-                  <Input
-                    label="Uurloon (€)"
-                    type="number"
-                    step="0.01"
-                    {...register('hourlyRate')}
-                  />
-                )}
-                {paymentType === 'monthly' && (
-                  <Input
-                    label="Maandsalaris (€)"
-                    type="number"
-                    step="0.01"
-                    {...register('monthlySalary')}
-                  />
-                )}
-                {paymentType === 'annual' && (
-                  <Input
-                    label="Jaarsalaris (€)"
-                    type="number"
-                    step="0.01"
-                    {...register('annualSalary')}
-                  />
-                )}
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Toeslagen (%)
-              </h5>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Input
-                  label="Overwerk"
-                  type="number"
-                  step="1"
-                  {...register('overtimeAllowance')}
-                />
-                <Input
-                  label="Onregelmatig"
-                  type="number"
-                  step="1"
-                  {...register('irregularAllowance')}
-                />
-                <Input
-                  label="Ploegendienst"
-                  type="number"
-                  step="1"
-                  {...register('shiftAllowance')}
-                />
-                <Input
-                  label="Weekend"
-                  type="number"
-                  step="1"
-                  {...register('weekendAllowance')}
-                />
-                <Input
-                  label="Avond"
-                  type="number"
-                  step="1"
-                  {...register('eveningAllowance')}
-                />
-                <Input
-                  label="Nacht"
-                  type="number"
-                  step="1"
-                  {...register('nightAllowance')}
-                />
-                <Input
-                  label="Zondag"
-                  type="number"
-                  step="1"
-                  {...register('sundayAllowance')}
-                />
-                <Input
-                  label="Consignatie"
-                  type="number"
-                  step="1"
-                  {...register('callDutyAllowance')}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Uitkeringen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Vakantietoeslag (%)"
-                  type="number"
-                  step="0.1"
-                  {...register('holidayAllowancePercentage')}
-                />
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    {...register('thirteenthMonth')}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    13e maand
-                  </label>
-                </div>
-                <Input
-                  label="Eindejaarsuitkering (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('endOfYearBonus')}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Fiscale Instellingen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    {...register('taxCredit')}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Loonheffingskorting toepassen
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Belastingtabel
-                  </label>
-                  <select
-                    {...register('taxTable')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="white">Wit (standaard)</option>
-                    <option value="green">Groen (65+)</option>
-                    <option value="special">Bijzondere tabel</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 3 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Vergoedingen & Aftrekposten
-              </h4>
-              
-              <h5 className="text-md font-medium text-gray-900 dark:text-white">
-                Reiskostenvergoeding
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Type vergoeding
-                  </label>
-                  <select
-                    {...register('travelAllowanceType')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                  >
-                    <option value="per_km">Per kilometer</option>
-                    <option value="public_transport">OV vergoeding</option>
-                    <option value="fixed">Vast bedrag</option>
-                  </select>
-                </div>
-                <Input
-                  label="Bedrag per km (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('travelAllowancePerKm')}
-                />
-                <Input
-                  label="Vast bedrag (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('travelAllowanceFixed')}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Overige Vergoedingen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Telefoonvergoeding (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('phoneAllowance')}
-                />
-                <Input
-                  label="Thuiswerkvergoeding (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('homeWorkAllowance')}
-                />
-                <Input
-                  label="Kledingvergoeding (€)"
-                  type="number"
-                  step="0.01"
-                  {...register('clothingAllowance')}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Pensioen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Pensioenregeling"
-                  {...register('pensionScheme')}
-                />
-                <Input
-                  label="Pensioenfonds"
-                  {...register('pensionFund')}
-                />
-                <Input
-                  label="Werknemerspremie (%)"
-                  type="number"
-                  step="0.1"
-                  {...register('pensionContribution')}
-                />
-                <Input
-                  label="Werkgeverspremie (%)"
-                  type="number"
-                  step="0.1"
-                  {...register('pensionEmployerContribution')}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 4 && (
-            <div className="space-y-6">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Verlof & Verzuim
-              </h4>
-              
-              <h5 className="text-md font-medium text-gray-900 dark:text-white">
-                Vakantiedagen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Wettelijke vakantiedagen"
-                  type="number"
-                  {...register('statutoryHolidayDays')}
-                  helperText="Berekend: 4 × contracturen per week"
-                />
-                <Input
-                  label="Bovenwettelijke vakantiedagen"
-                  type="number"
-                  {...register('extraStatutoryHolidayDays')}
-                />
-              </div>
-
-              <h5 className="text-md font-medium text-gray-900 dark:text-white mt-6">
-                Overige Dagen
-              </h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="ADV dagen"
-                  type="number"
-                  {...register('advDays')}
-                  helperText="Arbeidsduurverkorting"
-                />
-                <Input
-                  label="Seniorendagen"
-                  type="number"
-                  {...register('seniorDays')}
-                />
-                <Input
-                  label="Snipperdagen"
-                  type="number"
-                  {...register('snipperDays')}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex space-x-3">
-              {activeTab > 0 && (
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  onClick={() => setActiveTab(activeTab - 1)}
-                >
-                  Vorige
-                </Button>
-              )}
-              {activeTab < tabs.length - 1 && (
-                <Button 
-                  type="button" 
-                  onClick={() => setActiveTab(activeTab + 1)}
-                >
-                  Volgende
-                </Button>
-              )}
-            </div>
-            
-            <div className="flex space-x-3">
-              <Button type="button" variant="secondary" onClick={closeModal}>
-                Annuleren
-              </Button>
-              <Button type="submit" loading={submitting}>
-                {editingEmployee ? 'Bijwerken' : 'Aanmaken'}
-              </Button>
-            </div>
-          </div>
-        </form>
-      </Modal>
-    </div>
-  );
-};
-
-export default Employees;
