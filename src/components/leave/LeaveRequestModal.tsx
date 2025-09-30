@@ -87,6 +87,8 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
 
     return count;
   };
+
+  const onSubmit = async (data: LeaveRequestFormData) => {
     if (!user || !employeeId) {
       showError('Geen gebruiker', 'Je moet ingelogd zijn om verlof aan te vragen');
       return;
@@ -126,9 +128,10 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
       reset();
       onSuccess();
       onClose();
+      success('Verlofaanvraag ingediend', 'Je verlofaanvraag is succesvol ingediend');
     } catch (err) {
       console.error('Error creating leave request:', err);
-      console.error('Error creating leave request:', err);
+      showError('Fout bij aanvragen', 'Er is een fout opgetreden bij het indienen van je verlofaanvraag');
     } finally {
       setSubmitting(false);
     }
