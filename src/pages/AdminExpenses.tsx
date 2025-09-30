@@ -19,7 +19,7 @@ const AdminExpenses: React.FC = () => {
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([]);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [filterCompany, setFilterCompany] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('submitted');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
