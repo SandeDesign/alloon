@@ -157,7 +157,6 @@ const EmployeeDashboard: React.FC = () => {
             </Button>
           </div>
         </div>
-      </Card>
       </div>
     </div>
   );
