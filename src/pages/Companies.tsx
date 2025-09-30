@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, MapPin, Phone, Mail } from 'lucide-react';
+import { Building2, Plus, CreditCard as Edit, Trash2, MapPin, Phone, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Company, Branch } from '../types';
 import { getCompanies, createCompany, updateCompany, deleteCompany, getBranches } from '../services/firebase';

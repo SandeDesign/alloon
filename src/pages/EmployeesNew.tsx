@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, User, Mail, Phone } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit, Trash2, User, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { Employee } from '../types';
