@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, Calculator, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { Building2, Users, Calculator, Clock, TrendingUp, AlertCircle, Calendar, HeartPulse } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
