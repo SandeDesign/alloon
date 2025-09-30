@@ -158,7 +158,6 @@ const EmployeeDashboard: React.FC = () => {
           </div>
         </div>
       </Card>
-      </div>
     </div>
   );
 };
