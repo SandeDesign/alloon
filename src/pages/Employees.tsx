@@ -144,7 +144,7 @@ const employeeSchema = yup.object({
   placeOfBirth: yup.string().required('Geboorteplaats is verplicht'),
   nationality: yup.string().required('Nationaliteit is verplicht'),
   maritalStatus: yup.string().required('Burgerlijke staat is verplicht'),
-  
+
   // Adres
   street: yup.string().required('Straat is verplicht'),
   houseNumber: yup.string().required('Huisnummer is verplicht'),
@@ -152,32 +152,55 @@ const employeeSchema = yup.object({
     .required('Postcode is verplicht')
     .test('postcode-valid', 'Ongeldige postcode (gebruik 1234 AB formaat)', (value) => value ? validatePostalCode(value) : false),
   city: yup.string().required('Plaats is verplicht'),
-  
+
   // Contact
   email: yup.string().required('E-mailadres is verplicht').email('Ongeldig e-mailadres'),
   phone: yup.string()
     .required('Telefoonnummer is verplicht')
     .test('phone-valid', 'Ongeldig Nederlands telefoonnummer', (value) => value ? validatePhone(value) : false),
-  
+
   // Bank
   bankAccount: yup.string()
     .required('Bankrekeningnummer is verplicht')
     .test('iban-valid', 'Ongeldig IBAN nummer', (value) => value ? validateIBAN(value) : false),
-  
+
   // Bedrijf
   companyId: yup.string().required('Bedrijf is verplicht'),
   branchId: yup.string().required('Vestiging is verplicht'),
-  
+
   // Contract
   contractType: yup.string().required('Contracttype is verplicht'),
   startDate: yup.date().required('Startdatum is verplicht'),
   position: yup.string().required('Functie is verplicht'),
   cao: yup.string().required('CAO is verplicht'),
-  
+  hoursPerWeek: yup.number().required('Uren per week is verplicht').positive('Moet een positief getal zijn').max(168, 'Maximum 168 uren per week'),
+
   // Salaris
   salaryScale: yup.string().required('Loonschaal is verplicht'),
   paymentType: yup.string().required('Betalingstype is verplicht'),
   paymentFrequency: yup.string().required('Betalingsfrequentie is verplicht'),
+  hourlyRate: yup.number().when('paymentType', {
+    is: 'hourly',
+    then: (schema) => schema.required('Uurloon is verplicht').positive('Moet een positief bedrag zijn'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  monthlySalary: yup.number().when('paymentType', {
+    is: 'monthly',
+    then: (schema) => schema.required('Maandsalaris is verplicht').positive('Moet een positief bedrag zijn'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  annualSalary: yup.number().when('paymentType', {
+    is: 'annual',
+    then: (schema) => schema.required('Jaarsalaris is verplicht').positive('Moet een positief bedrag zijn'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+
+  // Vergoedingen
+  holidayAllowancePercentage: yup.number().required('Vakantietoeslag percentage is verplicht').min(0, 'Minimaal 0%').max(100, 'Maximaal 100%'),
+  pensionContribution: yup.number().required('Pensioenpremie werknemer is verplicht').min(0, 'Minimaal 0%').max(100, 'Maximaal 100%'),
+  pensionEmployerContribution: yup.number().required('Pensioenpremie werkgever is verplicht').min(0, 'Minimaal 0%').max(100, 'Maximaal 100%'),
+  taxCredit: yup.boolean().required('Loonheffingskorting is verplicht'),
+  taxTable: yup.string().required('Loontabel is verplicht'),
 });
 
 const Employees: React.FC = () => {
@@ -296,13 +319,22 @@ const Employees: React.FC = () => {
       // Set company and branch values
       setValue('companyId', defaultCompany.id);
       setValue('branchId', defaultBranch.id);
-      
-      // Set default values for new employee
+
+      // Set default values for new employee - Personal info
       setValue('nationality', 'Nederlandse');
       setValue('maritalStatus', 'single');
+
+      // Contract defaults
+      setValue('contractType', 'permanent');
+      setValue('contractStatus', 'active');
+      setValue('hoursPerWeek', 40);
+
+      // Payment defaults
       setValue('paymentType', 'monthly');
       setValue('paymentFrequency', 'monthly');
-      setValue('contractStatus', 'active');
+      setValue('monthlySalary', 0);
+
+      // Allowances defaults
       setValue('overtimeAllowance', 150);
       setValue('irregularAllowance', 130);
       setValue('shiftAllowance', 120);
@@ -311,12 +343,20 @@ const Employees: React.FC = () => {
       setValue('nightAllowance', 130);
       setValue('sundayAllowance', 170);
       setValue('callDutyAllowance', 125);
+
+      // Benefits defaults
       setValue('holidayAllowancePercentage', 8);
       setValue('travelAllowanceType', 'per_km');
       setValue('travelAllowancePerKm', 0.23);
+
+      // Pension defaults
+      setValue('pensionContribution', 0);
+      setValue('pensionEmployerContribution', 0);
+
+      // Tax defaults
       setValue('taxCredit', true);
       setValue('taxTable', 'white');
-      
+
       setIsModalOpen(true);
     } else {
       // Editing existing employee
