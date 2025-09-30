@@ -32,6 +32,23 @@ const convertTimestamps = (data: any) => {
     converted.date = converted.date.toDate();
   }
   
+  // Convert leave request specific dates
+  if (converted.startDate && typeof converted.startDate.toDate === 'function') {
+    converted.startDate = converted.startDate.toDate();
+  }
+  if (converted.endDate && typeof converted.endDate.toDate === 'function') {
+    converted.endDate = converted.endDate.toDate();
+  }
+  if (converted.approvedAt && typeof converted.approvedAt.toDate === 'function') {
+    converted.approvedAt = converted.approvedAt.toDate();
+  }
+  if (converted.reportedAt && typeof converted.reportedAt.toDate === 'function') {
+    converted.reportedAt = converted.reportedAt.toDate();
+  }
+  if (converted.actualReturnDate && typeof converted.actualReturnDate.toDate === 'function') {
+    converted.actualReturnDate = converted.actualReturnDate.toDate();
+  }
+  
   // Convert nested timestamps in personalInfo
   if (converted.personalInfo?.dateOfBirth && typeof converted.personalInfo.dateOfBirth.toDate === 'function') {
     converted.personalInfo.dateOfBirth = converted.personalInfo.dateOfBirth.toDate();

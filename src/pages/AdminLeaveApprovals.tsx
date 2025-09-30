@@ -33,28 +33,33 @@ const AdminLeaveApprovals: React.FC = () => {
       setLoading(true);
       const allRequests: LeaveRequest[] = [];
 
-      // Always try default-company first
-      try {
-        const defaultRequests = await firebaseService.getPendingLeaveApprovals('default-company', user.uid);
-        allRequests.push(...defaultRequests);
-      } catch (err) {
-        console.log('No requests found for default company');
-      }
-
-      // Then try all loaded companies
-      for (const company of companies) {
+      // Get all leave requests for this user
+      const allLeaveRequests = await firebaseService.getLeaveRequests(user.uid);
+      
+      // Filter for pending requests
+      const pendingRequests = allLeaveRequests.filter(request => request.status === 'pending');
+      
+      allRequests.push(...pendingRequests);
+      
+      // Also try company-specific queries if companies are loaded
+      if (companies.length > 0) {
         try {
-          const requests = await firebaseService.getPendingLeaveApprovals(company.id, user.uid);
-          allRequests.push(...requests);
+          const defaultRequests = await firebaseService.getPendingLeaveApprovals('default-company', user.uid);
+          // Only add if not already in the list
+          defaultRequests.forEach(req => {
+            if (!allRequests.find(existing => existing.id === req.id)) {
+              allRequests.push(req);
+            }
+          });
         } catch (err) {
-          console.log(`No requests found for company ${company.id}`);
+          console.log('No requests found for default company');
         }
       }
 
       setPendingRequests(allRequests);
     } catch (err) {
       console.error('Error loading pending requests:', err);
-      // Don't show error to user, just log it
+      showError('Fout bij laden', 'Kon verlofaanvragen niet laden');
     } finally {
       setLoading(false);
     }

@@ -30,28 +30,35 @@ const AdminAbsenceManagement: React.FC = () => {
       setLoading(true);
       const allSickLeave: SickLeave[] = [];
 
-      // Always try default-company first
-      try {
-        const defaultSickLeave = await firebaseService.getActiveSickLeave('default-company', user.uid);
-        allSickLeave.push(...defaultSickLeave);
-      } catch (err) {
-        console.log('No sick leave found for default company');
-      }
-
-      // Then try all loaded companies
-      for (const company of companies) {
+      // Get all sick leave records for this user
+      const allSickLeaveRecords = await firebaseService.getSickLeaveRecords(user.uid);
+      
+      // Filter for active sick leave
+      const activeSickLeaveRecords = allSickLeaveRecords.filter(record => 
+        record.status === 'active' || record.status === 'partially_recovered'
+      );
+      
+      allSickLeave.push(...activeSickLeaveRecords);
+      
+      // Also try company-specific queries if companies are loaded
+      if (companies.length > 0) {
         try {
-          const sickLeave = await firebaseService.getActiveSickLeave(company.id, user.uid);
-          allSickLeave.push(...sickLeave);
+          const defaultSickLeave = await firebaseService.getActiveSickLeave('default-company', user.uid);
+          // Only add if not already in the list
+          defaultSickLeave.forEach(record => {
+            if (!allSickLeave.find(existing => existing.id === record.id)) {
+              allSickLeave.push(record);
+            }
+          });
         } catch (err) {
-          console.log(`No sick leave found for company ${company.id}`);
+          console.log('No sick leave found for default company');
         }
       }
 
       setActiveSickLeave(allSickLeave);
     } catch (err) {
       console.error('Error loading active sick leave:', err);
-      // Don't show error to user, just log it
+      showError('Fout bij laden', 'Kon verzuimgegevens niet laden');
     } finally {
       setLoading(false);
     }
