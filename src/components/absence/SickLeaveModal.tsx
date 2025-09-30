@@ -25,7 +25,7 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({
   employeeId,
 }) => {
   const { user } = useAuth();
-  const { showToast } = useToast();
+  const { success, error } = useToast();
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<SickLeaveFormData>({
@@ -42,7 +42,7 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({
           setCurrentEmployee(employee);
         } catch (error) {
           console.error('Error loading employee:', error);
-          showToast('Fout bij laden werknemersgegevens', 'error');
+          error('Fout bij laden werknemersgegevens');
         }
       }
     };
@@ -72,7 +72,7 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({
     e.preventDefault();
     
     if (!user) {
-      showToast('Gebruiker niet ingelogd', 'error');
+      error('Gebruiker niet ingelogd');
       return;
     }
 
@@ -93,11 +93,11 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({
         doctorVisits: [],
       });
 
-      showToast('Ziekmelding succesvol ingediend', 'success');
+      success('Ziekmelding succesvol ingediend');
       handleClose();
     } catch (error) {
       console.error('Error creating sick leave:', error);
-      showToast('Fout bij indienen ziekmelding', 'error');
+      error('Fout bij indienen ziekmelding');
     } finally {
       setSubmitting(false);
     }
