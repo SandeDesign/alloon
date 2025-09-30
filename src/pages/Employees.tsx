@@ -283,7 +283,12 @@ const Employees: React.FC = () => {
       // Get available branches for this company
       const availableBranches = branches.filter(b => b.companyId === defaultCompany.id);
       if (availableBranches.length === 0) {
-        error('Geen vestigingen', `Voeg eerst een vestiging toe aan ${defaultCompany.name} voordat je werknemers kunt aanmaken`);
+        error('Geen vestigingen', `Voeg eerst een vestiging toe aan ${defaultCompany.name} voordat je werknemers kunt
+        )
+      }
+    }
+  }
+} aanmaken`);
         return;
       }
       
@@ -530,22 +535,11 @@ const Employees: React.FC = () => {
         },
         leaveInfo: {
           holidayDays: {
-            remaining: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
-            expiryDate: new Date(new Date().getFullYear() + 5, 11, 31) // 5 years from now
-          },
+            statutory: data.statutoryHolidayDays,
+            extraStatutory: data.extraStatutoryHolidayDays,
+            accumulated: data.statutoryHolidayDays + data.extraStatutoryHolidayDays,
+            taken: 0,
           advDays: (data.advDaysAccumulated !== undefined && data.advDaysAccumulated !== null) ? {
-            accumulated: data.advDaysAccumulated,
-            taken: data.advDaysTaken || 0,
-            remaining: (data.advDaysAccumulated || 0) - (data.advDaysTaken || 0)
-          } : undefined
-        },
-        },
-        
-        // Add deductions to salaryInfo where it belongs
-        salaryInfo: {
-          ...employeeData.salaryInfo,
-          deductions: data.deductions ? (Array.isArray(data.deductions) ? data.deductions : []) : [],
-          companyCarBenefit: (data.companyCarCatalogValue && data.companyCarCo2Emission) ? {
             accumulated: data.advDays,
             taken: 0,
             remaining: data.advDays,
