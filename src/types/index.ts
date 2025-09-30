@@ -1,5 +1,6 @@
 export interface Company {
   id: string;
+  userId: string;
   name: string;
   kvk: string;
   taxNumber: string;
@@ -28,6 +29,7 @@ export interface Company {
 
 export interface Branch {
   id: string;
+  userId: string;
   companyId: string;
   name: string;
   location: string;
@@ -44,6 +46,7 @@ export interface Branch {
 
 export interface Employee {
   id: string;
+  userId: string;
   companyId: string;
   branchId: string;
   personalInfo: {
@@ -92,6 +95,7 @@ export interface Employee {
 
 export interface TimeEntry {
   id: string;
+  userId: string;
   employeeId: string;
   date: Date;
   regularHours: number;
@@ -107,6 +111,7 @@ export interface TimeEntry {
 
 export interface PayrollCalculation {
   id: string;
+  userId: string;
   employeeId: string;
   period: {
     month: number;
@@ -139,6 +144,7 @@ export interface PayrollCalculation {
 
 export interface Regulation {
   id: string;
+  userId: string;
   title: string;
   description: string;
   category: 'tax' | 'minimum-wage' | 'pension' | 'cao' | 'other';

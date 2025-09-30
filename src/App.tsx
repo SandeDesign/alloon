@@ -1,9 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Companies from './pages/Companies';
 import Employees from './pages/Employees';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import { AppProvider } from './contexts/AppContext';
 import { ToastContainer } from './components/ui/Toast';
@@ -77,34 +82,44 @@ const Settings = () => (
 
 function App() {
   return (
-    <AppProvider>
+    <AuthProvider>
+      <AppProvider>
       <Router>
         <div className="App">
           <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Protected routes */}
             <Route
               path="/*"
               element={
-                <Layout>
-                  <Routes>
-                    <Route index element={<Dashboard />} />
-                    <Route path="companies" element={<Companies />} />
-                    <Route path="employees" element={<Employees />} />
-                    <Route path="hours" element={<Hours />} />
-                    <Route path="payroll" element={<Payroll />} />
-                    <Route path="payslips" element={<Payslips />} />
-                    <Route path="regulations" element={<Regulations />} />
-                    <Route path="export" element={<Export />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Layout>
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route index element={<Dashboard />} />
+                      <Route path="companies" element={<Companies />} />
+                      <Route path="employees" element={<Employees />} />
+                      <Route path="hours" element={<Hours />} />
+                      <Route path="payroll" element={<Payroll />} />
+                      <Route path="payslips" element={<Payslips />} />
+                      <Route path="regulations" element={<Regulations />} />
+                      <Route path="export" element={<Export />} />
+                      <Route path="settings" element={<Settings />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
               }
             />
           </Routes>
           <ToastContainer />
         </div>
       </Router>
-    </AppProvider>
+      </AppProvider>
+    </AuthProvider>
   );
 }
 

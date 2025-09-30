@@ -5,10 +5,14 @@ import Button from '../components/ui/Button';
 import Table from '../components/ui/Table';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import { Company } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { demoCompanies } from '../services/demoData';
+import { createCompany, updateCompany, deleteCompany } from '../services/firebase';
 
 interface CompanyFormData {
   name: string;
@@ -28,17 +32,14 @@ interface CompanyFormData {
 }
 
 const Companies: React.FC = () => {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const { user } = useAuth();
+  const { companies, refreshCompanies, loading } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<CompanyFormData>();
-
-  useEffect(() => {
-    // Load demo data
-    setCompanies(demoCompanies);
-  }, []);
 
   const openModal = (company?: Company) => {
     if (company) {
@@ -71,9 +72,11 @@ const Companies: React.FC = () => {
   };
 
   const onSubmit = (data: CompanyFormData) => {
+    if (!user) return;
+    
+    setSubmitting(true);
     try {
-      const companyData: Company = {
-        id: editingCompany?.id || `comp-${Date.now()}`,
+      const companyData = {
         name: data.name,
         kvk: data.kvk,
         taxNumber: data.taxNumber,
@@ -95,28 +98,38 @@ const Companies: React.FC = () => {
           holidayAllowancePercentage: data.holidayAllowancePercentage,
           pensionContributionPercentage: data.pensionContributionPercentage,
         },
-        createdAt: editingCompany?.createdAt || new Date(),
-        updatedAt: new Date(),
       };
 
       if (editingCompany) {
-        setCompanies(prev => prev.map(c => c.id === editingCompany.id ? companyData : c));
+        await updateCompany(editingCompany.id, user.uid, companyData);
         success('Bedrijf bijgewerkt', `${data.name} is succesvol bijgewerkt`);
       } else {
-        setCompanies(prev => [...prev, companyData]);
+        await createCompany(user.uid, companyData);
         success('Bedrijf aangemaakt', `${data.name} is succesvol toegevoegd`);
       }
 
+      await refreshCompanies();
       closeModal();
     } catch (err) {
+      console.error('Error saving company:', err);
       error('Er is een fout opgetreden', 'Probeer het opnieuw');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const deleteCompany = (company: Company) => {
+  const handleDeleteCompany = async (company: Company) => {
+    if (!user) return;
+    
     if (window.confirm(`Weet je zeker dat je ${company.name} wilt verwijderen?`)) {
-      setCompanies(prev => prev.filter(c => c.id !== company.id));
-      success('Bedrijf verwijderd', `${company.name} is succesvol verwijderd`);
+      try {
+        await deleteCompany(company.id, user.uid);
+        await refreshCompanies();
+        success('Bedrijf verwijderd', `${company.name} is succesvol verwijderd`);
+      } catch (err) {
+        console.error('Error deleting company:', err);
+        error('Fout bij verwijderen', 'Kon bedrijf niet verwijderen');
+      }
     }
   };
 
@@ -181,7 +194,7 @@ const Companies: React.FC = () => {
             variant="danger"
             onClick={(e) => {
               e.stopPropagation();
-              deleteCompany(company);
+              handleDeleteCompany(company);
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -190,6 +203,10 @@ const Companies: React.FC = () => {
       ),
     },
   ];
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="space-y-6">
@@ -211,7 +228,17 @@ const Companies: React.FC = () => {
 
       {/* Companies Table */}
       <Card>
-        <Table data={companies} columns={columns} />
+        {companies.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="Geen bedrijven"
+            description="Maak je eerste bedrijf aan om te beginnen met je loonadministratie"
+            actionLabel="Bedrijf Toevoegen"
+            onAction={() => openModal()}
+          />
+        ) : (
+          <Table data={companies} columns={columns} />
+        )}
       </Card>
 
       {/* Company Modal */}
@@ -349,7 +376,7 @@ const Companies: React.FC = () => {
             <Button type="button" variant="secondary" onClick={closeModal}>
               Annuleren
             </Button>
-            <Button type="submit">
+            <Button type="submit" loading={submitting}>
               {editingCompany ? 'Bijwerken' : 'Aanmaken'}
             </Button>
           </div>

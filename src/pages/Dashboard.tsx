@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Building2, Users, Calculator, Clock, TrendingUp, AlertCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
-import { demoCompanies, demoBranches, demoEmployees, demoTimeEntries } from '../services/demoData';
 
 interface QuickAction {
   title: string;
@@ -22,45 +24,23 @@ interface ActivityItem {
 }
 
 const Dashboard: React.FC = () => {
-  const { dashboardStats, setDashboardStats } = useApp();
+  const { dashboardStats, refreshDashboardStats, companies, employees, loading } = useApp();
+  const { user } = useAuth();
   const { success, info } = useToast();
   const [recentActivity] = useState<ActivityItem[]>([
     {
       id: '1',
       type: 'import',
-      message: 'Uren geïmporteerd voor 15 werknemers',
+      message: 'Welkom bij AlloonApp! Begin met het toevoegen van je eerste bedrijf.',
       timestamp: new Date('2024-12-16T14:30:00'),
-    },
-    {
-      id: '2',
-      type: 'payroll',
-      message: 'Loonstroken gegenereerd voor december 2024',
-      timestamp: new Date('2024-12-16T10:15:00'),
-    },
-    {
-      id: '3',
-      type: 'regulation',
-      message: 'Nieuwe regelgeving: Minimumloon wijziging',
-      timestamp: new Date('2024-12-15T16:45:00'),
     },
   ]);
 
   useEffect(() => {
-    // Load demo data and calculate stats
-    const activeEmployees = demoEmployees.filter(emp => emp.status === 'active').length;
-    const companiesCount = demoCompanies.length;
-    const branchesCount = demoBranches.length;
-    const pendingApprovals = demoTimeEntries.filter(entry => entry.status === 'draft').length;
-    const totalGrossThisMonth = 145250; // Demo calculation
-
-    setDashboardStats({
-      activeEmployees,
-      totalGrossThisMonth,
-      companiesCount,
-      branchesCount,
-      pendingApprovals,
-    });
-  }, [setDashboardStats]);
+    if (user) {
+      refreshDashboardStats();
+    }
+  }, [user, refreshDashboardStats]);
 
   const quickActions: QuickAction[] = [
     {
@@ -100,6 +80,34 @@ const Dashboard: React.FC = () => {
       color: 'text-purple-600 bg-purple-100',
     },
   ];
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  // Show empty state if no companies exist
+  if (companies.length === 0) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welkom bij AlloonApp!
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Begin met het opzetten van je loonadministratie door je eerste bedrijf toe te voegen.
+          </p>
+        </div>
+
+        <EmptyState
+          icon={Building2}
+          title="Geen bedrijven gevonden"
+          description="Maak je eerste bedrijf aan om te beginnen met je loonadministratie"
+          actionLabel="Eerste Bedrijf Toevoegen"
+          onAction={() => window.location.href = '/companies'}
+        />
+      </div>
+    );
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('nl-NL', {
@@ -258,33 +266,49 @@ const Dashboard: React.FC = () => {
         {/* Alerts */}
         <Card title="Aandachtspunten">
           <div className="space-y-4">
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                <div className="ml-3">
-                  <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    Nieuwe CAO Wijzigingen
-                  </h4>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    Er zijn nieuwe CAO wijzigingen beschikbaar die van invloed kunnen zijn op uw loonberekeningen.
-                  </p>
+            {employees.length === 0 ? (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      Voeg Werknemers Toe
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      Begin met het toevoegen van werknemers om je loonadministratie op te zetten.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex">
-                <Clock className="h-5 w-5 text-blue-600" />
-                <div className="ml-3">
-                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Uren Goedkeuring Vereist
-                  </h4>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                    {dashboardStats.pendingApprovals} urenregistraties wachten op goedkeuring.
-                  </p>
+            ) : dashboardStats.pendingApprovals > 0 ? (
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <div className="flex">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                      Uren Goedkeuring Vereist
+                    </h4>
+                    <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                      {dashboardStats.pendingApprovals} urenregistraties wachten op goedkeuring.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <div className="ml-3">
+                    <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
+                      Alles Up-to-Date
+                    </h4>
+                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      Je loonadministratie is volledig bijgewerkt. Goed bezig!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       </div>

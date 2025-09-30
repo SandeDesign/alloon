@@ -5,10 +5,14 @@ import Button from '../components/ui/Button';
 import Table from '../components/ui/Table';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import { Employee, Company, Branch } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
-import { demoEmployees, demoCompanies, demoBranches } from '../services/demoData';
+import { createEmployee, updateEmployee, deleteEmployee, getBranches } from '../services/firebase';
 
 interface EmployeeFormData {
   firstName: string;
@@ -35,20 +39,33 @@ interface EmployeeFormData {
 }
 
 const Employees: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [companies] = useState<Company[]>(demoCompanies);
-  const [branches] = useState<Branch[]>(demoBranches);
+  const { user } = useAuth();
+  const { employees, companies, refreshEmployees, loading } = useApp();
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { success, error } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<EmployeeFormData>();
   const selectedCompanyId = watch('companyId');
 
   useEffect(() => {
-    // Load demo data
-    setEmployees(demoEmployees);
-  }, []);
+    if (user) {
+      loadBranches();
+    }
+  }, [user]);
+
+  const loadBranches = async () => {
+    if (!user) return;
+    
+    try {
+      const data = await getBranches(user.uid);
+      setBranches(data);
+    } catch (err) {
+      console.error('Error loading branches:', err);
+    }
+  };
 
   const openModal = (employee?: Employee) => {
     if (employee) {
@@ -88,9 +105,11 @@ const Employees: React.FC = () => {
   };
 
   const onSubmit = (data: EmployeeFormData) => {
+    if (!user) return;
+    
+    setSubmitting(true);
     try {
-      const employeeData: Employee = {
-        id: editingEmployee?.id || `emp-${Date.now()}`,
+      const employeeData = {
         companyId: data.companyId,
         branchId: data.branchId,
         personalInfo: {
@@ -132,29 +151,39 @@ const Employees: React.FC = () => {
           pensionContribution: data.pensionContribution,
         },
         status: 'active',
-        createdAt: editingEmployee?.createdAt || new Date(),
-        updatedAt: new Date(),
       };
 
       if (editingEmployee) {
-        setEmployees(prev => prev.map(e => e.id === editingEmployee.id ? employeeData : e));
+        await updateEmployee(editingEmployee.id, user.uid, employeeData);
         success('Werknemer bijgewerkt', `${data.firstName} ${data.lastName} is succesvol bijgewerkt`);
       } else {
-        setEmployees(prev => [...prev, employeeData]);
+        await createEmployee(user.uid, employeeData);
         success('Werknemer aangemaakt', `${data.firstName} ${data.lastName} is succesvol toegevoegd`);
       }
 
+      await refreshEmployees();
       closeModal();
     } catch (err) {
+      console.error('Error saving employee:', err);
       error('Er is een fout opgetreden', 'Probeer het opnieuw');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const deleteEmployee = (employee: Employee) => {
+  const handleDeleteEmployee = async (employee: Employee) => {
+    if (!user) return;
+    
     const fullName = `${employee.personalInfo.firstName} ${employee.personalInfo.lastName}`;
     if (window.confirm(`Weet je zeker dat je ${fullName} wilt verwijderen?`)) {
-      setEmployees(prev => prev.filter(e => e.id !== employee.id));
-      success('Werknemer verwijderd', `${fullName} is succesvol verwijderd`);
+      try {
+        await deleteEmployee(employee.id, user.uid);
+        await refreshEmployees();
+        success('Werknemer verwijderd', `${fullName} is succesvol verwijderd`);
+      } catch (err) {
+        console.error('Error deleting employee:', err);
+        error('Fout bij verwijderen', 'Kon werknemer niet verwijderen');
+      }
     }
   };
 
@@ -289,7 +318,7 @@ const Employees: React.FC = () => {
             variant="danger"
             onClick={(e) => {
               e.stopPropagation();
-              deleteEmployee(employee);
+              handleDeleteEmployee(employee);
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -298,6 +327,10 @@ const Employees: React.FC = () => {
       ),
     },
   ];
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="space-y-6">
@@ -319,7 +352,27 @@ const Employees: React.FC = () => {
 
       {/* Employees Table */}
       <Card>
-        <Table data={employees} columns={columns} />
+        {employees.length === 0 ? (
+          companies.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="Geen bedrijven"
+              description="Maak eerst een bedrijf aan voordat je werknemers kunt toevoegen"
+              actionLabel="Bedrijf Toevoegen"
+              onAction={() => window.location.href = '/companies'}
+            />
+          ) : (
+            <EmptyState
+              icon={User}
+              title="Geen werknemers"
+              description="Voeg je eerste werknemer toe om te beginnen met loonadministratie"
+              actionLabel="Werknemer Toevoegen"
+              onAction={() => openModal()}
+            />
+          )
+        ) : (
+          <Table data={employees} columns={columns} />
+        )}
       </Card>
 
       {/* Employee Modal */}
@@ -576,7 +629,7 @@ const Employees: React.FC = () => {
             <Button type="button" variant="secondary" onClick={closeModal}>
               Annuleren
             </Button>
-            <Button type="submit">
+            <Button type="submit" loading={submitting}>
               {editingEmployee ? 'Bijwerken' : 'Aanmaken'}
             </Button>
           </div>
