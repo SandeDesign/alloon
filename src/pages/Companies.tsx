@@ -29,10 +29,6 @@ interface CompanyFormData {
   standardWorkWeek: number;
   holidayAllowancePercentage: number;
   pensionContributionPercentage: number;
-  // Eerste vestiging (alleen bij nieuw bedrijf)
-  branchName?: string;
-  branchLocation?: string;
-  branchCostCenter?: string;
 }
 
 const Companies: React.FC = () => {
@@ -117,7 +113,16 @@ const Companies: React.FC = () => {
         success('Bedrijf bijgewerkt', `${data.name} is succesvol bijgewerkt`);
       } else {
         // Create new company with initial branch
-        if (!data.branchName || !data.branchLocation || !data.branchCostCenter) {
+        // Get branch data from form elements
+        const branchNameElement = document.querySelector('input[name="branchName"]') as HTMLInputElement;
+        const branchLocationElement = document.querySelector('input[name="branchLocation"]') as HTMLInputElement;
+        const branchCostCenterElement = document.querySelector('input[name="branchCostCenter"]') as HTMLInputElement;
+        
+        const branchName = branchNameElement?.value;
+        const branchLocation = branchLocationElement?.value;
+        const branchCostCenter = branchCostCenterElement?.value;
+        
+        if (!branchName || !branchLocation || !branchCostCenter) {
           error('Ontbrekende gegevens', 'Vestigingsgegevens zijn verplicht voor een nieuw bedrijf');
           return;
         }
@@ -127,9 +132,9 @@ const Companies: React.FC = () => {
         // Create the initial branch
         const branchData = {
           companyId: companyId,
-          name: data.branchName,
-          location: data.branchLocation,
-          costCenter: data.branchCostCenter,
+          name: branchName,
+          location: branchLocation,
+          costCenter: branchCostCenter,
         };
         
         const branchId = await createBranch(user.uid, branchData);
@@ -331,24 +336,39 @@ const Companies: React.FC = () => {
                 Elke bedrijf heeft minimaal één vestiging. Deze wordt automatisch de hoofdvestiging.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Vestigingsnaam *"
-                  {...register('branchName', { required: !editingCompany ? 'Vestigingsnaam is verplicht' : false })}
-                  error={errors.branchName?.message}
-                  placeholder="bijv. Hoofdkantoor, Vestiging Amsterdam"
-                />
-                <Input
-                  label="Locatie *"
-                  {...register('branchLocation', { required: !editingCompany ? 'Locatie is verplicht' : false })}
-                  error={errors.branchLocation?.message}
-                  placeholder="bijv. Amsterdam, Rotterdam"
-                />
-                <Input
-                  label="Kostenplaats *"
-                  {...register('branchCostCenter', { required: !editingCompany ? 'Kostenplaats is verplicht' : false })}
-                  error={errors.branchCostCenter?.message}
-                  placeholder="bijv. 001, HK01"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Vestigingsnaam *
+                  </label>
+                  <input
+                    name="branchName"
+                    type="text"
+                    placeholder="bijv. Hoofdkantoor, Vestiging Amsterdam"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Locatie *
+                  </label>
+                  <input
+                    name="branchLocation"
+                    type="text"
+                    placeholder="bijv. Amsterdam, Rotterdam"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Kostenplaats *
+                  </label>
+                  <input
+                    name="branchCostCenter"
+                    type="text"
+                    placeholder="bijv. 001, HK01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"
+                  />
+                </div>
               </div>
             </div>
           )}
