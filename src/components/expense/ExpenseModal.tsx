@@ -72,8 +72,8 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
   }, [expenseType, kilometers, travelRatePerKm, setValue]);
 
   const onSubmit = async (data: ExpenseFormData) => {
-    if (!user || !employeeId) {
-      showError('Geen gebruiker', 'Je moet ingelogd zijn om een declaratie in te dienen');
+    if (!employeeId) {
+      showError('Geen werknemer', 'Werknemer ID ontbreekt');
       return;
     }
 
@@ -87,7 +87,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose, onSuccess,
 
     setSubmitting(true);
     try {
-      await createExpense(user.uid, {
+      await createExpense({
         employeeId,
         companyId,
         date: new Date(data.date),

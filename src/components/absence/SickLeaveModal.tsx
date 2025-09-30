@@ -49,8 +49,8 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
   }, [employeeId, employees]);
 
   const onSubmit = async (data: SickLeaveFormData) => {
-    if (!user || !employeeId) {
-      showError('Geen gebruiker', 'Je moet ingelogd zijn om ziek te melden');
+    if (!employeeId) {
+      showError('Geen werknemer', 'Werknemer ID ontbreekt');
       return;
     }
 
@@ -60,12 +60,12 @@ const SickLeaveModal: React.FC<SickLeaveModalProps> = ({ isOpen, onClose, onSucc
     // Skip employee validation - allow submission even without employee data
     setSubmitting(true);
     try {
-      await createSickLeave(user.uid, {
+      await createSickLeave({
         employeeId,
         companyId,
         startDate: new Date(data.startDate),
         reportedAt: new Date(),
-        reportedBy: user.displayName || user.email || 'Werknemer',
+        reportedBy: user?.displayName || user?.email || 'Werknemer',
         reportedVia: 'app',
         workCapacityPercentage: data.workCapacityPercentage,
         status: 'active',

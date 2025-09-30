@@ -17,6 +17,19 @@ import { auth } from '../lib/firebase';
 import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense } from '../types';
 import { generatePoortwachterMilestones, shouldActivatePoortwachter } from '../utils/poortwachterTracking';
 
+// Helper function to get the company owner's userId
+const getCompanyOwnerUserId = async (companyId: string): Promise<string> => {
+  const companyRef = doc(db, 'companies', companyId);
+  const companySnap = await getDoc(companyRef);
+  
+  if (!companySnap.exists()) {
+    throw new Error('Company not found');
+  }
+  
+  const companyData = companySnap.data();
+  return companyData.userId;
+};
+
 // Helper function to convert Firestore timestamps to Date objects
 const convertTimestamps = (data: any) => {
   const converted = { ...data };
@@ -594,7 +607,10 @@ export const getLeaveRequests = async (userId: string, employeeId?: string): Pro
   return requests;
 };
 
-export const createLeaveRequest = async (userId: string, request: Omit<LeaveRequest, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createLeaveRequest = async (request: Omit<LeaveRequest, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  // Get the company owner's userId
+  const userId = await getCompanyOwnerUserId(request.companyId);
+  
   const requestData = convertToTimestamps({
     ...request,
     userId,
@@ -725,7 +741,10 @@ export const getSickLeaveRecords = async (userId: string, employeeId?: string): 
   return records;
 };
 
-export const createSickLeave = async (userId: string, sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createSickLeave = async (sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  // Get the company owner's userId
+  const userId = await getCompanyOwnerUserId(sickLeave.companyId);
+  
   const shouldActivate = shouldActivatePoortwachter(sickLeave.startDate);
   const milestones = shouldActivate ? generatePoortwachterMilestones(sickLeave.startDate) : null;
 
@@ -898,7 +917,10 @@ export const getExpenses = async (userId: string, employeeId?: string): Promise<
   return expenses;
 };
 
-export const createExpense = async (userId: string, expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  // Get the company owner's userId
+  const userId = await getCompanyOwnerUserId(expense.companyId);
+  
   // Clean up undefined values that Firestore doesn't accept
   const cleanExpense = {
     ...expense,

@@ -89,8 +89,8 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
   };
 
   const onSubmit = async (data: LeaveRequestFormData) => {
-    if (!user || !employeeId) {
-      showError('Geen gebruiker', 'Je moet ingelogd zijn om verlof aan te vragen');
+    if (!employeeId) {
+      showError('Geen werknemer', 'Werknemer ID ontbreekt');
       return;
     }
 
@@ -113,7 +113,7 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ isOpen, onClose, 
     // Skip employee validation - allow submission even without employee data
     setSubmitting(true);
     try {
-      await createLeaveRequest(user.uid, {
+      await createLeaveRequest({
         employeeId,
         companyId,
         type: data.type,
