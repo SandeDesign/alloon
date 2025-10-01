@@ -320,3 +320,20 @@ export const markPayslipAsDownloaded = async (id: string, userId: string): Promi
     updatedAt: Timestamp.fromDate(new Date())
   });
 };
+
+export const regeneratePayslipPdf = async (
+  payslipId: string,
+  userId: string,
+  employee: any,
+  company: any,
+  calculation: any
+): Promise<string> => {
+  try {
+    const pdfData = await generatePayslipData(company, employee, calculation);
+    const downloadURL = await generateAndUploadPayslipPdf(pdfData, payslipId, userId);
+    return downloadURL;
+  } catch (error) {
+    console.error('Error regenerating payslip PDF:', error);
+    throw new Error('Failed to regenerate payslip PDF');
+  }
+};

@@ -56,7 +56,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
   const { success, error: showError } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<EmployeeFormData>({
+  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm<EmployeeFormData>({
     defaultValues: {
       nationality: 'Nederlandse',
       country: 'Nederland',
@@ -64,7 +64,8 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
       contractType: 'permanent',
       cao: 'cao-algemeen',
       paymentType: 'hourly',
-    }
+    },
+    mode: 'onBlur'
   });
 
   const contractType = watch('contractType');
@@ -80,7 +81,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
         lastName: employee.personalInfo.lastName,
         initials: employee.personalInfo.initials,
         bsn: employee.personalInfo.bsn,
-        dateOfBirth: employee.personalInfo.dateOfBirth.toISOString().split('T'),
+        dateOfBirth: employee.personalInfo.dateOfBirth.toISOString().split('T')[0],
         placeOfBirth: employee.personalInfo.placeOfBirth,
         nationality: employee.personalInfo.nationality,
         street: employee.personalInfo.address.street,
@@ -94,8 +95,8 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
         bankAccount: employee.personalInfo.bankAccount,
         maritalStatus: employee.personalInfo.maritalStatus,
         contractType: employee.contractInfo.type,
-        startDate: employee.contractInfo.startDate.toISOString().split('T'),
-        endDate: employee.contractInfo.endDate?.toISOString().split('T'),
+        startDate: employee.contractInfo.startDate.toISOString().split('T')[0],
+        endDate: employee.contractInfo.endDate?.toISOString().split('T')[0],
         hoursPerWeek: employee.contractInfo.hoursPerWeek,
         position: employee.contractInfo.position,
         department: employee.contractInfo.department,
@@ -552,11 +553,47 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
           )}
         </div>
 
+        {Object.keys(errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="text-red-800 font-semibold mb-2">Formulier bevat fouten:</h4>
+            <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+              {errors.companyId && <li>Bedrijf is verplicht</li>}
+              {errors.branchId && <li>Vestiging is verplicht</li>}
+              {errors.firstName && <li>Voornaam is verplicht</li>}
+              {errors.lastName && <li>Achternaam is verplicht</li>}
+              {errors.initials && <li>Initialen zijn verplicht</li>}
+              {errors.bsn && <li>BSN is verplicht</li>}
+              {errors.dateOfBirth && <li>Geboortedatum is verplicht</li>}
+              {errors.placeOfBirth && <li>Geboorteplaats is verplicht</li>}
+              {errors.nationality && <li>Nationaliteit is verplicht</li>}
+              {errors.street && <li>Straat is verplicht</li>}
+              {errors.houseNumber && <li>Huisnummer is verplicht</li>}
+              {errors.postalCode && <li>Postcode is verplicht</li>}
+              {errors.city && <li>Plaats is verplicht</li>}
+              {errors.country && <li>Land is verplicht</li>}
+              {errors.email && <li>E-mail is verplicht</li>}
+              {errors.phone && <li>Telefoon is verplicht</li>}
+              {errors.bankAccount && <li>IBAN is verplicht</li>}
+              {errors.maritalStatus && <li>Burgerlijke staat is verplicht</li>}
+              {errors.contractType && <li>Contract type is verplicht</li>}
+              {errors.position && <li>Functie is verplicht</li>}
+              {errors.startDate && <li>Startdatum is verplicht</li>}
+              {errors.endDate && <li>Einddatum is verplicht voor tijdelijk contract</li>}
+              {errors.hoursPerWeek && <li>Uren per week is verplicht</li>}
+              {errors.cao && <li>CAO is verplicht</li>}
+              {errors.paymentType && <li>Betalingstype is verplicht</li>}
+              {errors.hourlyRate && <li>Uurtarief is verplicht</li>}
+              {errors.monthlySalary && <li>Maandsalaris is verplicht</li>}
+              {errors.annualSalary && <li>Jaarsalaris is verplicht</li>}
+            </ul>
+          </div>
+        )}
+
         <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <Button type="button" variant="secondary" onClick={handleClose}>
             Annuleren
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button type="submit" loading={submitting || isSubmitting}>
             {employee ? 'Bijwerken' : 'Aanmaken'}
           </Button>
         </div>

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Download, Calendar, Building2, User } from 'lucide-react';
+import { FileText, Download, Calendar, Building2, User, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Payslip } from '../types/payslip';
-import { getPayslips, markPayslipAsDownloaded } from '../services/payslipService';
-import { getEmployeeById } from '../services/firebase';
+import { getPayslips, markPayslipAsDownloaded, regeneratePayslipPdf } from '../services/payslipService';
+import { getEmployeeById, getCompany } from '../services/firebase';
+import { getPayrollCalculations } from '../services/payrollService';
 import { useToast } from '../hooks/useToast';
 import { EmptyState } from '../components/ui/EmptyState';
 
@@ -22,6 +23,7 @@ export default function Payslips() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user || !selectedCompany) {
@@ -65,6 +67,56 @@ export default function Payslips() {
 
   const getMonthName = (date: Date): string => {
     return date.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+  };
+
+  const handleGeneratePdf = async (payslip: Payslip) => {
+    if (!employeeData || !user || !selectedCompany) {
+      showError('Fout', 'Benodigde gegevens ontbreken voor PDF generatie.');
+      return;
+    }
+
+    if (!payslip.id) {
+      showError('Fout', 'Loonstrook ID ontbreekt.');
+      return;
+    }
+
+    setGenerating(payslip.id);
+
+    try {
+      const company = await getCompany(selectedCompany.id, user.uid);
+      if (!company) {
+        throw new Error('Bedrijf niet gevonden');
+      }
+
+      const calculations = await getPayrollCalculations(
+        user.uid,
+        payslip.employeeId,
+        payslip.periodStartDate.getMonth() + 1,
+        payslip.periodStartDate.getFullYear()
+      );
+
+      if (!calculations || calculations.length === 0) {
+        throw new Error('Salarisberekening niet gevonden voor deze periode');
+      }
+
+      const calculation = calculations[0];
+
+      await regeneratePayslipPdf(
+        payslip.id,
+        user.uid,
+        employeeData,
+        company,
+        calculation
+      );
+
+      success('PDF gegenereerd', 'Loonstrook PDF is succesvol gegenereerd');
+      await loadData();
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      showError('Fout bij genereren', 'Kon loonstrook PDF niet genereren');
+    } finally {
+      setGenerating(null);
+    }
   };
 
   const handleDownload = async (payslip: Payslip) => {
@@ -245,16 +297,28 @@ export default function Payslips() {
                   )}
                 </div>
 
-                <Button
-                  onClick={() => handleDownload(payslip)}
-                  className="w-full"
-                  size="sm"
-                  disabled={!payslip.pdfUrl || downloading === payslip.id}
-                  loading={downloading === payslip.id}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {downloading === payslip.id ? 'Downloaden...' : 'Download PDF'}
-                </Button>
+                {!payslip.pdfUrl || payslip.pdfUrl.trim() === '' ? (
+                  <Button
+                    onClick={() => handleGeneratePdf(payslip)}
+                    className="w-full"
+                    size="sm"
+                    variant="success"
+                    loading={generating === payslip.id}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {generating === payslip.id ? 'Genereren...' : 'Genereer PDF'}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => handleDownload(payslip)}
+                    className="w-full"
+                    size="sm"
+                    loading={downloading === payslip.id}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {downloading === payslip.id ? 'Downloaden...' : 'Download PDF'}
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
