@@ -7,6 +7,10 @@ import Button from '../components/ui/Button';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
 import { AuditService } from '../services/auditService'; // Ensure AuditService is imported
+import { EmptyState } from '../components/ui/EmptyState';
+import { useApp } from '../contexts/AppContext'; // Import useApp to get selectedCompany
+import { Card } from '../components/ui/Card';
+
 interface AuditLog {
   id: string;
   user_id: string;
@@ -16,9 +20,6 @@ interface AuditLog {
   metadata?: any;
   created_at: string;
 }
-
-import { EmptyState } from '../components/ui/EmptyState';
-import { useApp } from '../contexts/AppContext'; // Import useApp to get selectedCompany
 
 interface AuditLogEntry { // Renamed to avoid conflict with AuditLog type from types/audit.ts
   id: string;
@@ -40,7 +41,7 @@ interface AuditLogEntry { // Renamed to avoid conflict with AuditLog type from t
 
 const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
-  const { error: showError } = useToast();
+  const { selectedCompany } = useApp();
   const { success, error: showError } = useToast();
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +83,8 @@ const AuditLogPage: React.FC = () => {
   }, [user, filters, showError]);
 
   useEffect(() => {
-  return {};
-};
+    loadAuditLogs();
+  }, [loadAuditLogs]);
 
 // Sick leave functions
 export const createSickLeave = async (adminUserId: string, sickLeaveData: any): Promise<string> => {
@@ -105,8 +106,6 @@ export const getAbsenceStatistics = async (adminUserId: string, companyId?: stri
   // TODO: Implement getAbsenceStatistics
   return {};
 };
-    loadAuditLogs();
-  }, [loadAuditLogs]);
 
   const handleExport = async () => {
     if (!user || !selectedCompany) {
@@ -242,7 +241,7 @@ export const getAbsenceStatistics = async (adminUserId: string, companyId?: stri
               </label>
               <input
                 type="date"
-                value={filters.startDate?.toISOString().split('T') || ''}
+                value={filters.startDate?.toISOString().split('T')[0] || ''}
                 onChange={(e) =>
                   setFilters({
                     ...filters,
@@ -259,7 +258,7 @@ export const getAbsenceStatistics = async (adminUserId: string, companyId?: stri
               </label>
               <input
                 type="date"
-                value={filters.endDate?.toISOString().split('T') || ''}
+                value={filters.endDate?.toISOString().split('T')[0] || ''}
                 onChange={(e) =>
                   setFilters({
                     ...filters,
