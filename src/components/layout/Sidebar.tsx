@@ -57,7 +57,7 @@ export const Sidebar: React.FC = () => {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
         <div className="flex items-center space-x-2">
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto" />
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-40" />
         </div>
         <NotificationCenter />
       </div>
