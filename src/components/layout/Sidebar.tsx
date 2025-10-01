@@ -177,7 +177,7 @@ export const Sidebar: React.FC = () => {
               title="Financieel"
               items={filteredFinancialNav}
               storageKey="nav-financial"
-              defaultOpen={true}
+              defaultOpen={false}
             />
           )
         )}
