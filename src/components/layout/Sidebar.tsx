@@ -45,6 +45,7 @@ export const navigation: NavigationItem[] = [
   { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'] },
 ];
 
+export const Sidebar: React.FC = () => {
   const { user, signOut, userRole } = useAuth();
 
   const filteredNavigation = navigation.filter(item => 
