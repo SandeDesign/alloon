@@ -18,6 +18,7 @@ interface AuditLog {
 }
 
 import { EmptyState } from '../components/ui/EmptyState';
+import Card from '../components/ui/Card';
 import { useApp } from '../contexts/AppContext'; // Import useApp to get selectedCompany
 
 interface AuditLogEntry { // Renamed to avoid conflict with AuditLog type from types/audit.ts
@@ -40,6 +41,7 @@ interface AuditLogEntry { // Renamed to avoid conflict with AuditLog type from t
 
 const AuditLogPage: React.FC = () => {
   const { user } = useAuth();
+  const { selectedCompany } = useApp();
   const { success, error: showError } = useToast();
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
