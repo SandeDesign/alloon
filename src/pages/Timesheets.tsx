@@ -59,7 +59,7 @@ export default function Timesheets() {
       setTimesheets(sheets);
 
       if (sheets.length > 0) {
-        setCurrentTimesheet(sheets);
+        setCurrentTimesheet(sheets[0]);
       } else {
         const weekDates = getWeekDates(selectedYear, selectedWeek);
         const emptyEntries: TimesheetEntry[] = weekDates.map(date => ({

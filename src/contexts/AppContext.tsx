@@ -114,11 +114,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       setLoading(true);
+      console.log('Loading data for adminUserId:', adminUserId);
       const [companiesData, employeesData, branchesData] = await Promise.all([
         getCompanies(adminUserId),
         getEmployees(adminUserId),
         getBranches(adminUserId),
       ]);
+
+      console.log('Loaded companies:', companiesData.length);
+      console.log('Loaded employees:', employeesData.length);
+      console.log('Loaded branches:', branchesData.length);
 
       setCompanies(companiesData);
       setEmployees(employeesData);
@@ -129,11 +134,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (currentEmployee) {
           const employeeCompany = companiesData.find(c => c.id === currentEmployee.companyId);
           if (employeeCompany) {
-            setSelectedCompany(employeeCompany);
+            setSelectedCompany(prev => {
+              if (prev?.id !== employeeCompany.id) {
+                return employeeCompany;
+              }
+              return prev;
+            });
           }
         }
-      } else if (companiesData.length > 0 && !selectedCompany) {
-        setSelectedCompany(companiesData[0]);
+      } else if (companiesData.length > 0) {
+        setSelectedCompany(prev => {
+          if (!prev && companiesData.length > 0) {
+            return companiesData[0];
+          }
+          return prev;
+        });
       }
 
       if (userRole === 'admin') {
@@ -141,10 +156,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (error) {
       console.error('Error loading app data:', error);
+      console.error('Error details:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, adminUserId, userRole, currentEmployeeId, selectedCompany, calculateDashboardStats]);
+  }, [user, adminUserId, userRole, currentEmployeeId, calculateDashboardStats]);
 
   useEffect(() => {
     if (user && adminUserId && (userRole === 'admin' || userRole === 'employee')) {
@@ -152,7 +168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setLoading(false);
     }
-  }, [user, adminUserId, userRole, loadData]);
+  }, [user, adminUserId, userRole, currentEmployeeId]);
 
   const refreshDashboardStats = useCallback(async () => {
     if (user && adminUserId && userRole === 'admin') {

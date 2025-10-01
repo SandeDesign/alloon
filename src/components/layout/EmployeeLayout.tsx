@@ -13,7 +13,7 @@ const navigation = [
   { name: 'Verlof', href: '/employee-dashboard/leave', icon: Calendar },
   { name: 'Verzuim', href: '/employee-dashboard/absence', icon: HeartPulse },
   { name: 'Declaraties', href: '/employee-dashboard/expenses', icon: Receipt },
-  { name: 'Uren', href: '/employee-dashboard/hours', icon: Clock },
+  { name: 'Uren', href: '/employee-dashboard/timesheets', icon: Clock },
 ];
 
 const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
