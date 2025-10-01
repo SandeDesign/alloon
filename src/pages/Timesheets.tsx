@@ -116,6 +116,16 @@ export default function Timesheets() {
     }
   }, [user, adminUserId, userRole, currentEmployeeId, selectedEmployeeId, selectedCompany, selectedYear, selectedWeek, showError]);
 
+  // Auto-select first employee for admin users
+  useEffect(() => {
+    if (userRole === 'admin' && !selectedEmployeeId && selectedCompany) {
+      const companyEmployees = employees.filter(emp => emp.companyId === selectedCompany.id);
+      if (companyEmployees.length > 0) {
+        setSelectedEmployeeId(companyEmployees[0].id);
+      }
+    }
+  }, [userRole, selectedEmployeeId, selectedCompany, employees]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);

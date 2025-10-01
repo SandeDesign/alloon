@@ -166,13 +166,20 @@ export const calculatePayroll = async (
   periodEndDate: Date,
   hourlyRate: HourlyRate
 ): Promise<Omit<PayrollCalculation, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> => {
-  const totalHours = timesheets.reduce((acc, ts) => ({
-    regular: acc.regular + ts.totalRegularHours,
-    overtime: acc.overtime + ts.totalOvertimeHours,
-    evening: acc.evening + ts.totalEveningHours,
-    night: acc.night + ts.totalNightHours,
-    weekend: acc.weekend + ts.totalWeekendHours,
-    travel: acc.travel + ts.totalTravelKilometers
+  // Filter entries to only include those within the payroll period
+  const entriesInPeriod = timesheets.flatMap(ts => 
+    ts.entries.filter(entry => 
+      entry.date >= periodStartDate && entry.date <= periodEndDate
+    )
+  );
+
+  const totalHours = entriesInPeriod.reduce((acc, entry) => ({
+    regular: acc.regular + entry.regularHours,
+    overtime: acc.overtime + entry.overtimeHours,
+    evening: acc.evening + entry.eveningHours,
+    night: acc.night + entry.nightHours,
+    weekend: acc.weekend + entry.weekendHours,
+    travel: acc.travel + entry.travelKilometers
   }), {
     regular: 0,
     overtime: 0,
