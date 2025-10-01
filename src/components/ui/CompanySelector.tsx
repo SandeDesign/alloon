@@ -20,12 +20,12 @@ export const CompanySelector: React.FC = () => {
 
   return (
     <div className="relative">
-      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <Building2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+      <div className="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+        <Building2 className="h-4 w-4 text-gray-500" />
         <select
           value={selectedCompany?.id || ''}
           onChange={handleCompanyChange}
-          className="appearance-none bg-transparent text-sm font-medium text-gray-900 dark:text-white border-none focus:outline-none pr-6 cursor-pointer"
+          className="appearance-none bg-transparent text-sm font-medium text-gray-900 border-none focus:outline-none pr-6 cursor-pointer"
         >
           {companies.map((company) => (
             <option key={company.id} value={company.id}>

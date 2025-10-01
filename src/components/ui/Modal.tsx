@@ -39,11 +39,11 @@ const Modal: React.FC<ModalProps> = ({
         </span>
 
         <div
-          className={`inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]}`}
+          className={`inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle w-full ${sizeClasses[size]}`}
         >
-          <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div className="bg-white px-6 pt-6 pb-4 sm:p-8 sm:pb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-xl font-semibold text-gray-900">
                 {title}
               </h3>
               <Button variant="ghost" size="sm" onClick={onClose}>

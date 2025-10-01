@@ -48,26 +48,26 @@ const Toast: React.FC<ToastProps> = ({ toast, onRemove }) => {
 
   return (
     <div
-      className={`max-w-sm w-full shadow-lg rounded-lg pointer-events-auto border ${getColorClasses()}`}
+      className={`max-w-sm w-full shadow-xl rounded-xl pointer-events-auto border ${getColorClasses()}`}
     >
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-start">
           <div className="flex-shrink-0">
             {getIcon()}
           </div>
           <div className="ml-3 w-0 flex-1 pt-0.5">
             {toast.title && (
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <p className="text-sm font-semibold text-gray-900">
                 {toast.title}
               </p>
             )}
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-gray-600">
               {toast.message}
             </p>
           </div>
           <div className="ml-4 flex-shrink-0 flex">
             <button
-              className="bg-transparent rounded-md inline-flex text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none"
+              className="bg-transparent rounded-md inline-flex text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
               onClick={() => onRemove(toast.id)}
             >
               <span className="sr-only">Close</span>

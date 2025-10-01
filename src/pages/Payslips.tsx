@@ -97,9 +97,7 @@ export default function Payslips() {
   if (!selectedCompany) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loonstroken</h1>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900">Loonstroken</h1>
         <EmptyState
           icon={Building2}
           title="Geen bedrijf geselecteerd"
@@ -114,9 +112,7 @@ export default function Payslips() {
   if (userRole === 'admin' && !selectedEmployeeId && companyEmployees.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loonstroken</h1>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900">Loonstroken</h1>
         <EmptyState
           icon={FileText}
           title="Geen werknemers gevonden"
@@ -130,8 +126,8 @@ export default function Payslips() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loonstroken</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900">Loonstroken</h1>
+          <p className="text-gray-600 mt-2">
             {userRole === 'admin' ? 'Bekijk en beheer loonstroken' : 'Bekijk en download uw loonstroken'}
           </p>
         </div>
@@ -140,7 +136,7 @@ export default function Payslips() {
             <select
               value={selectedEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
             >
               <option value="">Selecteer werknemer</option>
               {companyEmployees.map(emp => (
@@ -155,7 +151,7 @@ export default function Payslips() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
             >
               {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -184,18 +180,18 @@ export default function Payslips() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {payslips.map((payslip) => (
-            <Card key={payslip.id} className="hover:shadow-lg transition-shadow">
+            <Card key={payslip.id} className="p-6">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-lg">
+                    <div className="p-3 bg-blue-50 rounded-xl">
                       <FileText className="h-6 w-6 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">
+                      <h3 className="font-semibold text-gray-900">
                         {getMonthName(payslip.periodStartDate)}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-500">
                         {payslip.periodStartDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} - {payslip.periodEndDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                       </p>
                     </div>
@@ -204,21 +200,21 @@ export default function Payslips() {
 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Gegenereerd:</span>
-                    <span className="text-gray-900 dark:text-white">
+                    <span className="text-gray-500">Gegenereerd:</span>
+                    <span className="text-gray-900 font-medium">
                       {payslip.generatedAt.toLocaleDateString('nl-NL')}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Uitbetaling:</span>
-                    <span className="text-gray-900 dark:text-white">
+                    <span className="text-gray-500">Uitbetaling:</span>
+                    <span className="text-gray-900 font-medium">
                       {payslip.paymentDate.toLocaleDateString('nl-NL')}
                     </span>
                   </div>
                   {payslip.downloadedAt && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-500 dark:text-gray-500">Gedownload:</span>
-                      <span className="text-gray-500 dark:text-gray-500">
+                      <span className="text-gray-400">Gedownload:</span>
+                      <span className="text-gray-400">
                         {payslip.downloadedAt.toLocaleDateString('nl-NL')}
                       </span>
                     </div>
@@ -240,14 +236,14 @@ export default function Payslips() {
         </div>
       )}
 
-      <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+      <Card className="bg-blue-50 border-blue-200">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-800">
-            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="p-3 bg-blue-100 rounded-xl">
+            <FileText className="h-5 w-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-1">Bewaartermijn</h3>
-            <p className="text-sm text-blue-800 dark:text-blue-300">
+            <h3 className="font-semibold text-blue-900 mb-2">Bewaartermijn</h3>
+            <p className="text-sm text-blue-800">
               Loonstroken worden 7 jaar bewaard conform wettelijke vereisten. Download en bewaar uw loonstroken ook zelf voor uw administratie.
             </p>
           </div>

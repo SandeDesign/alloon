@@ -13,11 +13,9 @@ interface AppContextType {
   selectedCompany: Company | null;
   dashboardStats: DashboardStats;
   loading: boolean;
-  darkMode: boolean;
   currentEmployeeId: string | null;
   setSelectedCompany: (company: Company | null) => void;
   refreshDashboardStats: () => Promise<void>;
-  toggleDarkMode: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -36,22 +34,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     branchesCount: 0,
     pendingApprovals: 0,
   });
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true' || 
-             window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('darkMode', darkMode.toString());
-  }, [darkMode]);
 
   const calculateDashboardStats = useCallback(async (
     companiesData: Company[],
@@ -177,9 +160,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user, adminUserId, userRole, loadData]);
 
-  const toggleDarkMode = () => {
-    setDarkMode(prevMode => !prevMode);
-  };
 
   return (
     <AppContext.Provider
@@ -190,11 +170,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedCompany,
         dashboardStats,
         loading,
-        darkMode,
         currentEmployeeId,
         setSelectedCompany,
         refreshDashboardStats,
-        toggleDarkMode,
       }}
     >
       {children}

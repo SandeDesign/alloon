@@ -13,8 +13,6 @@ import {
   BookOpen,
   Download,
   Settings,
-  Moon,
-  Sun,
   LogOut,
   Shield,
 } from 'lucide-react';
@@ -47,8 +45,6 @@ export const navigation: NavigationItem[] = [
   { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'] },
 ];
 
-const Sidebar: React.FC = () => {
-  const { darkMode, toggleDarkMode } = useApp();
   const { user, signOut, userRole } = useAuth();
 
   const filteredNavigation = navigation.filter(item => 
@@ -56,9 +52,9 @@ const Sidebar: React.FC = () => {
   );
 
   return (
-    <div className="hidden lg:flex h-screen w-64 flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+    <div className="hidden lg:flex h-screen w-64 flex-col bg-white border-r border-gray-200 shadow-sm">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
         <div className="flex items-center space-x-2">
           <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto" />
         </div>
@@ -68,7 +64,7 @@ const Sidebar: React.FC = () => {
 
       {/* Company Selector */}
       {userRole === 'admin' && (
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3 border-b border-gray-100">
           <CompanySelector />
         </div>
       )}
@@ -82,8 +78,8 @@ const Sidebar: React.FC = () => {
             className={({ isActive }) =>
               `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`
             }
           >
@@ -93,23 +89,11 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      {/* Dark mode toggle */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-        <button
-          onClick={toggleDarkMode}
-          className="flex w-full items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 rounded-lg transition-colors"
-        >
-          {darkMode ? (
-            <Sun className="mr-3 h-5 w-5" />
-          ) : (
-            <Moon className="mr-3 h-5 w-5" />
-          )}
-          {darkMode ? 'Lichte modus' : 'Donkere modus'}
-        </button>
-        
+      {/* User actions */}
+      <div className="border-t border-gray-100 p-3">
         <button
           onClick={signOut}
-          className="flex w-full items-center px-3 py-2 mt-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800 rounded-lg transition-colors"
+          className="flex w-full items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
         >
           <LogOut className="mr-3 h-5 w-5" />
           Uitloggen

@@ -130,76 +130,84 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <h1 className="text-3xl font-bold text-gray-900">
           Dashboard
         </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
+        <p className="text-gray-600 mt-2">
           Welkom terug! Hier is een overzicht van uw loonadministratie.
         </p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Users className="h-8 w-8 text-blue-600" />
+              <div className="p-3 bg-blue-600 rounded-xl">
+                <Users className="h-6 w-6 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-600">
                 Actieve Werknemers
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-gray-900">
                 {dashboardStats.activeEmployees}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="p-3 bg-green-600 rounded-xl">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-600">
                 Bruto Loon Deze Maand
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-gray-900">
                 {formatCurrency(dashboardStats.totalGrossThisMonth)}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Building2 className="h-8 w-8 text-orange-600" />
+              <div className="p-3 bg-orange-600 rounded-xl">
+                <Building2 className="h-6 w-6 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-600">
                 Bedrijven
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-gray-900">
                 {dashboardStats.companiesCount}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <AlertCircle className="h-8 w-8 text-red-600" />
+              <div className="p-3 bg-red-600 rounded-xl">
+                <AlertCircle className="h-6 w-6 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <p className="text-sm font-medium text-gray-600">
                 Te Goedkeuren
               </p>
               <button 
                 onClick={() => navigate('/admin/leave-approvals')} // Navigate to a general approvals page or specific one
-                className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 transition-colors"
+                className="text-2xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
               >
                 {dashboardStats.pendingApprovals}
               </button>
@@ -209,29 +217,34 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <Card title="Snelle Acties" subtitle="Veelgebruikte functionaliteiten">
+      <Card>
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-900">Snelle Acties</h2>
+          <p className="text-gray-600 mt-1">Veelgebruikte functionaliteiten</p>
+        </div>
+        <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action) => {
             const IconComponent = action.icon;
             return (
               <div
                 key={action.title}
-                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow"
+                className="p-6 border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-200 bg-white hover:bg-gray-50"
               >
                 <div className="flex items-center mb-3">
-                  <div className={`p-2 rounded-lg ${action.color}`}>
+                  <div className={`p-3 rounded-xl ${action.color.replace('bg-', 'bg-').replace('text-', 'text-white')}`} style={{backgroundColor: action.color.includes('blue') ? '#3B82F6' : action.color.includes('green') ? '#10B981' : action.color.includes('purple') ? '#8B5CF6' : action.color.includes('red') ? '#EF4444' : '#F59E0B'}}>
                     <IconComponent className="h-6 w-6" />
                   </div>
                 </div>
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                <h4 className="text-sm font-semibold text-gray-900 mb-2">
                   {action.title}
                 </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                <p className="text-xs text-gray-600 mb-4">
                   {action.description}
                 </p>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="outline"
                   onClick={action.action}
                   className="w-full"
                 >
@@ -240,6 +253,7 @@ const Dashboard: React.FC = () => {
               </div>
             );
           })}
+        </div>
         </div>
       </Card>
 

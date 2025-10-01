@@ -14,6 +14,10 @@ import { db } from '../lib/firebase';
 import { Payslip, PayslipData } from '../types/payslip';
 import { PayrollCalculation } from '../types/payroll';
 import { Employee, Company } from '../types';
+import { pdf } from '@react-pdf/renderer';
+import { PayslipPDFTemplate } from '../components/payslip/PayslipPDFTemplate';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 
 const convertTimestamps = (data: any) => {
   const converted = { ...data };
@@ -109,6 +113,41 @@ export const createPayslip = async (
   return docRef.id;
 };
 
+export const generateAndUploadPayslipPdf = async (
+  payslipData: PayslipData,
+  payslipId: string,
+  userId: string
+): Promise<string> => {
+  try {
+    // Generate PDF blob
+    const pdfBlob = await pdf(<PayslipPDFTemplate data={payslipData} />).toBlob();
+    
+    // Create storage path
+    const fileName = `payslip-${payslipId}-${Date.now()}.pdf`;
+    const storagePath = `payslips/${userId}/${fileName}`;
+    const storageRef = ref(storage, storagePath);
+    
+    // Upload to Firebase Storage
+    await uploadBytes(storageRef, pdfBlob);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    // Update payslip record with PDF URL
+    const payslipRef = doc(db, 'payslips', payslipId);
+    await updateDoc(payslipRef, {
+      pdfUrl: downloadURL,
+      pdfStoragePath: storagePath,
+      updatedAt: Timestamp.fromDate(new Date())
+    });
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error generating payslip PDF:', error);
+    throw new Error('Failed to generate payslip PDF');
+  }
+};
+
 export const createPayslipFromCalculation = async (
   userId: string,
   calculation: any,
@@ -130,7 +169,20 @@ export const createPayslipFromCalculation = async (
     generatedBy: userId
   };
 
-  return await createPayslip(userId, payslipData);
+  const payslipId = await createPayslip(userId, payslipData);
+  
+  // Generate payslip data for PDF
+  const pdfData = await generatePayslipData(company, employee, calculation);
+  
+  // Generate and upload PDF
+  try {
+    await generateAndUploadPayslipPdf(pdfData, payslipId, userId);
+  } catch (error) {
+    console.error('Error generating PDF for payslip:', payslipId, error);
+    // Continue without PDF - can be regenerated later
+  }
+  
+  return payslipId;
 };
 
 export const generatePayslipData = async (

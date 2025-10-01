@@ -26,21 +26,21 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+        className="fixed inset-0 bg-black bg-opacity-25 z-40 lg:hidden backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 shadow-xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
             <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto" />
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <X className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+              <X className="h-6 w-6 text-gray-600" />
             </button>
           </div>
 
@@ -53,8 +53,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
                 className={({ isActive }) =>
                   `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`
                 }
               >
