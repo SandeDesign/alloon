@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   collection,
   doc,
@@ -15,10 +14,9 @@ import { db } from '../lib/firebase';
 import { Payslip, PayslipData } from '../types/payslip';
 import { PayrollCalculation } from '../types/payroll';
 import { Employee, Company } from '../types';
-import { pdf } from '@react-pdf/renderer';
-import { PayslipPDFTemplate } from '../components/payslip/PayslipPDFTemplate';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../lib/firebase';
+import { generatePayslipPdfBlob } from './payslipPdfGenerator';
 
 const convertTimestamps = (data: any) => {
   const converted = { ...data };
@@ -120,28 +118,23 @@ export const generateAndUploadPayslipPdf = async (
   userId: string
 ): Promise<string> => {
   try {
-    // Generate PDF blob
-    const pdfBlob = await pdf(<PayslipPDFTemplate data={payslipData} />).toBlob();
-    
-    // Create storage path
+    const pdfBlob = await generatePayslipPdfBlob(payslipData);
+
     const fileName = `payslip-${payslipId}-${Date.now()}.pdf`;
     const storagePath = `payslips/${userId}/${fileName}`;
     const storageRef = ref(storage, storagePath);
-    
-    // Upload to Firebase Storage
+
     await uploadBytes(storageRef, pdfBlob);
-    
-    // Get download URL
+
     const downloadURL = await getDownloadURL(storageRef);
-    
-    // Update payslip record with PDF URL
+
     const payslipRef = doc(db, 'payslips', payslipId);
     await updateDoc(payslipRef, {
       pdfUrl: downloadURL,
       pdfStoragePath: storagePath,
       updatedAt: Timestamp.fromDate(new Date())
     });
-    
+
     return downloadURL;
   } catch (error) {
     console.error('Error generating payslip PDF:', error);
