@@ -187,9 +187,9 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
           salaryScale: 'A',
           paymentType: data.paymentType,
           paymentFrequency: 'monthly' as const,
-          hourlyRate: data.hourlyRate,
-          monthlySalary: data.monthlySalary,
-          annualSalary: data.annualSalary,
+          hourlyRate: data.hourlyRate || null,
+          monthlySalary: data.monthlySalary || null,
+          annualSalary: data.annualSalary || null,
           allowances: {
             overtime: 150,
             irregular: 125,
