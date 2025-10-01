@@ -63,15 +63,22 @@ export default function Payslips() {
   }, [loadData]);
 
   const handleDownload = async (payslip: Payslip) => {
-    if (!employeeData) {
+    if (!employeeData || !user) {
       showError('Fout', 'Werknemergegevens ontbreken voor download.');
       return;
     }
 
     try {
       if (payslip.pdfUrl) {
-        window.open(payslip.pdfUrl, '_blank');
-        await markPayslipAsDownloaded(payslip.id!, user!.uid); // Use user.uid for ownership check
+        const link = document.createElement('a');
+        link.href = payslip.pdfUrl;
+        link.download = `loonstrook-${getMonthName(payslip.periodStartDate)}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        await markPayslipAsDownloaded(payslip.id!, user.uid);
         success('Loonstrook gedownload', 'Loonstrook succesvol gedownload');
       } else {
         showError('Niet beschikbaar', 'Loonstrook PDF is nog niet beschikbaar');

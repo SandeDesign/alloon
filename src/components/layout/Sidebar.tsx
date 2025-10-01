@@ -85,9 +85,9 @@ export const Sidebar: React.FC = () => {
   return (
     <div className="hidden lg:flex h-screen w-64 flex-col bg-white border-r border-gray-200 shadow-sm">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
+      <div className="flex h-20 items-center justify-between px-6 border-b border-gray-100">
         <div className="flex items-center space-x-2 flex-shrink-0 min-w-0">
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-12 w-auto object-contain" />
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto object-contain" />
         </div>
         <NotificationCenter />
       </div>

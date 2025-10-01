@@ -176,7 +176,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSucces
         contractInfo: {
           type: data.contractType,
           startDate: new Date(data.startDate),
-          endDate: data.endDate ? new Date(data.endDate) : undefined,
+          ...(data.endDate ? { endDate: new Date(data.endDate) } : {}),
           hoursPerWeek: data.hoursPerWeek,
           position: data.position,
           department: data.department,

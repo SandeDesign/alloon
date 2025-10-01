@@ -59,8 +59,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
-            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto object-contain" />
+          <div className="flex h-20 items-center justify-between px-6 border-b border-gray-100">
+            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-14 w-auto object-contain" />
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
