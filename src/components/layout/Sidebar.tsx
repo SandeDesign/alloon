@@ -147,7 +147,7 @@ export const Sidebar: React.FC = () => {
               title="Tijd & Aanwezigheid"
               items={filteredTimeNav}
               storageKey="nav-time-attendance"
-              defaultOpen={true}
+              defaultOpen={false}
             />
           )
         )}
