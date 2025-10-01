@@ -183,7 +183,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
                   items={systemNav}
                   onItemClick={onClose}
                   storageKey="mobile-nav-system"
-                  defaultOpen={true}
+                  defaultOpen={false}
                 />
               )
             )}
