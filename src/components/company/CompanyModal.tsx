@@ -5,7 +5,7 @@ import Input from '../ui/Input';
 import Button from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
-import { createCompany, updateCompany } from '../../services/firebase';
+import { createCompany, updateCompany, getCompanies } from '../../services/firebase';
 import { Company } from '../../types';
 
 interface CompanyFormData {
@@ -24,6 +24,10 @@ interface CompanyFormData {
   standardWorkWeek: number;
   holidayAllowancePercentage: number;
   pensionContributionPercentage: number;
+  
+  // ✅ NIEUW: Bedrijfstype fields
+  companyType: 'employer' | 'project';
+  primaryEmployerId?: string;
 }
 
 interface CompanyModalProps {
@@ -37,8 +41,11 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
   const { user } = useAuth();
   const { success, error: showError } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  
+  // ✅ NIEUW: State voor employer companies
+  const [employerCompanies, setEmployerCompanies] = useState<Company[]>([]);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CompanyFormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<CompanyFormData>({
     defaultValues: {
       country: 'Nederland',
       defaultCAO: 'cao-algemeen',
@@ -46,8 +53,31 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
       standardWorkWeek: 40,
       holidayAllowancePercentage: 8,
       pensionContributionPercentage: 6,
+      companyType: 'employer', // Default naar employer
     }
   });
+
+  // ✅ NIEUW: Watch companyType om UI aan te passen
+  const companyType = watch('companyType');
+
+  // ✅ NIEUW: Load employer companies voor project company selector
+  useEffect(() => {
+    const loadEmployerCompanies = async () => {
+      if (user) {
+        try {
+          const companies = await getCompanies(user.uid);
+          const employers = companies.filter(c => c.companyType === 'employer');
+          setEmployerCompanies(employers);
+        } catch (error) {
+          console.error('Error loading employer companies:', error);
+        }
+      }
+    };
+
+    if (isOpen) {
+      loadEmployerCompanies();
+    }
+  }, [isOpen, user]);
 
   useEffect(() => {
     if (company) {
@@ -67,6 +97,10 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
         standardWorkWeek: company.settings.standardWorkWeek,
         holidayAllowancePercentage: company.settings.holidayAllowancePercentage,
         pensionContributionPercentage: company.settings.pensionContributionPercentage,
+        
+        // ✅ NIEUW: Set company type fields
+        companyType: company.companyType || 'employer',
+        primaryEmployerId: company.primaryEmployerId,
       });
     } else {
       reset({
@@ -76,6 +110,7 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
         standardWorkWeek: 40,
         holidayAllowancePercentage: 8,
         pensionContributionPercentage: 6,
+        companyType: 'employer',
       });
     }
   }, [company, reset]);
@@ -83,12 +118,23 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
   const onSubmit = async (data: CompanyFormData) => {
     if (!user) return;
 
+    // ✅ NIEUW: Validatie voor project companies
+    if (data.companyType === 'project' && !data.primaryEmployerId) {
+      showError('Primaire werkgever vereist', 'Selecteer een primaire werkgever voor dit projectbedrijf');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const companyData = {
         name: data.name,
         kvk: data.kvk,
         taxNumber: data.taxNumber,
+        
+        // ✅ NIEUW: Company type data
+        companyType: data.companyType,
+        primaryEmployerId: data.companyType === 'project' ? data.primaryEmployerId : undefined,
+        
         address: {
           street: data.street,
           city: data.city,
@@ -135,143 +181,213 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={company ? 'Bedrijf Bewerken' : 'Nieuw Bedrijf'} size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={company ? 'Bedrijf bewerken' : 'Nieuw bedrijf'} size="lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* ✅ NIEUW: Bedrijfstype selector */}
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Bedrijfstype *
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+              <input
+                type="radio"
+                value="employer"
+                {...register('companyType', { required: 'Selecteer een bedrijfstype' })}
+                className="mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">Werkgever</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Primaire werkgever (bijv. Buddy BV)
+                </div>
+              </div>
+            </label>
+            
+            <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+              <input
+                type="radio"
+                value="project"
+                {...register('companyType', { required: 'Selecteer een bedrijfstype' })}
+                className="mr-3"
+              />
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">Projectbedrijf</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Voor specifieke projecten/klanten
+                </div>
+              </div>
+            </label>
+          </div>
+          {errors.companyType && (
+            <p className="text-red-500 text-sm mt-1">{errors.companyType.message}</p>
+          )}
+        </div>
+
+        {/* ✅ NIEUW: Primary employer selector voor project companies */}
+        {companyType === 'project' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Primaire werkgever *
+            </label>
+            <select
+              {...register('primaryEmployerId', { 
+                required: companyType === 'project' ? 'Selecteer een primaire werkgever' : false 
+              })}
+              className="w-full px-3 py-2 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-800 border rounded-lg border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              <option value="">Selecteer werkgever...</option>
+              {employerCompanies.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}
+                </option>
+              ))}
+            </select>
+            {errors.primaryEmployerId && (
+              <p className="text-red-500 text-sm mt-1">{errors.primaryEmployerId.message}</p>
+            )}
+            {employerCompanies.length === 0 && (
+              <p className="text-yellow-600 text-sm mt-1">
+                Maak eerst een werkgever-bedrijf aan voordat je een projectbedrijf kunt maken.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Bestaande bedrijfsinformatie velden */}
+        <div className="grid grid-cols-2 gap-4">
           <Input
             label="Bedrijfsnaam *"
             {...register('name', { required: 'Bedrijfsnaam is verplicht' })}
             error={errors.name?.message}
           />
           <Input
-            label="KvK Nummer *"
+            label="KvK nummer *"
             {...register('kvk', { required: 'KvK nummer is verplicht' })}
             error={errors.kvk?.message}
           />
         </div>
 
         <Input
-          label="BTW Nummer *"
-          {...register('taxNumber', { required: 'BTW nummer is verplicht' })}
+          label="Belastingnummer"
+          {...register('taxNumber')}
           error={errors.taxNumber?.message}
         />
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Adresgegevens</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Straat *"
-              {...register('street', { required: 'Straat is verplicht' })}
-              error={errors.street?.message}
-            />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Adresgegevens</h3>
+          <Input
+            label="Straat en huisnummer *"
+            {...register('street', { required: 'Straat is verplicht' })}
+            error={errors.street?.message}
+          />
+          <div className="grid grid-cols-2 gap-4">
             <Input
               label="Postcode *"
               {...register('zipCode', { required: 'Postcode is verplicht' })}
               error={errors.zipCode?.message}
             />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Plaats *"
               {...register('city', { required: 'Plaats is verplicht' })}
               error={errors.city?.message}
             />
-            <Input
-              label="Land *"
-              {...register('country', { required: 'Land is verplicht' })}
-              error={errors.country?.message}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Contactgegevens</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="E-mail *"
-              type="email"
-              {...register('email', { required: 'E-mail is verplicht' })}
-              error={errors.email?.message}
-            />
-            <Input
-              label="Telefoon *"
-              {...register('phone', { required: 'Telefoon is verplicht' })}
-              error={errors.phone?.message}
-            />
           </div>
           <Input
-            label="Website"
-            {...register('website')}
+            label="Land *"
+            {...register('country', { required: 'Land is verplicht' })}
+            error={errors.country?.message}
           />
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Instellingen</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Standaard CAO *
-              </label>
-              <select
-                {...register('defaultCAO', { required: 'CAO is verplicht' })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-              >
-                <option value="cao-algemeen">Algemeen (geen specifieke CAO)</option>
-                <option value="cao-bouw">Bouw & Infra</option>
-                <option value="cao-horeca">Horeca & Catering</option>
-                <option value="cao-zorg">Zorg & Welzijn</option>
-                <option value="cao-metaal">Metaal & Techniek</option>
-              </select>
-            </div>
-            <Input
-              label="Reiskostenvergoeding (€/km) *"
-              type="number"
-              step="0.01"
-              {...register('travelAllowancePerKm', { 
-                required: 'Reiskostenvergoeding is verplicht',
-                valueAsNumber: true 
-              })}
-              error={errors.travelAllowancePerKm?.message}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Standaard werkweek (uren) *"
-              type="number"
-              {...register('standardWorkWeek', { 
-                required: 'Standaard werkweek is verplicht',
-                valueAsNumber: true 
-              })}
-              error={errors.standardWorkWeek?.message}
-            />
-            <Input
-              label="Vakantietoeslag (%) *"
-              type="number"
-              step="0.1"
-              {...register('holidayAllowancePercentage', { 
-                required: 'Vakantietoeslag is verplicht',
-                valueAsNumber: true 
-              })}
-              error={errors.holidayAllowancePercentage?.message}
-            />
-            <Input
-              label="Pensioenpremie (%) *"
-              type="number"
-              step="0.1"
-              {...register('pensionContributionPercentage', { 
-                required: 'Pensioenpremie is verplicht',
-                valueAsNumber: true 
-              })}
-              error={errors.pensionContributionPercentage?.message}
-            />
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Contactgegevens</h3>
+          <Input
+            label="E-mailadres *"
+            type="email"
+            {...register('email', { 
+              required: 'E-mailadres is verplicht',
+              pattern: {
+                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                message: 'Ongeldig e-mailadres'
+              }
+            })}
+            error={errors.email?.message}
+          />
+          <Input
+            label="Telefoonnummer *"
+            {...register('phone', { required: 'Telefoonnummer is verplicht' })}
+            error={errors.phone?.message}
+          />
+          <Input
+            label="Website"
+            {...register('website')}
+            error={errors.website?.message}
+          />
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button type="button" variant="secondary" onClick={handleClose}>
+        {/* ✅ Instellingen alleen voor employer companies */}
+        {companyType === 'employer' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Standaardinstellingen</h3>
+            <Input
+              label="Standaard CAO"
+              {...register('defaultCAO')}
+              error={errors.defaultCAO?.message}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Reiskosten per km (€)"
+                type="number"
+                step="0.01"
+                {...register('travelAllowancePerKm', { 
+                  required: 'Reiskosten per km is verplicht',
+                  min: { value: 0, message: 'Reiskosten kan niet negatief zijn' }
+                })}
+                error={errors.travelAllowancePerKm?.message}
+              />
+              <Input
+                label="Standaard werkweek (uren)"
+                type="number"
+                {...register('standardWorkWeek', { 
+                  required: 'Standaard werkweek is verplicht',
+                  min: { value: 1, message: 'Werkweek moet minimaal 1 uur zijn' },
+                  max: { value: 60, message: 'Werkweek kan maximaal 60 uur zijn' }
+                })}
+                error={errors.standardWorkWeek?.message}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Vakantietoeslag (%)"
+                type="number"
+                step="0.1"
+                {...register('holidayAllowancePercentage', { 
+                  required: 'Vakantietoeslag is verplicht',
+                  min: { value: 0, message: 'Vakantietoeslag kan niet negatief zijn' }
+                })}
+                error={errors.holidayAllowancePercentage?.message}
+              />
+              <Input
+                label="Pensioenbijdrage (%)"
+                type="number"
+                step="0.1"
+                {...register('pensionContributionPercentage', { 
+                  required: 'Pensioenbijdrage is verplicht',
+                  min: { value: 0, message: 'Pensioenbijdrage kan niet negatief zijn' }
+                })}
+                error={errors.pensionContributionPercentage?.message}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-4">
+          <Button type="button" variant="outline" onClick={handleClose} isFullWidth>
             Annuleren
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button type="submit" isLoading={submitting} isFullWidth>
             {company ? 'Bijwerken' : 'Aanmaken'}
           </Button>
         </div>
