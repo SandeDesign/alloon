@@ -127,6 +127,7 @@ export default function Timesheets() {
     setImporting(true);
     try {
       // Trigger Make.com webhook to get ITKnecht data
+      // TODO: Replace 'JOUW_MAKE_WEBHOOK_URL_HIER' with your actual webhook URL
       const response = await fetch('JOUW_MAKE_WEBHOOK_URL_HIER', {
         method: 'POST',
         headers: { 
@@ -148,7 +149,7 @@ export default function Timesheets() {
       const itknechtData = await response.json();
       
       // Process the ITKnecht data and update timesheet
-      if (itknechtData && Array.isArray(itknechtData)) {
+      if (itknechtData && Array.isArray(itknechtData) && itknechtData.length > 0) {
         await processITKnechtData(itknechtData);
         success('Import geslaagd', `${itknechtData.length} ITKnecht entries geïmporteerd`);
         await loadData(); // Reload to show updated data
