@@ -14,7 +14,7 @@ import {
 import { db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense } from '../types';
+import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense, EmployeeWithCompanies, CompanyWithEmployees } from '../types';
 import { generatePoortwachterMilestones, shouldActivatePoortwachter } from '../utils/poortwachterTracking';
 
 // Helper function to convert Firestore timestamps to Date objects
@@ -153,6 +153,32 @@ export const getCompanies = async (userId: string): Promise<Company[]> => {
   } as Company));
 };
 
+// ✅ NIEUW: Get companies with filtering by type
+export const getCompaniesByType = async (userId: string, companyType?: 'employer' | 'project'): Promise<Company[]> => {
+  let q;
+  
+  if (companyType) {
+    q = query(
+      collection(db, 'companies'),
+      where('userId', '==', userId),
+      where('companyType', '==', companyType),
+      orderBy('createdAt', 'desc')
+    );
+  } else {
+    q = query(
+      collection(db, 'companies'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+  }
+  
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data())
+  } as Company));
+};
+
 export const getCompany = async (id: string, userId: string): Promise<Company | null> => {
   const docRef = doc(db, 'companies', id);
   const docSnap = await getDoc(docRef);
@@ -170,10 +196,25 @@ export const getCompany = async (id: string, userId: string): Promise<Company | 
   } as Company;
 };
 
+// ✅ GEWIJZIGD: Updated createCompany om company type te ondersteunen
 export const createCompany = async (userId: string, company: Omit<Company, 'id' | 'userId'>): Promise<string> => {
+  // Validate project company has primaryEmployerId
+  if (company.companyType === 'project' && !company.primaryEmployerId) {
+    throw new Error('Project companies must have a primaryEmployerId');
+  }
+  
+  // Validate primary employer exists and is owned by same user
+  if (company.companyType === 'project' && company.primaryEmployerId) {
+    const primaryEmployer = await getCompany(company.primaryEmployerId, userId);
+    if (!primaryEmployer || primaryEmployer.companyType !== 'employer') {
+      throw new Error('Invalid primary employer');
+    }
+  }
+  
   const companyData = convertToTimestamps({
     ...company,
     userId,
+    companyType: company.companyType || 'employer', // Default to employer
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -311,6 +352,20 @@ export const getEmployees = async (userId: string, companyId?: string, branchId?
   } as Employee));
 };
 
+// ✅ NIEUW: Get employees with their project companies populated
+export const getEmployeesWithProjectCompanies = async (userId: string, companyId?: string): Promise<EmployeeWithCompanies[]> => {
+  const employees = await getEmployees(userId, companyId);
+  const companies = await getCompanies(userId);
+  
+  return employees.map(employee => ({
+    ...employee,
+    primaryEmployer: companies.find(c => c.id === employee.companyId),
+    projectCompaniesData: employee.projectCompanies?.map(pcId => 
+      companies.find(c => c.id === pcId)
+    ).filter(Boolean) || []
+  }));
+};
+
 export const getEmployee = async (id: string, userId: string): Promise<Employee | null> => {
   const docRef = doc(db, 'employees', id);
   const docSnap = await getDoc(docRef);
@@ -328,10 +383,34 @@ export const getEmployee = async (id: string, userId: string): Promise<Employee 
   } as Employee;
 };
 
+// ✅ GEWIJZIGD: Updated createEmployee om project companies te ondersteunen
 export const createEmployee = async (userId: string, employee: Omit<Employee, 'id' | 'userId'>): Promise<string> => {
+  // Validate primary company exists and is owned by user
+  const primaryCompany = await getCompany(employee.companyId, userId);
+  if (!primaryCompany) {
+    throw new Error('Invalid primary company');
+  }
+  
+  // Validate project companies exist and are owned by user
+  if (employee.projectCompanies && employee.projectCompanies.length > 0) {
+    const projectCompanies = await Promise.all(
+      employee.projectCompanies.map(pcId => getCompany(pcId, userId))
+    );
+    
+    if (projectCompanies.some(pc => !pc)) {
+      throw new Error('One or more project companies are invalid');
+    }
+    
+    // Ensure all project companies are actually project type
+    if (projectCompanies.some(pc => pc?.companyType !== 'project')) {
+      throw new Error('All project companies must be of type "project"');
+    }
+  }
+  
   const employeeData = convertToTimestamps({
     ...employee,
     userId,
+    projectCompanies: employee.projectCompanies || [], // Ensure array exists
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -340,6 +419,7 @@ export const createEmployee = async (userId: string, employee: Omit<Employee, 'i
   return docRef.id;
 };
 
+// ✅ GEWIJZIGD: Updated updateEmployee om project companies te ondersteunen
 export const updateEmployee = async (id: string, userId: string, updates: Partial<Employee>): Promise<void> => {
   // First verify ownership
   const docRef = doc(db, 'employees', id);
@@ -347,6 +427,17 @@ export const updateEmployee = async (id: string, userId: string, updates: Partia
   
   if (!docSnap.exists() || docSnap.data().userId !== userId) {
     throw new Error('Unauthorized');
+  }
+  
+  // Validate project companies if they're being updated
+  if (updates.projectCompanies) {
+    const projectCompanies = await Promise.all(
+      updates.projectCompanies.map(pcId => getCompany(pcId, userId))
+    );
+    
+    if (projectCompanies.some(pc => !pc || pc.companyType !== 'project')) {
+      throw new Error('All project companies must be valid and of type "project"');
+    }
   }
   
   const updateData = convertToTimestamps({
@@ -385,6 +476,21 @@ export const getEmployeeById = async (employeeId: string): Promise<Employee | nu
     id: docSnap.id,
     ...convertTimestamps(docSnap.data())
   } as Employee;
+};
+
+// ✅ NIEUW: Get employees for a specific project company
+export const getEmployeesForProjectCompany = async (userId: string, projectCompanyId: string): Promise<Employee[]> => {
+  const q = query(
+    collection(db, 'employees'),
+    where('userId', '==', userId),
+    where('projectCompanies', 'array-contains', projectCompanyId)
+  );
+  
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...convertTimestamps(doc.data())
+  } as Employee));
 };
 
 // Time Entries
@@ -431,6 +537,41 @@ export const createTimeEntry = async (userId: string, timeEntry: Omit<TimeEntry,
   });
   
   const docRef = await addDoc(collection(db, 'timeEntries'), entryData);
+  return docRef.id;
+};
+
+// ✅ NIEUW: Create time entry with work company support
+export const createTimeEntryWithWorkCompany = async (
+  userId: string, 
+  timeEntry: Omit<TimeEntry, 'id' | 'userId'>
+): Promise<string> => {
+  // Validate work company if specified
+  if (timeEntry.workCompanyId) {
+    const workCompany = await getCompany(timeEntry.workCompanyId, userId);
+    if (!workCompany) {
+      throw new Error('Invalid work company');
+    }
+    
+    // Verify employee is allowed to work for this company
+    const employee = await getEmployee(timeEntry.employeeId, userId);
+    if (!employee) {
+      throw new Error('Invalid employee');
+    }
+    
+    const allowedCompanies = [employee.companyId, ...(employee.projectCompanies || [])];
+    if (!allowedCompanies.includes(timeEntry.workCompanyId)) {
+      throw new Error('Employee is not authorized to work for this company');
+    }
+  }
+  
+  const timeEntryData = convertToTimestamps({
+    ...timeEntry,
+    userId,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+  
+  const docRef = await addDoc(collection(db, 'timeEntries'), timeEntryData);
   return docRef.id;
 };
 
@@ -1007,4 +1148,62 @@ export const submitExpense = async (id: string, userId: string, submittedBy: str
   });
 
   await updateDoc(docRef, updateData);
+};
+
+// ✅ NIEUW: Helper function to check if user can manage a company
+export const canUserManageCompany = async (userId: string, companyId: string): Promise<boolean> => {
+  try {
+    const company = await getCompany(companyId, userId);
+    return !!company; // User can manage if they own the company
+  } catch {
+    return false;
+  }
+};
+
+// ✅ NIEUW: Get company hierarchy (employer with its project companies)
+export const getCompanyHierarchy = async (userId: string): Promise<CompanyWithEmployees[]> => {
+  const companies = await getCompanies(userId);
+  const employees = await getEmployees(userId);
+  
+  const employerCompanies = companies.filter(c => c.companyType === 'employer');
+  
+  return employerCompanies.map(employer => ({
+    ...employer,
+    employees: employees.filter(emp => emp.companyId === employer.id),
+    projectCompanies: companies.filter(c => 
+      c.companyType === 'project' && c.primaryEmployerId === employer.id
+    )
+  }));
+};
+
+// ✅ NIEUW: Smart company selector data voor forms
+export interface CompanySelectData {
+  employerCompanies: Company[];
+  projectCompanies: Company[];
+  employeeCanWorkFor: Company[]; // Voor specifieke employee
+}
+
+export const getCompanySelectData = async (
+  userId: string, 
+  employeeId?: string
+): Promise<CompanySelectData> => {
+  const companies = await getCompanies(userId);
+  const employerCompanies = companies.filter(c => c.companyType === 'employer');
+  const projectCompanies = companies.filter(c => c.companyType === 'project');
+  
+  let employeeCanWorkFor: Company[] = employerCompanies; // Default to all employers
+  
+  if (employeeId) {
+    const employee = await getEmployee(employeeId, userId);
+    if (employee) {
+      const allowedCompanyIds = [employee.companyId, ...(employee.projectCompanies || [])];
+      employeeCanWorkFor = companies.filter(c => allowedCompanyIds.includes(c.id));
+    }
+  }
+  
+  return {
+    employerCompanies,
+    projectCompanies,
+    employeeCanWorkFor
+  };
 };
