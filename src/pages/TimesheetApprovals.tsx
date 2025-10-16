@@ -185,15 +185,21 @@ export default function TimesheetApprovals() {
 
                   {/* Low Hours Warning */}
                   {(() => {
+                    const employee = employees.find(emp => emp.id === timesheet.employeeId);
+                    const contractHoursPerWeek = employee?.contractInfo?.hoursPerWeek || 40;
+                    const expectedWeeklyHours = contractHoursPerWeek;
+                    const actualWeeklyHours = timesheet.totalRegularHours;
+                    const underPerformanceThreshold = expectedWeeklyHours * 0.85; // 85% of contract hours
                     const workDays = timesheet.entries.filter(e => e.regularHours > 0).length;
-                    const averageHoursPerDay = workDays > 0 ? timesheet.totalRegularHours / workDays : 0;
+                    const averageHoursPerDay = workDays > 0 ? actualWeeklyHours / workDays : 0;
                     
-                    if (workDays > 0 && averageHoursPerDay < 7) {
+                    if (workDays > 0 && actualWeeklyHours < underPerformanceThreshold) {
                       return (
                         <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                           <div className="flex items-start gap-2">
                             <div className="text-yellow-800 text-sm">
-                              <strong>⚠️ Lage uren:</strong> Gemiddeld {averageHoursPerDay.toFixed(1)} uur per werkdag
+                              <strong>⚠️ Onder contract uren:</strong> {actualWeeklyHours}u van {contractHoursPerWeek}u contract 
+                              (gemiddeld {averageHoursPerDay.toFixed(1)}u per werkdag)
                             </div>
                           </div>
                           {timesheet.lowHoursExplanation && (
