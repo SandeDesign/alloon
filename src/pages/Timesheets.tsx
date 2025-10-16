@@ -128,7 +128,7 @@ export default function Timesheets() {
     try {
       // Trigger Make.com webhook to get ITKnecht data
       // TODO: Replace 'JOUW_MAKE_WEBHOOK_URL_HIER' with your actual webhook URL
-      const response = await fetch('https://hook.eu2.make.com/wh18u8c7x989zoakqxqmomjoy2cpfd3b', {
+      const response = await fetch('JOUW_MAKE_WEBHOOK_URL_HIER', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -216,13 +216,18 @@ export default function Timesheets() {
           ...updatedEntries[dayIndex],
           regularHours: dayTotalHours,
           travelKilometers: dayTotalKm,
+          // Clear other hour types to keep it simple
+          overtimeHours: 0,
+          eveningHours: 0,
+          nightHours: 0,
+          weekendHours: 0,
           notes: `ITKnecht import: ${dayEntries.length} entries`,
           updatedAt: new Date()
         };
       }
     });
 
-    // Calculate new totals
+    // Calculate new totals (simplified)
     const totals = calculateWeekTotals(updatedEntries);
 
     // Update timesheet
@@ -230,10 +235,10 @@ export default function Timesheets() {
       ...currentTimesheet,
       entries: updatedEntries,
       totalRegularHours: totals.regularHours,
-      totalOvertimeHours: totals.overtimeHours,
-      totalEveningHours: totals.eveningHours,
-      totalNightHours: totals.nightHours,
-      totalWeekendHours: totals.weekendHours,
+      totalOvertimeHours: 0, // Simplified - no overtime tracking
+      totalEveningHours: 0,
+      totalNightHours: 0,
+      totalWeekendHours: 0,
       totalTravelKilometers: totals.travelKilometers,
       updatedAt: new Date()
     };
@@ -319,7 +324,7 @@ export default function Timesheets() {
   const handleSubmit = async () => {
     if (!currentTimesheet || !currentTimesheet.id || !user || !adminUserId || !employeeData) return;
 
-    if (currentTimesheet.totalRegularHours === 0 && currentTimesheet.totalOvertimeHours === 0 && currentTimesheet.totalTravelKilometers === 0) {
+    if (currentTimesheet.totalRegularHours === 0 && currentTimesheet.totalTravelKilometers === 0) {
       showError('Geen uren ingevoerd', 'Voer minimaal één uur of kilometer in om in te dienen');
       return;
     }
@@ -430,7 +435,7 @@ export default function Timesheets() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {((userRole === 'admin' && selectedEmployeeId) || (userRole !== 'admin' && currentEmployeeId)) && (
+          {userRole === 'admin' && selectedEmployeeId && (
             <Button
               onClick={handleImportFromITKnecht}
               disabled={importing || saving}
@@ -518,49 +523,40 @@ export default function Timesheets() {
         </Card>
       )}
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Datum
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Normale uren
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Overuren
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Avonduren
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Nachturen
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Weekenduren
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Reiskilometers
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Notities
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentTimesheet.entries.map((entry, index) => (
-                <tr key={index} className={entry.notes?.includes('ITKnecht') ? 'bg-blue-50' : ''}>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+      {/* Mobile-first Card Layout */}
+      <div className="space-y-4">
+        {currentTimesheet.entries.map((entry, index) => {
+          const totalHours = entry.regularHours + entry.overtimeHours + entry.eveningHours + entry.nightHours + entry.weekendHours;
+          const isImported = entry.notes?.includes('ITKnecht');
+          
+          return (
+            <Card key={index} className={`${isImported ? 'bg-blue-50 border-blue-200' : ''} transition-all hover:shadow-md`}>
+              <div className="p-4">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
                       {getDayName(entry.date)}
-                    </div>
-                    <div className="text-sm text-gray-500">
+                    </h3>
+                    <p className="text-sm text-gray-500">
                       {entry.date.toLocaleDateString('nl-NL')}
+                    </p>
+                  </div>
+                  {isImported && (
+                    <div className="flex items-center gap-2 text-blue-600 text-sm">
+                      <Download className="h-4 w-4" />
+                      ITKnecht
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  )}
+                </div>
+
+                {/* Input Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Total Hours */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Uren
+                    </label>
                     <Input
                       type="number"
                       min="0"
@@ -569,58 +565,16 @@ export default function Timesheets() {
                       value={entry.regularHours}
                       onChange={(e) => updateEntry(index, 'regularHours', parseFloat(e.target.value) || 0)}
                       disabled={isReadOnly}
-                      className="w-20"
+                      className="text-center text-lg font-semibold"
+                      placeholder="0"
                     />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={entry.overtimeHours}
-                      onChange={(e) => updateEntry(index, 'overtimeHours', parseFloat(e.target.value) || 0)}
-                      disabled={isReadOnly}
-                      className="w-20"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={entry.eveningHours}
-                      onChange={(e) => updateEntry(index, 'eveningHours', parseFloat(e.target.value) || 0)}
-                      disabled={isReadOnly}
-                      className="w-20"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={entry.nightHours}
-                      onChange={(e) => updateEntry(index, 'nightHours', parseFloat(e.target.value) || 0)}
-                      disabled={isReadOnly}
-                      className="w-20"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={entry.weekendHours}
-                      onChange={(e) => updateEntry(index, 'weekendHours', parseFloat(e.target.value) || 0)}
-                      disabled={isReadOnly}
-                      className="w-20"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
+                  </div>
+
+                  {/* Travel Kilometers */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Kilometers
+                    </label>
                     <Input
                       type="number"
                       min="0"
@@ -628,35 +582,75 @@ export default function Timesheets() {
                       value={entry.travelKilometers}
                       onChange={(e) => updateEntry(index, 'travelKilometers', parseFloat(e.target.value) || 0)}
                       disabled={isReadOnly}
-                      className="w-20"
+                      className="text-center text-lg font-semibold"
+                      placeholder="0"
                     />
-                  </td>
-                  <td className="px-4 py-3">
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2 md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Notities
+                    </label>
                     <Input
                       type="text"
                       value={entry.notes || ''}
                       onChange={(e) => updateEntry(index, 'notes', e.target.value)}
                       disabled={isReadOnly}
-                      className="w-32"
                       placeholder="Notities..."
                     />
-                  </td>
-                </tr>
-              ))}
-              <tr className="bg-gray-50 font-medium">
-                <td className="px-4 py-3 text-sm text-gray-900">Totaal</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalRegularHours}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalOvertimeHours}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalEveningHours}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalNightHours}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalWeekendHours}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{currentTimesheet.totalTravelKilometers} km</td>
-                <td className="px-4 py-3"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
+                  </div>
+                </div>
+
+                {/* Quick Summary */}
+                {(entry.regularHours > 0 || entry.travelKilometers > 0) && (
+                  <div className="mt-4 pt-3 border-t border-gray-200">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Dag totaal:</span>
+                      <span className="font-medium">
+                        {entry.regularHours}u {entry.travelKilometers > 0 && `• ${entry.travelKilometers}km`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+
+        {/* Week Summary Card */}
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Week Totaal</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {currentTimesheet.totalRegularHours}
+                </div>
+                <div className="text-sm text-gray-600">Uren</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {currentTimesheet.totalTravelKilometers}
+                </div>
+                <div className="text-sm text-gray-600">Kilometers</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {currentTimesheet.entries.filter(e => e.regularHours > 0).length}
+                </div>
+                <div className="text-sm text-gray-600">Werkdagen</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {Math.round((currentTimesheet.totalRegularHours / 5) * 10) / 10}
+                </div>
+                <div className="text-sm text-gray-600">Ø per dag</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {!isReadOnly && (
         <div className="flex justify-end gap-3">
