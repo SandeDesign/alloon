@@ -254,6 +254,7 @@ export default function TimesheetApprovals() {
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Datum</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Uren</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Reiskilometers</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Werkzaamheden</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Notities</th>
                           </tr>
                         </thead>
@@ -263,6 +264,27 @@ export default function TimesheetApprovals() {
                               <td className="px-3 py-2 text-sm">{entry.date.toLocaleDateString('nl-NL')}</td>
                               <td className="px-3 py-2 text-sm">{entry.regularHours}</td>
                               <td className="px-3 py-2 text-sm">{entry.travelKilometers}</td>
+                              <td className="px-3 py-2 text-sm">
+                                {entry.workActivities && entry.workActivities.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {entry.workActivities.map((activity, actIdx) => (
+                                      <div 
+                                        key={actIdx} 
+                                        className={`text-xs p-1 rounded ${
+                                          activity.isITKnechtImport ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'
+                                        }`}
+                                      >
+                                        <span className="font-medium">{activity.hours}u:</span> {activity.description}
+                                        {activity.isITKnechtImport && (
+                                          <span className="ml-1 text-blue-600">📥</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">Geen details</span>
+                                )}
+                              </td>
                               <td className="px-3 py-2 text-sm">{entry.notes}</td>
                             </tr>
                           ))}
