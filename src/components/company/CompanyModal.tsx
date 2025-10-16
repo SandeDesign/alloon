@@ -126,15 +126,12 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
 
     setSubmitting(true);
     try {
-      const companyData = {
+      // ✅ FIX: Build company data object without undefined values
+      const companyData: any = {
         name: data.name,
         kvk: data.kvk,
         taxNumber: data.taxNumber,
-        
-        // ✅ NIEUW: Company type data
         companyType: data.companyType,
-        primaryEmployerId: data.companyType === 'project' ? data.primaryEmployerId : undefined,
-        
         address: {
           street: data.street,
           city: data.city,
@@ -156,6 +153,11 @@ const CompanyModal: React.FC<CompanyModalProps> = ({ isOpen, onClose, onSuccess,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+
+      // ✅ FIX: Only add primaryEmployerId if it has a value
+      if (data.companyType === 'project' && data.primaryEmployerId) {
+        companyData.primaryEmployerId = data.primaryEmployerId;
+      }
 
       if (company) {
         await updateCompany(company.id, user.uid, companyData);
