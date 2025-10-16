@@ -175,7 +175,9 @@ export default function Timesheets() {
       return {
         dag: data.Dag || '',
         totaal_factuureerbare_uren: parseFloat(data['Totaal factureerbare uren'] || 0),
-        gereden_kilometers: parseFloat(data['Gereden kilometers'] || 0)
+        gereden_kilometers: parseFloat(data['Gereden kilometers'] || 0),
+        klant: data.Klant || '',
+        werkzaamheden: data.Werkzaamheden || data.Omschrijving || 'ITKnecht werk'
       };
     });
 
@@ -212,10 +214,19 @@ export default function Timesheets() {
       });
 
       if (dayIndex !== -1) {
+        // Create work activities from ITKnecht entries
+        const workActivities = dayEntries.map(entry => ({
+          hours: entry.totaal_factuureerbare_uren,
+          description: `${entry.klant ? entry.klant + ': ' : ''}${entry.werkzaamheden}`,
+          clientId: '', // Could be mapped if client data is available
+          isITKnechtImport: true
+        }));
+
         updatedEntries[dayIndex] = {
           ...updatedEntries[dayIndex],
           regularHours: dayTotalHours,
           travelKilometers: dayTotalKm,
+          workActivities: workActivities,
           // Clear other hour types to keep it simple
           overtimeHours: 0,
           eveningHours: 0,
@@ -289,6 +300,79 @@ export default function Timesheets() {
       totalNightHours: totals.nightHours,
       totalWeekendHours: totals.weekendHours,
       totalTravelKilometers: totals.travelKilometers,
+      updatedAt: new Date()
+    });
+  };
+
+  const addWorkActivity = (entryIndex: number) => {
+    if (!currentTimesheet) return;
+
+    const updatedEntries = [...currentTimesheet.entries];
+    const entry = updatedEntries[entryIndex];
+    
+    const newActivity = {
+      hours: 0,
+      description: '',
+      clientId: '',
+      isITKnechtImport: false
+    };
+
+    updatedEntries[entryIndex] = {
+      ...entry,
+      workActivities: [...(entry.workActivities || []), newActivity],
+      updatedAt: new Date()
+    };
+
+    setCurrentTimesheet({
+      ...currentTimesheet,
+      entries: updatedEntries,
+      updatedAt: new Date()
+    });
+  };
+
+  const updateWorkActivity = (entryIndex: number, activityIndex: number, field: string, value: any) => {
+    if (!currentTimesheet) return;
+
+    const updatedEntries = [...currentTimesheet.entries];
+    const entry = updatedEntries[entryIndex];
+    const activities = [...(entry.workActivities || [])];
+    
+    activities[activityIndex] = {
+      ...activities[activityIndex],
+      [field]: value
+    };
+
+    updatedEntries[entryIndex] = {
+      ...entry,
+      workActivities: activities,
+      updatedAt: new Date()
+    };
+
+    setCurrentTimesheet({
+      ...currentTimesheet,
+      entries: updatedEntries,
+      updatedAt: new Date()
+    });
+  };
+
+  const removeWorkActivity = (entryIndex: number, activityIndex: number) => {
+    if (!currentTimesheet) return;
+
+    const updatedEntries = [...currentTimesheet.entries];
+    const entry = updatedEntries[entryIndex];
+    const activities = [...(entry.workActivities || [])];
+    
+    activities.splice(activityIndex, 1);
+
+    updatedEntries[entryIndex] = {
+      ...entry,
+      workActivities: activities,
+      updatedAt: new Date()
+    };
+
+    setCurrentTimesheet({
+      ...currentTimesheet,
+      entries: updatedEntries,
       updatedAt: new Date()
     });
   };
@@ -696,6 +780,108 @@ export default function Timesheets() {
                     </div>
                   </div>
                 )}
+
+                {/* Work Activities Section */}
+                <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-gray-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Werkzaamheden
+                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => addWorkActivity(index)}
+                      disabled={isReadOnly}
+                      className="text-xs px-2 py-1"
+                    >
+                      + Werk toevoegen
+                    </Button>
+                  </div>
+                  
+                  {/* Work Activities List */}
+                  <div className="space-y-2">
+                    {(entry.workActivities || []).map((activity, activityIndex) => (
+                      <div 
+                        key={activityIndex} 
+                        className={`grid grid-cols-12 gap-2 items-center p-2 rounded ${
+                          activity.isITKnechtImport 
+                            ? 'bg-blue-50 border border-blue-200' 
+                            : 'bg-gray-50'
+                        }`}
+                      >
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="24"
+                            step="0.5"
+                            value={activity.hours}
+                            onChange={(e) => updateWorkActivity(index, activityIndex, 'hours', parseFloat(e.target.value) || 0)}
+                            disabled={isReadOnly || activity.isITKnechtImport}
+                            className={`text-xs text-center ${
+                              activity.isITKnechtImport ? 'bg-blue-50' : ''
+                            }`}
+                            placeholder="0.0u"
+                          />
+                        </div>
+                        <div className="col-span-7">
+                          <div className="flex items-center gap-1">
+                            {activity.isITKnechtImport && (
+                              <Download className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                            )}
+                            <Input
+                              type="text"
+                              value={activity.description}
+                              onChange={(e) => updateWorkActivity(index, activityIndex, 'description', e.target.value)}
+                              disabled={isReadOnly || activity.isITKnechtImport}
+                              className={`text-xs ${
+                                activity.isITKnechtImport ? 'bg-blue-50' : ''
+                              }`}
+                              placeholder="Wat heb je gedaan?"
+                            />
+                          </div>
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => removeWorkActivity(index, activityIndex)}
+                            disabled={isReadOnly || activity.isITKnechtImport}
+                            className="text-xs px-2 py-1 text-red-600 hover:text-red-800"
+                            title={activity.isITKnechtImport ? 'ITKnecht import kan niet worden verwijderd' : 'Verwijder werkzaamheid'}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {(!entry.workActivities || entry.workActivities.length === 0) && (
+                      <div className="text-xs text-gray-500 italic">
+                        Geen werkzaamheden toegevoegd. Klik op "Werk toevoegen" om details toe te voegen.
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Work Activities Summary */}
+                  {entry.workActivities && entry.workActivities.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Gedetailleerde uren:</span>
+                        <span className="font-medium">
+                          {entry.workActivities.reduce((sum, activity) => sum + activity.hours, 0).toFixed(1)}u
+                        </span>
+                      </div>
+                      {Math.abs(entry.regularHours - entry.workActivities.reduce((sum, activity) => sum + activity.hours, 0)) > 0.1 && (
+                        <div className="text-xs text-yellow-600 mt-1">
+                          ⚠️ Verschil met totaal uren: {(entry.regularHours - entry.workActivities.reduce((sum, activity) => sum + activity.hours, 0)).toFixed(1)}u
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
           );
