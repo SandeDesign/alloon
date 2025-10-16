@@ -77,7 +77,6 @@ function App() {
                         <Routes>
                           <Route index element={<Dashboard />} />
                           <Route path="companies" element={<Companies />} />
-                          <Route path="projectteam" element={<Projectteam />} />
                           <Route path="employees" element={<EmployeesNew />} />
                           <Route path="timesheets" element={<Timesheets />} />
                           <Route path="timesheet-approvals" element={<TimesheetApprovals />} />
