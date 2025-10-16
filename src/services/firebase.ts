@@ -17,6 +17,25 @@ import { auth } from '../lib/firebase';
 import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense, EmployeeWithCompanies, CompanyWithEmployees } from '../types';
 import { generatePoortwachterMilestones, shouldActivatePoortwachter } from '../utils/poortwachterTracking';
 
+// Helper function to remove undefined values from objects (Firebase doesn't accept undefined)
+const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefinedValues);
+  }
+  
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = removeUndefinedValues(value);
+    }
+  }
+  return cleaned;
+};
+
 // Helper function to convert Firestore timestamps to Date objects
 const convertTimestamps = (data: any) => {
   const converted = { ...data };
@@ -153,7 +172,7 @@ export const getCompanies = async (userId: string): Promise<Company[]> => {
   } as Company));
 };
 
-// ✅ NIEUW: Get companies with filtering by type
+// Get companies with filtering by type
 export const getCompaniesByType = async (userId: string, companyType?: 'employer' | 'project'): Promise<Company[]> => {
   let q;
   
@@ -196,7 +215,7 @@ export const getCompany = async (id: string, userId: string): Promise<Company | 
   } as Company;
 };
 
-// ✅ GEWIJZIGD: Updated createCompany om company type te ondersteunen
+// Updated createCompany with undefined value filtering
 export const createCompany = async (userId: string, company: Omit<Company, 'id' | 'userId'>): Promise<string> => {
   // Validate project company has primaryEmployerId
   if (company.companyType === 'project' && !company.primaryEmployerId) {
@@ -219,10 +238,14 @@ export const createCompany = async (userId: string, company: Omit<Company, 'id' 
     updatedAt: new Date()
   });
   
-  const docRef = await addDoc(collection(db, 'companies'), companyData);
+  // Remove undefined values before sending to Firebase
+  const cleanedData = removeUndefinedValues(companyData);
+  
+  const docRef = await addDoc(collection(db, 'companies'), cleanedData);
   return docRef.id;
 };
 
+// Updated updateCompany with undefined value filtering
 export const updateCompany = async (id: string, userId: string, updates: Partial<Company>): Promise<void> => {
   // First verify ownership
   const docRef = doc(db, 'companies', id);
@@ -237,7 +260,10 @@ export const updateCompany = async (id: string, userId: string, updates: Partial
     updatedAt: new Date()
   });
   
-  await updateDoc(docRef, updateData);
+  // Remove undefined values before sending to Firebase
+  const cleanedData = removeUndefinedValues(updateData);
+  
+  await updateDoc(docRef, cleanedData);
 };
 
 export const deleteCompany = async (id: string, userId: string): Promise<void> => {
@@ -285,7 +311,8 @@ export const createBranch = async (userId: string, branch: Omit<Branch, 'id' | '
     updatedAt: new Date()
   });
   
-  const docRef = await addDoc(collection(db, 'branches'), branchData);
+  const cleanedData = removeUndefinedValues(branchData);
+  const docRef = await addDoc(collection(db, 'branches'), cleanedData);
   return docRef.id;
 };
 
@@ -303,7 +330,8 @@ export const updateBranch = async (id: string, userId: string, updates: Partial<
     updatedAt: new Date()
   });
   
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const deleteBranch = async (id: string, userId: string): Promise<void> => {
@@ -352,7 +380,7 @@ export const getEmployees = async (userId: string, companyId?: string, branchId?
   } as Employee));
 };
 
-// ✅ NIEUW: Get employees with their project companies populated
+// Get employees with their project companies populated
 export const getEmployeesWithProjectCompanies = async (userId: string, companyId?: string): Promise<EmployeeWithCompanies[]> => {
   const employees = await getEmployees(userId, companyId);
   const companies = await getCompanies(userId);
@@ -383,7 +411,7 @@ export const getEmployee = async (id: string, userId: string): Promise<Employee 
   } as Employee;
 };
 
-// ✅ GEWIJZIGD: Updated createEmployee om project companies te ondersteunen
+// Updated createEmployee with project companies support
 export const createEmployee = async (userId: string, employee: Omit<Employee, 'id' | 'userId'>): Promise<string> => {
   // Validate primary company exists and is owned by user
   const primaryCompany = await getCompany(employee.companyId, userId);
@@ -415,11 +443,12 @@ export const createEmployee = async (userId: string, employee: Omit<Employee, 'i
     updatedAt: new Date()
   });
   
-  const docRef = await addDoc(collection(db, 'employees'), employeeData);
+  const cleanedData = removeUndefinedValues(employeeData);
+  const docRef = await addDoc(collection(db, 'employees'), cleanedData);
   return docRef.id;
 };
 
-// ✅ GEWIJZIGD: Updated updateEmployee om project companies te ondersteunen
+// Updated updateEmployee with project companies support
 export const updateEmployee = async (id: string, userId: string, updates: Partial<Employee>): Promise<void> => {
   // First verify ownership
   const docRef = doc(db, 'employees', id);
@@ -445,7 +474,8 @@ export const updateEmployee = async (id: string, userId: string, updates: Partia
     updatedAt: new Date()
   });
   
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const deleteEmployee = async (id: string, userId: string): Promise<void> => {
@@ -478,7 +508,7 @@ export const getEmployeeById = async (employeeId: string): Promise<Employee | nu
   } as Employee;
 };
 
-// ✅ NIEUW: Get employees for a specific project company
+// Get employees for a specific project company
 export const getEmployeesForProjectCompany = async (userId: string, projectCompanyId: string): Promise<Employee[]> => {
   const q = query(
     collection(db, 'employees'),
@@ -536,11 +566,12 @@ export const createTimeEntry = async (userId: string, timeEntry: Omit<TimeEntry,
     updatedAt: new Date()
   });
   
-  const docRef = await addDoc(collection(db, 'timeEntries'), entryData);
+  const cleanedData = removeUndefinedValues(entryData);
+  const docRef = await addDoc(collection(db, 'timeEntries'), cleanedData);
   return docRef.id;
 };
 
-// ✅ NIEUW: Create time entry with work company support
+// Create time entry with work company support
 export const createTimeEntryWithWorkCompany = async (
   userId: string, 
   timeEntry: Omit<TimeEntry, 'id' | 'userId'>
@@ -571,7 +602,8 @@ export const createTimeEntryWithWorkCompany = async (
     updatedAt: new Date()
   });
   
-  const docRef = await addDoc(collection(db, 'timeEntries'), timeEntryData);
+  const cleanedData = removeUndefinedValues(timeEntryData);
+  const docRef = await addDoc(collection(db, 'timeEntries'), cleanedData);
   return docRef.id;
 };
 
@@ -589,7 +621,8 @@ export const updateTimeEntry = async (id: string, userId: string, updates: Parti
     updatedAt: new Date()
   });
   
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 // User Roles
@@ -602,7 +635,8 @@ export const createUserRole = async (uid: string, role: 'admin' | 'employee', em
     updatedAt: new Date()
   });
   
-  await addDoc(collection(db, 'users'), roleData);
+  const cleanedData = removeUndefinedValues(roleData);
+  await addDoc(collection(db, 'users'), cleanedData);
 };
 
 export const getUserRole = async (uid: string): Promise<UserRole | null> => {
@@ -651,7 +685,8 @@ export const createEmployeeAuthAccount = async (
       updatedAt: new Date()
     });
     
-    await updateDoc(employeeRef, updateData);
+    const cleanedData = removeUndefinedValues(updateData);
+    await updateDoc(employeeRef, cleanedData);
     
     // Create user role for the new employee
     await createUserRole(newUserId, 'employee', employeeId);
@@ -721,7 +756,8 @@ export const createLeaveRequest = async (adminUserId: string, request: Omit<Leav
     updatedAt: new Date()
   });
 
-  const docRef = await addDoc(collection(db, 'leaveRequests'), requestData);
+  const cleanedData = removeUndefinedValues(requestData);
+  const docRef = await addDoc(collection(db, 'leaveRequests'), cleanedData);
   return docRef.id;
 };
 
@@ -738,7 +774,8 @@ export const updateLeaveRequest = async (id: string, userId: string, updates: Pa
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const approveLeaveRequest = async (id: string, userId: string, approvedBy: string): Promise<void> => {
@@ -807,11 +844,13 @@ export const updateLeaveBalance = async (employeeId: string, userId: string, yea
     updatedAt: new Date()
   });
 
+  const cleanedData = removeUndefinedValues(balanceData);
+
   if (querySnapshot.empty) {
-    await addDoc(collection(db, 'leaveBalances'), balanceData);
+    await addDoc(collection(db, 'leaveBalances'), cleanedData);
   } else {
     const docRef = doc(db, 'leaveBalances', querySnapshot.docs[0].id);
-    await updateDoc(docRef, balanceData);
+    await updateDoc(docRef, cleanedData);
   }
 };
 
@@ -846,7 +885,7 @@ export const getSickLeaveRecords = async (adminUserId: string, employeeId?: stri
 export const createSickLeave = async (adminUserId: string, sickLeave: Omit<SickLeave, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   
   const shouldActivate = shouldActivatePoortwachter(sickLeave.startDate);
-  const milestones = shouldActivate ? generatePoortwachterMilestones(sickLeave.startDate) : null; // Corrected function name
+  const milestones = shouldActivate ? generatePoortwachterMilestones(sickLeave.startDate) : null;
 
   const sickLeaveData = convertToTimestamps({
     ...sickLeave,
@@ -857,7 +896,8 @@ export const createSickLeave = async (adminUserId: string, sickLeave: Omit<SickL
     updatedAt: new Date()
   });
 
-  const docRef = await addDoc(collection(db, 'sickLeave'), sickLeaveData);
+  const cleanedData = removeUndefinedValues(sickLeaveData);
+  const docRef = await addDoc(collection(db, 'sickLeave'), cleanedData);
   return docRef.id;
 };
 
@@ -874,7 +914,8 @@ export const updateSickLeave = async (id: string, userId: string, updates: Parti
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const getActiveSickLeave = async (companyId: string, userId: string): Promise<SickLeave[]> => {
@@ -979,12 +1020,13 @@ export const calculateAbsenceStats = async (employeeId: string, companyId: strin
   );
 
   const existingSnapshot = await getDocs(existingQuery);
+  const cleanedData = removeUndefinedValues(statsData);
 
   if (existingSnapshot.empty) {
-    await addDoc(collection(db, 'absenceStatistics'), statsData);
+    await addDoc(collection(db, 'absenceStatistics'), cleanedData);
   } else {
     const docRef = doc(db, 'absenceStatistics', existingSnapshot.docs[0].id);
-    await updateDoc(docRef, statsData);
+    await updateDoc(docRef, cleanedData);
   }
 };
 
@@ -1035,7 +1077,8 @@ export const createExpense = async (adminUserId: string, expense: Omit<Expense, 
     updatedAt: new Date()
   });
 
-  const docRef = await addDoc(collection(db, 'expenses'), expenseData);
+  const cleanedData = removeUndefinedValues(expenseData);
+  const docRef = await addDoc(collection(db, 'expenses'), cleanedData);
   return docRef.id;
 };
 
@@ -1052,7 +1095,8 @@ export const updateExpense = async (id: string, userId: string, updates: Partial
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const approveExpense = async (id: string, userId: string, approverName: string, approverId: string, comment?: string): Promise<void> => {
@@ -1080,7 +1124,8 @@ export const approveExpense = async (id: string, userId: string, approverName: s
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const rejectExpense = async (id: string, userId: string, approverName: string, approverId: string, comment: string): Promise<void> => {
@@ -1108,7 +1153,8 @@ export const rejectExpense = async (id: string, userId: string, approverName: st
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
 export const getPendingExpenses = async (companyId: string, userId: string): Promise<Expense[]> => {
@@ -1147,10 +1193,11 @@ export const submitExpense = async (id: string, userId: string, submittedBy: str
     updatedAt: new Date()
   });
 
-  await updateDoc(docRef, updateData);
+  const cleanedData = removeUndefinedValues(updateData);
+  await updateDoc(docRef, cleanedData);
 };
 
-// ✅ NIEUW: Helper function to check if user can manage a company
+// Helper function to check if user can manage a company
 export const canUserManageCompany = async (userId: string, companyId: string): Promise<boolean> => {
   try {
     const company = await getCompany(companyId, userId);
@@ -1160,7 +1207,7 @@ export const canUserManageCompany = async (userId: string, companyId: string): P
   }
 };
 
-// ✅ NIEUW: Get company hierarchy (employer with its project companies)
+// Get company hierarchy (employer with its project companies)
 export const getCompanyHierarchy = async (userId: string): Promise<CompanyWithEmployees[]> => {
   const companies = await getCompanies(userId);
   const employees = await getEmployees(userId);
@@ -1176,7 +1223,7 @@ export const getCompanyHierarchy = async (userId: string): Promise<CompanyWithEm
   }));
 };
 
-// ✅ NIEUW: Smart company selector data voor forms
+// Smart company selector data voor forms
 export interface CompanySelectData {
   employerCompanies: Company[];
   projectCompanies: Company[];
