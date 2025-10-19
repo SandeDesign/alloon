@@ -29,7 +29,7 @@ export const MobileBottomNav: React.FC = () => {
     if (userRole === 'manager') {
       return [
         { href: '/', icon: Home, label: 'Dashboard' },
-        { href: '/employees', icon: Users, label: 'Team' },
+        { href: '/team', icon: Users, label: 'Team' },
         { href: '/timesheets', icon: Clock, label: 'Uren' },
         { href: '/settings', icon: Settings, label: 'Instellingen' },
       ];
@@ -38,7 +38,7 @@ export const MobileBottomNav: React.FC = () => {
     // Admin
     return [
       { href: '/', icon: Home, label: 'Dashboard' },
-      { href: '/companies', icon: Building2, label: 'Bedrijven' },
+      { href: '/work-companies', icon: Building2, label: 'Bedrijven' },
       { href: '/employees', icon: Users, label: 'Werknemers' },
       { href: '/timesheets', icon: Clock, label: 'Uren' },
     ];
@@ -54,7 +54,7 @@ export const MobileBottomNav: React.FC = () => {
             key={href}
             to={href}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center px-3 py-2 min-w-0 flex-1 text-xs font-medium transition-colors ${
+              `flex flex-col items-center justify-center px-3 py-2 min-w-0 flex-1 text-xs font-medium transition-colors relative ${
                 isActive
                   ? 'text-blue-600'
                   : 'text-gray-500 hover:text-gray-700'
