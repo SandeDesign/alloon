@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { MobileNavigationGroup } from './MobileNavigationGroup';
+import { CompanySelector } from '../ui/CompanySelector';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface NavigationItem {
   name: string;
@@ -22,31 +24,11 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
 
   const isEmployee = userRole === 'employee';
 
-  const mainNav = [
-    navigation[0],
-    navigation[1],
-    navigation[2],
-  ].filter(item => item && item.roles.includes(userRole || ''));
-
-  const timeNav = [
-    navigation[3],
-    navigation[4],
-    navigation[5],
-    navigation[6],
-  ].filter(item => item && item.roles.includes(userRole || ''));
-
-  const financialNav = [
-    navigation[7],
-    navigation[8],
-    navigation[9],
-    navigation[10],
-  ].filter(item => item && item.roles.includes(userRole || ''));
-
-  const systemNav = [
-    navigation[11],
-    navigation[12],
-    navigation[13],
-  ].filter(item => item && item.roles.includes(userRole || ''));
+  // ✅ AANGEPAST: Groepeer navigation items voor loonmaatschappij structuur
+  const mainNav = navigation.slice(0, 5).filter(item => item && item.roles.includes(userRole || ''));
+  const timeNav = navigation.slice(5, 9).filter(item => item && item.roles.includes(userRole || ''));
+  const financialNav = navigation.slice(9, 13).filter(item => item && item.roles.includes(userRole || ''));
+  const systemNav = navigation.slice(13).filter(item => item && item.roles.includes(userRole || ''));
 
   return (
     <>
@@ -55,12 +37,13 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
         onClick={onClose}
       />
 
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+      <div className={`fixed inset-y-0 left-0 w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex h-full flex-col">
-          <div className="flex h-20 items-center justify-between px-6 border-b border-gray-100">
-            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-14 w-auto object-contain" />
+          {/* ✅ Header */}
+          <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
+            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto object-contain" />
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -69,125 +52,162 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({ isOpen, onClose, navigat
             </button>
           </div>
 
-          <nav className="flex-1 space-y-4 px-3 py-4 overflow-y-auto">
-            {!isEmployee && mainNav.length > 0 && (
-              <div className="space-y-1">
-                {mainNav.map((item) => (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                      }`
-                    }
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </NavLink>
-                ))}
+          <div className="flex-1 overflow-y-auto">
+            {/* ✅ AANGEPAST: Company Selector - Alleen voor Admin/Manager */}
+            {(userRole === 'admin' || userRole === 'manager') && (
+              <div className="p-4 border-b border-gray-100">
+                <CompanySelector />
               </div>
             )}
 
-            {timeNav.length > 0 && (
-              isEmployee ? (
-                <div className="space-y-1">
-                  {timeNav.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      onClick={onClose}
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }`
-                      }
-                    >
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {item.name}
-                    </NavLink>
-                  ))}
-                </div>
-              ) : (
-                <MobileNavigationGroup
-                  title="Tijd & Aanwezigheid"
-                  items={timeNav}
-                  onItemClick={onClose}
-                  storageKey="mobile-nav-time-attendance"
-                  defaultOpen={false}
-                />
-              )
-            )}
+            {/* ✅ Navigation */}
+            <nav className="flex-1 space-y-6 px-4 py-6">
+              
+              {/* Hoofdmenu */}
+              {mainNav.length > 0 && (
+                isEmployee ? (
+                  <div className="space-y-2">
+                    <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Hoofdmenu
+                    </h3>
+                    {mainNav.map((item) => (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center px-4 py-3 text-base font-medium rounded-xl transition-colors ${
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`
+                        }
+                      >
+                        <item.icon className="mr-4 h-6 w-6" />
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : (
+                  <MobileNavigationGroup
+                    title="Hoofdmenu"
+                    items={mainNav}
+                    onItemClick={onClose}
+                    storageKey="mobile-nav-main"
+                    defaultOpen={true}
+                  />
+                )
+              )}
 
-            {financialNav.length > 0 && (
-              isEmployee ? (
-                <div className="space-y-1">
-                  {financialNav.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      onClick={onClose}
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }`
-                      }
-                    >
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {item.name}
-                    </NavLink>
-                  ))}
-                </div>
-              ) : (
-                <MobileNavigationGroup
-                  title="Financieel"
-                  items={financialNav}
-                  onItemClick={onClose}
-                  storageKey="mobile-nav-financial"
-                  defaultOpen={false}
-                />
-              )
-            )}
+              {/* Tijd & Aanwezigheid */}
+              {timeNav.length > 0 && (
+                isEmployee ? (
+                  <div className="space-y-2">
+                    <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Tijd & Aanwezigheid
+                    </h3>
+                    {timeNav.map((item) => (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center px-4 py-3 text-base font-medium rounded-xl transition-colors ${
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`
+                        }
+                      >
+                        <item.icon className="mr-4 h-6 w-6" />
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : (
+                  <MobileNavigationGroup
+                    title="Tijd & Aanwezigheid"
+                    items={timeNav}
+                    onItemClick={onClose}
+                    storageKey="mobile-nav-time-attendance"
+                    defaultOpen={false}
+                  />
+                )
+              )}
 
-            {systemNav.length > 0 && (
-              isEmployee ? (
-                <div className="space-y-1">
-                  {systemNav.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      onClick={onClose}
-                      className={({ isActive }) =>
-                        `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }`
-                      }
-                    >
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {item.name}
-                    </NavLink>
-                  ))}
-                </div>
-              ) : (
-                <MobileNavigationGroup
-                  title="Systeem"
-                  items={systemNav}
-                  onItemClick={onClose}
-                  storageKey="mobile-nav-system"
-                  defaultOpen={false}
-                />
-              )
-            )}
-          </nav>
+              {/* Financieel */}
+              {financialNav.length > 0 && (
+                isEmployee ? (
+                  <div className="space-y-2">
+                    <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Financieel
+                    </h3>
+                    {financialNav.map((item) => (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center px-4 py-3 text-base font-medium rounded-xl transition-colors ${
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`
+                        }
+                      >
+                        <item.icon className="mr-4 h-6 w-6" />
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : (
+                  <MobileNavigationGroup
+                    title="Financieel"
+                    items={financialNav}
+                    onItemClick={onClose}
+                    storageKey="mobile-nav-financial"
+                    defaultOpen={false}
+                  />
+                )
+              )}
+
+              {/* Systeem */}
+              {systemNav.length > 0 && (
+                isEmployee ? (
+                  <div className="space-y-2">
+                    <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Systeem
+                    </h3>
+                    {systemNav.map((item) => (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center px-4 py-3 text-base font-medium rounded-xl transition-colors ${
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`
+                        }
+                      >
+                        <item.icon className="mr-4 h-6 w-6" />
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : (
+                  <MobileNavigationGroup
+                    title="Systeem"
+                    items={systemNav}
+                    onItemClick={onClose}
+                    storageKey="mobile-nav-system"
+                    defaultOpen={false}
+                  />
+                )
+              )}
+            </nav>
+          </div>
         </div>
       </div>
     </>
