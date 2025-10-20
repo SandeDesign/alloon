@@ -37,35 +37,35 @@ export interface NavigationItem {
   color?: string;
 }
 
-// Navigation items - EXACTE VOLGORDE zoals in origineel
+// ✅ FIXED: Navigation items met manager role support
 export const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], color: 'text-purple-600' },
   { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], color: 'text-blue-600' },
-  { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin'], color: 'text-green-600' },
+  { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin', 'manager'], color: 'text-green-600' },
   
   // ADMIN BEHEER - NIEUWE SECTIE
   { name: 'Admin Dashboard', href: '/admin/dashboard', icon: UserCog, roles: ['admin'], color: 'text-red-600' },
   { name: 'Gebruikersbeheer', href: '/admin/users', icon: UserCog, roles: ['admin'], color: 'text-red-600' },
   { name: 'Rollen & Rechten', href: '/admin/roles', icon: Link, roles: ['admin'], color: 'text-red-600' },
-  { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], color: 'text-teal-600' },
-  { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], color: 'text-red-600' },
+  { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin', 'manager'], color: 'text-teal-600' },
+  { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], color: 'text-red-600' },
   
   // TIJD & AANWEZIGHEID
-  { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee'], color: 'text-orange-600' },
-  { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], color: 'text-indigo-600' },
+  { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee', 'manager'], color: 'text-orange-600' },
+  { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin', 'manager'], color: 'text-indigo-600' },
   
   // FACTURATIE
   { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], color: 'text-emerald-600' },
   { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], color: 'text-amber-600' },
   
   // DATA & BESTANDEN
-  { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], color: 'text-cyan-600' },
+  { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin', 'manager'], color: 'text-cyan-600' },
   { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], color: 'text-violet-600' },
   
   // SYSTEEM
-  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee'], color: 'text-cyan-600' },
+  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], color: 'text-cyan-600' },
   { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], color: 'text-slate-600' },
-  { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'], color: 'text-gray-600' },
+  { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], color: 'text-gray-600' },
 ];
 
 // Company Selector
@@ -74,6 +74,7 @@ const CompanySelector: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const { userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
+  // ✅ FIXED: Only admin sees company selector
   if (userRole !== 'admin' || !companies || companies.length === 0) {
     return null;
   }
@@ -231,7 +232,7 @@ const Sidebar: React.FC = () => {
   // Filter navigation items based on user role
   const filteredNavigation = navigation.filter(item => userRole && item.roles.includes(userRole));
 
-  // Categorize navigation items - CORRECT volgens screenshots
+  // ✅ FIXED: Correcte categorisering volgens screenshots
   const mainItems = filteredNavigation.slice(0, 3); // Dashboard, Bedrijven, Werknemers
   const adminItems = filteredNavigation.slice(3, 8); // Admin Dashboard tot Verzuim Beheren
   const timeItems = filteredNavigation.slice(8, 10); // Urenregistratie, Uren Goedkeuren
