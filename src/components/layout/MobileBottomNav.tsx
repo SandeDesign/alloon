@@ -7,7 +7,9 @@ import {
   Settings,
   Users,
   Building2,
-  Menu
+  Menu,
+  Send,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -36,16 +38,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/employees', icon: Users, label: 'Team' },
         { href: '/timesheets', icon: Clock, label: 'Uren' },
-        { href: '/settings', icon: Settings, label: 'Instellingen' },
+        { href: '/timesheet-approvals', icon: Calendar, label: 'Goedkeuren' },
       ];
     }
     
-    // Admin
+    // Admin - aangepast voor nieuwe structure
     return [
       { href: '/', icon: Home, label: 'Dashboard' },
-      { href: '/companies', icon: Building2, label: 'Bedrijven' },
-      { href: '/employees', icon: Users, label: 'Werknemers' },
       { href: '/timesheets', icon: Clock, label: 'Uren' },
+      { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
+      { href: '/employees', icon: Users, label: 'Werknemers' },
     ];
   };
 
@@ -83,7 +85,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
           </NavLink>
         ))}
         
-        {/* Menu button - 5th item - NU WERKT IE */}
+        {/* Menu button - 5th item */}
         <button
           onClick={() => {
             console.log('Menu button clicked!'); // Debug log
