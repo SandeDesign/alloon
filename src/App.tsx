@@ -12,6 +12,10 @@ import Absence from './pages/Absence';
 import Expenses from './pages/Expenses';
 import AdminLeaveApprovals from './pages/AdminLeaveApprovals';
 import AdminAbsenceManagement from './pages/AdminAbsenceManagement';
+// ✅ NEW ADMIN PAGES
+import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
+import AdminRoles from './pages/AdminRoles';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -68,6 +72,11 @@ function App() {
                           <Route index element={<Dashboard />} />
                           <Route path="companies" element={<Companies />} />
                           <Route path="employees" element={<EmployeesNew />} />
+                          
+                          {/* ✅ NEW ADMIN ROUTES */}
+                          <Route path="admin/dashboard" element={<AdminDashboard />} />
+                          <Route path="admin/users" element={<AdminUsers />} />
+                          <Route path="admin/roles" element={<AdminRoles />} />
                           
                           {/* ✅ TIJD & UREN */}
                           <Route path="timesheets" element={<Timesheets />} />
