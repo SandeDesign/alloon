@@ -7,20 +7,20 @@ import {
   LayoutDashboard,
   Building2,
   Users,
+  Clock,
   Calendar,
   HeartPulse,
-  Receipt,
-  Clock,
-  Calculator,
   FileText,
-  BookOpen,
+  Upload,
   Download,
   Settings,
   Shield,
   Zap,
   Activity,
-  TrendingUp,
-  Cog
+  Receipt,
+  Send,
+  FolderOpen,
+  TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
@@ -49,6 +49,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
 
   if (!isOpen) return null;
 
+  // ✅ GECORRIGEERDE categorieën met verlof en verzuim
   const menuCategories: MenuCategory[] = [
     {
       title: 'Hoofdmenu',
@@ -64,26 +65,32 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
       icon: Activity,
       items: [
         { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee'], color: 'text-orange-600' },
-        { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Calendar, roles: ['admin'], color: 'text-indigo-600' },
+        { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], color: 'text-indigo-600' },
         { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], color: 'text-teal-600' },
         { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], color: 'text-red-600' },
       ]
     },
     {
-      title: 'Financieel',
+      title: 'Facturatie',
+      icon: Receipt,
+      items: [
+        { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], color: 'text-emerald-600' },
+        { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], color: 'text-amber-600' },
+      ]
+    },
+    {
+      title: 'Data & Bestanden',
       icon: TrendingUp,
       items: [
-        { name: 'Declaraties', href: '/admin/expenses', icon: Receipt, roles: ['admin'], color: 'text-amber-600' },
-        { name: 'Loonverwerking', href: '/payroll-processing', icon: Calculator, roles: ['admin'], color: 'text-emerald-600' },
-        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee'], color: 'text-cyan-600' },
-        { name: 'Loonaangiftes', href: '/tax-returns', icon: BookOpen, roles: ['admin'], color: 'text-violet-600' },
+        { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], color: 'text-cyan-600' },
+        { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], color: 'text-violet-600' },
       ]
     },
     {
       title: 'Systeem',
-      icon: Cog,
+      icon: Settings,
       items: [
-        { name: 'Exports', href: '/exports', icon: Download, roles: ['admin'], color: 'text-pink-600' },
+        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee'], color: 'text-cyan-600' },
         { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], color: 'text-slate-600' },
         { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'], color: 'text-gray-600' },
       ]
@@ -113,7 +120,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
         <div className="flex h-full flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-gray-50">
-            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto" />
+            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-12 w-auto" />
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -207,7 +214,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
           {/* Footer */}
           <div className="border-t border-gray-200 p-4 bg-gray-50">
             <div className="text-center text-sm text-gray-500">
-              AlloonApp v2.0 - © 2025
+              AlloonApp v2.0 - Met verlof & verzuim
             </div>
           </div>
         </div>
