@@ -12,34 +12,24 @@ import Absence from './pages/Absence';
 import Expenses from './pages/Expenses';
 import AdminLeaveApprovals from './pages/AdminLeaveApprovals';
 import AdminAbsenceManagement from './pages/AdminAbsenceManagement';
-import AdminExpenses from './pages/AdminExpenses';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import Settings from './pages/Settings';
-import TaxReturns from './pages/TaxReturns';
 import AuditLogPage from './pages/AuditLog';
 import Timesheets from './pages/Timesheets';
 import TimesheetApprovals from './pages/TimesheetApprovals';
-import PayrollProcessing from './pages/PayrollProcessing';
 import Payslips from './pages/Payslips';
-import ExportsManagement from './pages/ExportsManagement';
+// ✅ NIEUWE IMPORTS voor vereenvoudigd systeem
+import OutgoingInvoices from './pages/OutgoingInvoices';
+import IncomingInvoices from './pages/IncomingInvoices';
+import TimesheetExport from './pages/TimesheetExport';
+import DriveFiles from './pages/DriveFiles';
 import { AppProvider } from './contexts/AppContext';
 import { ToastContainer } from './components/ui/Toast';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
-
-const Regulations = () => (
-  <div className="text-center py-12">
-    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-      Regelgeving
-    </h1>
-    <p className="text-gray-600 dark:text-gray-400">
-      Deze functionaliteit wordt binnenkort toegevoegdt
-    </p>
-  </div>
-);
 
 function App() {
   const AppContent: React.FC = () => {
@@ -77,18 +67,28 @@ function App() {
                           <Route index element={<Dashboard />} />
                           <Route path="companies" element={<Companies />} />
                           <Route path="employees" element={<EmployeesNew />} />
+                          
+                          {/* ✅ TIJD & UREN */}
                           <Route path="timesheets" element={<Timesheets />} />
                           <Route path="timesheet-approvals" element={<TimesheetApprovals />} />
+                          
+                          {/* ✅ VERLOF & VERZUIM - BEHOUDEN */}
                           <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
                           <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
-                          <Route path="admin/expenses" element={<AdminExpenses />} />
-                          <Route path="payroll-processing" element={<PayrollProcessing />} />
+                          
+                          {/* ✅ NIEUWE ROUTES - Facturatie */}
+                          <Route path="outgoing-invoices" element={<OutgoingInvoices />} />
+                          <Route path="incoming-invoices" element={<IncomingInvoices />} />
+                          
+                          {/* ✅ NIEUWE ROUTES - Data & Exports */}
+                          <Route path="timesheet-export" element={<TimesheetExport />} />
+                          <Route path="drive-files" element={<DriveFiles />} />
+                          
+                          {/* ✅ BEHOUDEN ROUTES - Systeem */}
                           <Route path="payslips" element={<Payslips />} />
-                          <Route path="regulations" element={<Regulations />} />
-                          <Route path="exports" element={<ExportsManagement />} />
-                          <Route path="settings" element={<Settings />} />
-                          <Route path="tax-returns" element={<TaxReturns />} />
                           <Route path="audit-log" element={<AuditLogPage />} />
+                          <Route path="settings" element={<Settings />} />
+                          
                           <Route path="employee-dashboard/*" element={<Navigate to="/" replace />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
