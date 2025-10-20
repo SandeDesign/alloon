@@ -9,7 +9,6 @@ import Sidebar from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { MobileFullScreenMenu } from './MobileFullScreenMenu';
 import { NotificationCenter } from '../notifications/NotificationCenter';
-import { navigation } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,6 +32,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleProfileClick = () => {
     navigate('/settings');
+  };
+
+  // Get page title based on current route
+  const getPageTitle = (pathname: string): string => {
+    const titles: { [key: string]: string } = {
+      '/': 'Dashboard',
+      '/companies': 'Bedrijven',
+      '/employees': 'Werknemers',
+      '/timesheets': 'Urenregistratie',
+      '/timesheet-approvals': 'Uren Goedkeuren',
+      '/admin/leave-approvals': 'Verlof Goedkeuren',
+      '/admin/absence-management': 'Verzuimbeheer',
+      '/outgoing-invoices': 'Uitgaande Facturen',
+      '/incoming-invoices': 'Inkomende Facturen',
+      '/timesheet-export': 'Uren Export',
+      '/drive-files': 'Drive Bestanden',
+      '/payslips': 'Loonstroken',
+      '/audit-log': 'Audit Log',
+      '/settings': 'Instellingen',
+    };
+    
+    return titles[pathname] || 'AlloonApp';
   };
 
   return (
@@ -96,28 +117,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
     </div>
   );
-};
-
-// Helper function to get page title
-const getPageTitle = (pathname: string): string => {
-  const titles: { [key: string]: string } = {
-    '/': 'Dashboard',
-    '/companies': 'Bedrijven',
-    '/employees': 'Werknemers',
-    '/timesheets': 'Urenregistratie',
-    '/timesheet-approvals': 'Uren Goedkeuren',
-    '/admin/leave-approvals': 'Verlof Goedkeuren',
-    '/admin/absence-management': 'Verzuimbeheer',
-    '/admin/expenses': 'Declaraties',
-    '/payroll-processing': 'Loonverwerking',
-    '/payslips': 'Loonstroken',
-    '/tax-returns': 'Loonaangiftes',
-    '/exports': 'Exports',
-    '/audit-log': 'Audit Log',
-    '/settings': 'Instellingen',
-  };
-  
-  return titles[pathname] || 'AlloonApp';
 };
 
 export default Layout;
