@@ -5,6 +5,8 @@ import {
   Building2,
   Users,
   Clock,
+  Calendar,
+  HeartPulse,
   FileText,
   Upload,
   Download,
@@ -12,6 +14,8 @@ import {
   LogOut,
   Shield,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
   Zap,
   TrendingUp,
   Activity,
@@ -31,7 +35,7 @@ export interface NavigationItem {
   color?: string;
 }
 
-// ✅ VEREENVOUDIGDE navigation zonder payroll
+// Navigation items
 export const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], color: 'text-purple-600' },
   { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], color: 'text-blue-600' },
@@ -41,27 +45,42 @@ export const navigation: NavigationItem[] = [
   { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee'], color: 'text-orange-600' },
   { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], color: 'text-indigo-600' },
   
-  // ✅ NIEUW: Facturatie
+  // Verlof & Verzuim
+  { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], color: 'text-teal-600' },
+  { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], color: 'text-red-600' },
+  
+  // Facturatie
   { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], color: 'text-emerald-600' },
   { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], color: 'text-amber-600' },
   
-  // ✅ AANGEPAST: Exports (alleen uren naar loonadministratie)
+  // Data & Exports
   { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], color: 'text-cyan-600' },
   { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], color: 'text-violet-600' },
   
   // Systeem
+  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee'], color: 'text-cyan-600' },
   { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], color: 'text-slate-600' },
   { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'], color: 'text-gray-600' },
 ];
 
-// Modern Company Selector (ongewijzigd)
-const ModernCompanySelector: React.FC = () => {
+// Company Selector
+const CompanySelector: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const { companies, selectedCompany, setSelectedCompany } = useApp();
   const { userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   if (userRole !== 'admin' || !companies || companies.length === 0) {
     return null;
+  }
+
+  if (collapsed) {
+    return (
+      <div className="px-3 py-4">
+        <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+          <Building2 className="h-6 w-6 text-white" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -124,8 +143,8 @@ const ModernCompanySelector: React.FC = () => {
   );
 };
 
-// Modern Navigation Item (ongewijzigd)
-const ModernNavItem: React.FC<{ item: NavigationItem }> = ({ item }) => (
+// Navigation Item
+const NavItem: React.FC<{ item: NavigationItem; collapsed: boolean }> = ({ item, collapsed }) => (
   <NavLink
     to={item.href}
     className={({ isActive }) =>
@@ -133,120 +152,155 @@ const ModernNavItem: React.FC<{ item: NavigationItem }> = ({ item }) => (
         isActive
           ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm border border-blue-200'
           : 'text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-slate-50 hover:text-gray-900'
-      }`
+      } ${collapsed ? 'justify-center' : ''}`
     }
+    title={collapsed ? item.name : undefined}
   >
-    <div className={`p-2 rounded-lg mr-3 transition-all duration-200 ${
-      ({ isActive }: { isActive: boolean }) => isActive 
-        ? 'bg-blue-500 shadow-sm' 
-        : 'bg-gray-100 group-hover:bg-gray-200'
-    }`}>
-      <item.icon className={`h-4 w-4 ${
-        ({ isActive }: { isActive: boolean }) => isActive ? 'text-white' : item.color || 'text-gray-600'
-      }`} />
-    </div>
-    <span className="flex-1">{item.name}</span>
-    {item.badge && (
-      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-        {item.badge}
-      </span>
+    {({ isActive }) => (
+      <>
+        <div className={`p-2 rounded-lg ${collapsed ? '' : 'mr-3'} transition-all duration-200 ${
+          isActive 
+            ? 'bg-blue-500 shadow-sm' 
+            : 'bg-gray-100 group-hover:bg-gray-200'
+        }`}>
+          <item.icon className={`h-4 w-4 ${
+            isActive ? 'text-white' : item.color || 'text-gray-600'
+          }`} />
+        </div>
+        {!collapsed && (
+          <>
+            <span className="flex-1">{item.name}</span>
+            {item.badge && (
+              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+      </>
     )}
   </NavLink>
 );
 
-// Modern Section Header (ongewijzigd)
-const ModernSectionHeader: React.FC<{ title: string; icon: React.ComponentType<{ className?: string }> }> = ({ title, icon: Icon }) => (
-  <div className="flex items-center space-x-2 px-4 py-2 mb-2">
-    <Icon className="h-4 w-4 text-gray-400" />
-    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</span>
-    <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent"></div>
-  </div>
-);
+// Section Header
+const SectionHeader: React.FC<{ 
+  title: string; 
+  icon: React.ComponentType<{ className?: string }>; 
+  collapsed: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+}> = ({ title, icon: Icon, collapsed, isExpanded, onToggle }) => {
+  if (collapsed) {
+    return (
+      <div className="flex justify-center py-2">
+        <div className="w-8 h-px bg-gray-300"></div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onToggle}
+      className="flex items-center space-x-2 px-4 py-2 mb-2 w-full hover:bg-gray-50 rounded-lg transition-colors"
+    >
+      <Icon className="h-4 w-4 text-gray-400" />
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex-1 text-left">{title}</span>
+      <ChevronRight className={`h-3 w-3 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+    </button>
+  );
+};
 
 const Sidebar: React.FC = () => {
   const { signOut, userRole } = useAuth();
+  const [collapsed, setCollapsed] = useState(true); // Start collapsed
+  const [expandedSections, setExpandedSections] = useState<string[]>(['Hoofdmenu']); // Only main expanded by default
 
-  // ✅ AANGEPASTE categorieën voor vereenvoudigd systeem
+  const toggleSection = (sectionTitle: string) => {
+    setExpandedSections(prev =>
+      prev.includes(sectionTitle)
+        ? prev.filter(s => s !== sectionTitle)
+        : [...prev, sectionTitle]
+    );
+  };
+
+  // Filter and categorize navigation items
   const mainItems = navigation.slice(0, 3).filter(item => userRole && item.roles.includes(userRole));
-  const timeItems = navigation.slice(3, 5).filter(item => userRole && item.roles.includes(userRole)); // Alleen uren
-  const invoiceItems = navigation.slice(5, 7).filter(item => userRole && item.roles.includes(userRole)); // Facturen
-  const dataItems = navigation.slice(7, 9).filter(item => userRole && item.roles.includes(userRole)); // Export & Drive
-  const systemItems = navigation.slice(9).filter(item => userRole && item.roles.includes(userRole)); // Systeem
+  const timeItems = navigation.slice(3, 7).filter(item => userRole && item.roles.includes(userRole));
+  const invoiceItems = navigation.slice(7, 9).filter(item => userRole && item.roles.includes(userRole));
+  const dataItems = navigation.slice(9, 11).filter(item => userRole && item.roles.includes(userRole));
+  const systemItems = navigation.slice(11).filter(item => userRole && item.roles.includes(userRole));
+
+  const sections = [
+    { title: 'Hoofdmenu', icon: Zap, items: mainItems },
+    { title: 'Tijd & Aanwezigheid', icon: Activity, items: timeItems },
+    { title: 'Facturatie', icon: Receipt, items: invoiceItems },
+    { title: 'Data & Bestanden', icon: TrendingUp, items: dataItems },
+    { title: 'Systeem', icon: Settings, items: systemItems },
+  ].filter(section => section.items.length > 0);
 
   return (
-    <div className="hidden lg:flex lg:w-72 lg:flex-col lg:bg-white lg:border-r lg:border-gray-200 lg:shadow-sm">
-      {/* Header met groter logo */}
-      <div className="flex h-20 items-center justify-center border-b border-gray-100 px-6 bg-gradient-to-r from-slate-50 to-gray-50">
-        <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto" />
+    <div className={`hidden lg:flex lg:flex-col lg:bg-white lg:border-r lg:border-gray-200 lg:shadow-sm transition-all duration-300 ${
+      collapsed ? 'lg:w-20' : 'lg:w-72'
+    }`}>
+      {/* Header */}
+      <div className="flex h-20 items-center justify-center border-b border-gray-100 px-6 bg-gradient-to-r from-slate-50 to-gray-50 relative">
+        {!collapsed && (
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto" />
+        )}
+        {collapsed && (
+          <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xl">A</span>
+          </div>
+        )}
+        
+        {/* Toggle Button */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
+        >
+          <ChevronLeft className={`h-3 w-3 text-gray-600 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {/* Company Selector */}
-      <ModernCompanySelector />
+      <CompanySelector collapsed={collapsed} />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-6 px-4 py-6 overflow-y-auto">
-        
-        {/* Hoofdmenu */}
-        {mainItems.length > 0 && (
-          <div className="space-y-1">
-            <ModernSectionHeader title="Hoofdmenu" icon={Zap} />
-            {mainItems.map((item) => (
-              <ModernNavItem key={item.name} item={item} />
-            ))}
+      <nav className="flex-1 space-y-2 px-4 py-6 overflow-y-auto">
+        {sections.map((section) => (
+          <div key={section.title} className="space-y-1">
+            <SectionHeader
+              title={section.title}
+              icon={section.icon}
+              collapsed={collapsed}
+              isExpanded={expandedSections.includes(section.title)}
+              onToggle={() => toggleSection(section.title)}
+            />
+            
+            {(collapsed || expandedSections.includes(section.title)) && (
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <NavItem key={item.name} item={item} collapsed={collapsed} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Tijd & Uren */}
-        {timeItems.length > 0 && (
-          <div className="space-y-1">
-            <ModernSectionHeader title="Tijd & Uren" icon={Activity} />
-            {timeItems.map((item) => (
-              <ModernNavItem key={item.name} item={item} />
-            ))}
-          </div>
-        )}
-
-        {/* ✅ NIEUW: Facturatie */}
-        {invoiceItems.length > 0 && (
-          <div className="space-y-1">
-            <ModernSectionHeader title="Facturatie" icon={Receipt} />
-            {invoiceItems.map((item) => (
-              <ModernNavItem key={item.name} item={item} />
-            ))}
-          </div>
-        )}
-
-        {/* ✅ NIEUW: Data & Bestanden */}
-        {dataItems.length > 0 && (
-          <div className="space-y-1">
-            <ModernSectionHeader title="Data & Bestanden" icon={TrendingUp} />
-            {dataItems.map((item) => (
-              <ModernNavItem key={item.name} item={item} />
-            ))}
-          </div>
-        )}
-
-        {/* Systeem */}
-        {systemItems.length > 0 && (
-          <div className="space-y-1">
-            <ModernSectionHeader title="Systeem" icon={Settings} />
-            {systemItems.map((item) => (
-              <ModernNavItem key={item.name} item={item} />
-            ))}
-          </div>
-        )}
+        ))}
       </nav>
 
       {/* Footer */}
       <div className="border-t border-gray-100 p-4 bg-gradient-to-r from-slate-50 to-gray-50">
         <button
           onClick={signOut}
-          className="flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group"
+          className={`flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group ${
+            collapsed ? 'justify-center' : ''
+          }`}
+          title={collapsed ? 'Uitloggen' : undefined}
         >
           <div className="p-2 rounded-lg mr-3 bg-gray-100 group-hover:bg-red-100 transition-colors">
             <LogOut className="h-4 w-4 text-gray-600 group-hover:text-red-600" />
           </div>
-          <span>Uitloggen</span>
+          {!collapsed && <span>Uitloggen</span>}
         </button>
       </div>
     </div>
