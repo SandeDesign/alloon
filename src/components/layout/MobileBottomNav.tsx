@@ -9,9 +9,7 @@ import {
   Building2,
   Menu,
   Send,
-  Calendar,
-  Shield,
-  UserPlus
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -44,12 +42,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
       ];
     }
     
-    // Admin - ✅ AANGEPAST voor nieuwe admin structure
+    // Admin - aangepast voor nieuwe structure
     return [
       { href: '/', icon: Home, label: 'Dashboard' },
-      { href: '/admin', icon: Shield, label: 'Admin' },
-      { href: '/employees', icon: Users, label: 'Team' },
       { href: '/timesheets', icon: Clock, label: 'Uren' },
+      { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
+      { href: '/employees', icon: Users, label: 'Werknemers' },
     ];
   };
 
