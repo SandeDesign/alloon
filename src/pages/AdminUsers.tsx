@@ -7,8 +7,6 @@ import {
   Search, 
   Shield,
   Mail,
-  Phone,
-  Building2,
   Ban,
   UserCheck
 } from 'lucide-react';
@@ -32,18 +30,18 @@ import { db } from '../lib/firebase';
 
 interface SystemUser {
   id: string;
+  uid?: string;
   email: string;
   displayName?: string;
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   role: 'admin' | 'manager' | 'employee';
-  status?: 'active' | 'inactive' | 'suspended';
+  isActive?: boolean;
   companyIds?: string[];
-  phoneNumber?: string;
+  permissions?: string[];
+  createdAt?: Date;
   lastLoginAt?: Date;
-  createdAt: Date;
+  createdBy?: string;
   updatedAt?: Date;
-  emailVerified?: boolean;
 }
 
 const AdminUsers: React.FC = () => {
@@ -62,32 +60,34 @@ const AdminUsers: React.FC = () => {
     try {
       setLoading(true);
       
-      // Get all users from Firebase
-      const usersQuery = query(
-        collection(db, 'users'),
-        orderBy('createdAt', 'desc')
-      );
-      const usersSnapshot = await getDocs(usersQuery);
+      // Get all users from Firebase - just query all without orderBy first
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      
+      console.log('Firebase users found:', usersSnapshot.docs.length);
       
       const usersData: SystemUser[] = usersSnapshot.docs.map(doc => {
         const data = doc.data();
+        console.log('User data:', data); // Debug log
+        
         return {
           id: doc.id,
+          uid: data.uid,
           email: data.email || '',
-          displayName: data.displayName,
-          firstName: data.firstName,
-          lastName: data.lastName,
+          displayName: data.displayName || data.name || '',
+          name: data.name,
           role: data.role || 'employee',
-          status: data.status || 'active',
+          isActive: data.isActive !== false, // Default to true if not set
           companyIds: data.companyIds || [],
-          phoneNumber: data.phoneNumber,
+          permissions: data.permissions || [],
+          createdAt: data.createdAt?.toDate(),
           lastLoginAt: data.lastLoginAt?.toDate(),
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate(),
-          emailVerified: data.emailVerified || false
+          createdBy: data.createdBy,
+          updatedAt: data.updatedAt?.toDate()
         };
       });
 
+      console.log('Processed users:', usersData);
       setUsers(usersData);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -102,13 +102,15 @@ const AdminUsers: React.FC = () => {
   }, [loadUsers]);
 
   const filteredUsers = users.filter(user => {
+    const name = user.displayName || user.name || '';
     const matchesSearch = 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
+      name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && user.isActive !== false) ||
+                         (statusFilter === 'inactive' && user.isActive === false);
     
     return matchesSearch && matchesRole && matchesStatus;
   });
@@ -124,23 +126,24 @@ const AdminUsers: React.FC = () => {
       success('Rol bijgewerkt', 'Gebruikersrol is succesvol gewijzigd');
       loadUsers();
     } catch (error) {
+      console.error('Error updating role:', error);
       showError('Fout bij bijwerken', 'Kon gebruikersrol niet wijzigen');
     }
   };
 
-  const handleUpdateUserStatus = async (userId: string, newStatus: SystemUser['status']) => {
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
-        status: newStatus,
+        isActive: !currentStatus,
         updatedAt: new Date()
       });
       
-      const statusText = newStatus === 'active' ? 'geactiveerd' : 
-                        newStatus === 'inactive' ? 'gedeactiveerd' : 'geschorst';
+      const statusText = !currentStatus ? 'geactiveerd' : 'gedeactiveerd';
       success('Status bijgewerkt', `Gebruiker is ${statusText}`);
       loadUsers();
     } catch (error) {
+      console.error('Error updating status:', error);
       showError('Fout bij bijwerken', 'Kon gebruikersstatus niet wijzigen');
     }
   };
@@ -155,6 +158,7 @@ const AdminUsers: React.FC = () => {
       success('Gebruiker verwijderd', 'Gebruiker is succesvol verwijderd');
       loadUsers();
     } catch (error) {
+      console.error('Error deleting user:', error);
       showError('Fout bij verwijderen', 'Kon gebruiker niet verwijderen');
     }
   };
@@ -168,13 +172,10 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: SystemUser['status']) => {
-    switch (status) {
-      case 'active': return 'text-green-600 bg-green-100';
-      case 'inactive': return 'text-gray-600 bg-gray-100';
-      case 'suspended': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive 
+      ? 'text-green-600 bg-green-100'
+      : 'text-red-600 bg-red-100';
   };
 
   const formatDate = (date: Date | undefined) => {
@@ -199,13 +200,23 @@ const AdminUsers: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gebruikersbeheer</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Beheer systeemgebruikers en hun rollen
+            Beheer systeemgebruikers en hun rollen ({users.length} gebruikers gevonden)
           </p>
         </div>
         <Button icon={Plus}>
           Nieuwe Gebruiker
         </Button>
       </div>
+
+      {/* Debug Info */}
+      {users.length === 0 && !loading && (
+        <Card className="p-4 bg-yellow-50 border-yellow-200">
+          <p className="text-yellow-800">
+            <strong>Debug:</strong> Geen gebruikers gevonden in de 'users' collectie. 
+            Controleer of de collectie bestaat en of je de juiste rechten hebt.
+          </p>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -244,7 +255,6 @@ const AdminUsers: React.FC = () => {
                 <option value="all">Alle statussen</option>
                 <option value="active">Actief</option>
                 <option value="inactive">Inactief</option>
-                <option value="suspended">Geschorst</option>
               </select>
             </div>
           </div>
@@ -269,7 +279,7 @@ const AdminUsers: React.FC = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Actief</p>
               <p className="text-xl font-bold text-gray-900">
-                {users.filter(u => u.status === 'active' || !u.status).length}
+                {users.filter(u => u.isActive !== false).length}
               </p>
             </div>
           </div>
@@ -291,9 +301,9 @@ const AdminUsers: React.FC = () => {
           <div className="flex items-center">
             <Ban className="h-8 w-8 text-orange-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Geschorst</p>
+              <p className="text-sm font-medium text-gray-600">Inactief</p>
               <p className="text-xl font-bold text-gray-900">
-                {users.filter(u => u.status === 'suspended').length}
+                {users.filter(u => u.isActive === false).length}
               </p>
             </div>
           </div>
@@ -305,9 +315,9 @@ const AdminUsers: React.FC = () => {
         <EmptyState
           icon={Users}
           title="Geen gebruikers gevonden"
-          description={searchTerm || roleFilter !== 'all' || statusFilter !== 'all' 
-            ? "Pas je filters aan om meer resultaten te zien"
-            : "Er zijn nog geen gebruikers aangemaakt"
+          description={users.length === 0 
+            ? "Er zijn nog geen gebruikers in de database"
+            : "Pas je filters aan om meer resultaten te zien"
           }
         />
       ) : (
@@ -329,9 +339,6 @@ const AdminUsers: React.FC = () => {
                     Aangemaakt
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Laatste Login
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acties
                   </th>
                 </tr>
@@ -348,14 +355,17 @@ const AdminUsers: React.FC = () => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {systemUser.displayName || 
-                             `${systemUser.firstName || ''} ${systemUser.lastName || ''}`.trim() || 
-                             'Naamloos'}
+                            {systemUser.displayName || systemUser.name || 'Geen naam'}
                           </div>
                           <div className="text-sm text-gray-500 flex items-center">
                             <Mail className="h-3 w-3 mr-1" />
                             {systemUser.email}
                           </div>
+                          {systemUser.uid && (
+                            <div className="text-xs text-gray-400">
+                              UID: {systemUser.uid.substring(0, 8)}...
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -371,21 +381,15 @@ const AdminUsers: React.FC = () => {
                       </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={systemUser.status || 'active'}
-                        onChange={(e) => handleUpdateUserStatus(systemUser.id, e.target.value as SystemUser['status'])}
-                        className={`text-sm px-2 py-1 rounded-full border-none ${getStatusColor(systemUser.status || 'active')}`}
+                      <button
+                        onClick={() => handleToggleUserStatus(systemUser.id, systemUser.isActive !== false)}
+                        className={`text-sm px-2 py-1 rounded-full border-none cursor-pointer ${getStatusColor(systemUser.isActive !== false)}`}
                       >
-                        <option value="active">Actief</option>
-                        <option value="inactive">Inactief</option>
-                        <option value="suspended">Geschorst</option>
-                      </select>
+                        {systemUser.isActive !== false ? 'Actief' : 'Inactief'}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(systemUser.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(systemUser.lastLoginAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center space-x-2">
