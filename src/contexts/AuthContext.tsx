@@ -44,9 +44,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole(roleData?.role || null);
           setCurrentEmployeeId(roleData?.employeeId || null);
 
+          // ✅ FIXED: Handle admin, manager, and employee roles properly
           if (roleData?.role === 'admin') {
             setAdminUserId(user.uid);
-          } else if (roleData?.role === 'employee' && roleData?.employeeId) {
+          } else if ((roleData?.role === 'employee' || roleData?.role === 'manager') && roleData?.employeeId) {
+            // Both employee and manager roles need employeeId and should find their admin
             const employeeDoc = await getEmployeeById(roleData.employeeId);
             if (employeeDoc) {
               setAdminUserId(employeeDoc.userId);
@@ -156,10 +158,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
-      success('E-mail verzonden!', 'Controleer je inbox voor de reset link');
+      success('E-mail verzonden!', 'Controleer je e-mail voor instructies om je wachtwoord te resetten');
     } catch (err: any) {
-      console.error('Password reset error:', err);
-      let message = 'Er is een fout opgetreden bij het versturen van de reset e-mail';
+      console.error('Reset password error:', err);
+      let message = 'Er is een fout opgetreden bij het verzenden van de reset e-mail';
 
       switch (err.code) {
         case 'auth/user-not-found':
@@ -178,26 +180,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const value: AuthContextType = {
+    user,
+    userRole,
+    currentEmployeeId,
+    adminUserId,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userRole,
-        currentEmployeeId,
-        adminUserId,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        resetPassword,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
