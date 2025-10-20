@@ -4,13 +4,9 @@ import {
   LayoutDashboard,
   Building2,
   Users,
-  Calendar,
-  HeartPulse,
-  Receipt,
   Clock,
-  Calculator,
   FileText,
-  BookOpen,
+  Upload,
   Download,
   Settings,
   LogOut,
@@ -18,7 +14,10 @@ import {
   ChevronDown,
   Zap,
   TrendingUp,
-  Activity
+  Activity,
+  Receipt,
+  Send,
+  FolderOpen
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,24 +31,30 @@ export interface NavigationItem {
   color?: string;
 }
 
+// ✅ VEREENVOUDIGDE navigation zonder payroll
 export const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], color: 'text-purple-600' },
   { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], color: 'text-blue-600' },
   { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin'], color: 'text-green-600' },
+  
+  // Tijd & Urenregistratie
   { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee'], color: 'text-orange-600' },
-  { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Calendar, roles: ['admin'], color: 'text-indigo-600' },
-  { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], color: 'text-teal-600' },
-  { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], color: 'text-red-600' },
-  { name: 'Declaraties', href: '/admin/expenses', icon: Receipt, roles: ['admin'], color: 'text-amber-600' },
-  { name: 'Loonverwerking', href: '/payroll-processing', icon: Calculator, roles: ['admin'], color: 'text-emerald-600' },
-  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee'], color: 'text-cyan-600' },
-  { name: 'Loonaangiftes', href: '/tax-returns', icon: BookOpen, roles: ['admin'], color: 'text-violet-600' },
-  { name: 'Exports', href: '/exports', icon: Download, roles: ['admin'], color: 'text-pink-600' },
+  { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], color: 'text-indigo-600' },
+  
+  // ✅ NIEUW: Facturatie
+  { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], color: 'text-emerald-600' },
+  { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], color: 'text-amber-600' },
+  
+  // ✅ AANGEPAST: Exports (alleen uren naar loonadministratie)
+  { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], color: 'text-cyan-600' },
+  { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], color: 'text-violet-600' },
+  
+  // Systeem
   { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], color: 'text-slate-600' },
   { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee'], color: 'text-gray-600' },
 ];
 
-// Modern Company Selector
+// Modern Company Selector (ongewijzigd)
 const ModernCompanySelector: React.FC = () => {
   const { companies, selectedCompany, setSelectedCompany } = useApp();
   const { userRole } = useAuth();
@@ -119,7 +124,7 @@ const ModernCompanySelector: React.FC = () => {
   );
 };
 
-// Modern Navigation Item
+// Modern Navigation Item (ongewijzigd)
 const ModernNavItem: React.FC<{ item: NavigationItem }> = ({ item }) => (
   <NavLink
     to={item.href}
@@ -149,7 +154,7 @@ const ModernNavItem: React.FC<{ item: NavigationItem }> = ({ item }) => (
   </NavLink>
 );
 
-// Modern Section Header
+// Modern Section Header (ongewijzigd)
 const ModernSectionHeader: React.FC<{ title: string; icon: React.ComponentType<{ className?: string }> }> = ({ title, icon: Icon }) => (
   <div className="flex items-center space-x-2 px-4 py-2 mb-2">
     <Icon className="h-4 w-4 text-gray-400" />
@@ -161,11 +166,12 @@ const ModernSectionHeader: React.FC<{ title: string; icon: React.ComponentType<{
 const Sidebar: React.FC = () => {
   const { signOut, userRole } = useAuth();
 
-  // Filter navigation items based on user role
+  // ✅ AANGEPASTE categorieën voor vereenvoudigd systeem
   const mainItems = navigation.slice(0, 3).filter(item => userRole && item.roles.includes(userRole));
-  const timeItems = navigation.slice(3, 8).filter(item => userRole && item.roles.includes(userRole));
-  const financialItems = navigation.slice(8, 12).filter(item => userRole && item.roles.includes(userRole));
-  const systemItems = navigation.slice(12).filter(item => userRole && item.roles.includes(userRole));
+  const timeItems = navigation.slice(3, 5).filter(item => userRole && item.roles.includes(userRole)); // Alleen uren
+  const invoiceItems = navigation.slice(5, 7).filter(item => userRole && item.roles.includes(userRole)); // Facturen
+  const dataItems = navigation.slice(7, 9).filter(item => userRole && item.roles.includes(userRole)); // Export & Drive
+  const systemItems = navigation.slice(9).filter(item => userRole && item.roles.includes(userRole)); // Systeem
 
   return (
     <div className="hidden lg:flex lg:w-72 lg:flex-col lg:bg-white lg:border-r lg:border-gray-200 lg:shadow-sm">
@@ -180,7 +186,7 @@ const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="flex-1 space-y-6 px-4 py-6 overflow-y-auto">
         
-        {/* Main */}
+        {/* Hoofdmenu */}
         {mainItems.length > 0 && (
           <div className="space-y-1">
             <ModernSectionHeader title="Hoofdmenu" icon={Zap} />
@@ -190,27 +196,37 @@ const Sidebar: React.FC = () => {
           </div>
         )}
 
-        {/* Time & Attendance */}
+        {/* Tijd & Uren */}
         {timeItems.length > 0 && (
           <div className="space-y-1">
-            <ModernSectionHeader title="Tijd & Aanwezigheid" icon={Activity} />
+            <ModernSectionHeader title="Tijd & Uren" icon={Activity} />
             {timeItems.map((item) => (
               <ModernNavItem key={item.name} item={item} />
             ))}
           </div>
         )}
 
-        {/* Financial */}
-        {financialItems.length > 0 && (
+        {/* ✅ NIEUW: Facturatie */}
+        {invoiceItems.length > 0 && (
           <div className="space-y-1">
-            <ModernSectionHeader title="Financieel" icon={TrendingUp} />
-            {financialItems.map((item) => (
+            <ModernSectionHeader title="Facturatie" icon={Receipt} />
+            {invoiceItems.map((item) => (
               <ModernNavItem key={item.name} item={item} />
             ))}
           </div>
         )}
 
-        {/* System */}
+        {/* ✅ NIEUW: Data & Bestanden */}
+        {dataItems.length > 0 && (
+          <div className="space-y-1">
+            <ModernSectionHeader title="Data & Bestanden" icon={TrendingUp} />
+            {dataItems.map((item) => (
+              <ModernNavItem key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+
+        {/* Systeem */}
         {systemItems.length > 0 && (
           <div className="space-y-1">
             <ModernSectionHeader title="Systeem" icon={Settings} />
