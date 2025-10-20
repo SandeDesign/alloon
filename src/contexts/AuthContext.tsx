@@ -8,19 +8,9 @@ import {
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { auth, db } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { useToast } from '../hooks/useToast';
 import { getUserRole, getEmployeeById } from '../services/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  updateDoc, 
-  doc, 
-  addDoc, 
-  Timestamp 
-} from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -44,46 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { success, error } = useToast();
 
-  // Enhanced createUserRole function
-  const createUserRole = async (
-    uid: string, 
-    role: 'admin' | 'manager' | 'employee', 
-    employeeId?: string,
-    email?: string,
-    displayName?: string
-  ): Promise<void> => {
-    const roleData = {
-      uid,
-      role,
-      employeeId: employeeId || null,
-      email: email || '',
-      displayName: displayName || '',
-      isActive: true,
-      createdAt: Timestamp.fromDate(new Date()),
-      updatedAt: Timestamp.fromDate(new Date())
-    };
-    
-    await addDoc(collection(db, 'users'), roleData);
-  };
-
-  // Enhanced updateLastLogin function
-  const updateLastLogin = async (uid: string): Promise<void> => {
-    const q = query(
-      collection(db, 'users'),
-      where('uid', '==', uid)
-    );
-
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      await updateDoc(doc(db, 'users', userDoc.id), {
-        lastLoginAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date())
-      });
-    }
-  };
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
@@ -94,11 +44,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole(roleData?.role || null);
           setCurrentEmployeeId(roleData?.employeeId || null);
 
-          // Handle admin, manager, and employee roles properly
           if (roleData?.role === 'admin') {
             setAdminUserId(user.uid);
-          } else if ((roleData?.role === 'employee' || roleData?.role === 'manager') && roleData?.employeeId) {
-            // Both employee and manager roles need employeeId and should find their admin
+          } else if (roleData?.role === 'employee' && roleData?.employeeId) {
             const employeeDoc = await getEmployeeById(roleData.employeeId);
             if (employeeDoc) {
               setAdminUserId(employeeDoc.userId);
@@ -108,9 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setAdminUserId(null);
           }
-
-          // Update last login time
-          await updateLastLogin(user.uid);
         } catch (err) {
           console.error('Error loading user role:', err);
           setUserRole(null);
@@ -165,8 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(user, { displayName });
 
-      // Create user role with enhanced function
-      await createUserRole(user.uid, 'admin', undefined, email, displayName);
+      const { createUserRole } = await import('../services/firebase');
+      await createUserRole(user.uid, 'admin');
       setUserRole('admin');
 
       success('Account aangemaakt!', 'Je kunt nu beginnen met het beheren van je loonadministratie');
@@ -211,10 +156,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
-      success('E-mail verzonden!', 'Controleer je e-mail voor instructies om je wachtwoord te resetten');
+      success('E-mail verzonden!', 'Controleer je inbox voor de reset link');
     } catch (err: any) {
-      console.error('Reset password error:', err);
-      let message = 'Er is een fout opgetreden bij het verzenden van de reset e-mail';
+      console.error('Password reset error:', err);
+      let message = 'Er is een fout opgetreden bij het versturen van de reset e-mail';
 
       switch (err.code) {
         case 'auth/user-not-found':
@@ -233,26 +178,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const value: AuthContextType = {
-    user,
-    userRole,
-    currentEmployeeId,
-    adminUserId,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userRole,
+        currentEmployeeId,
+        adminUserId,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
