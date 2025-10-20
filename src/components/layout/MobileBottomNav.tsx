@@ -9,7 +9,9 @@ import {
   Building2,
   Menu,
   Send,
-  Calendar
+  Calendar,
+  Shield,
+  UserPlus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -42,12 +44,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
       ];
     }
     
-    // Admin - aangepast voor nieuwe structure
+    // Admin - ✅ AANGEPAST voor nieuwe admin structure
     return [
       { href: '/', icon: Home, label: 'Dashboard' },
+      { href: '/admin', icon: Shield, label: 'Admin' },
+      { href: '/employees', icon: Users, label: 'Team' },
       { href: '/timesheets', icon: Clock, label: 'Uren' },
-      { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
-      { href: '/employees', icon: Users, label: 'Werknemers' },
     ];
   };
 
@@ -76,29 +78,32 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
                 }`}>
                   <Icon className={`h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />
                 </div>
-                <span className="truncate text-xs">{label}</span>
+                <span className={`truncate leading-tight ${
+                  isActive ? 'text-blue-600' : 'text-gray-500'
+                }`}>
+                  {label}
+                </span>
                 {isActive && (
-                  <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-blue-600 rounded-full" />
+                  <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />
                 )}
               </>
             )}
           </NavLink>
         ))}
-        
-        {/* Menu button - 5th item */}
+
+        {/* Menu button for accessing more options */}
         <button
-          onClick={() => {
-            console.log('Menu button clicked!'); // Debug log
-            onMenuClick();
-          }}
-          className="flex flex-col items-center justify-center px-2 py-2 min-w-0 flex-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-all duration-200 hover:bg-gray-50 rounded-lg active:bg-gray-100"
+          onClick={onMenuClick}
+          className="flex flex-col items-center justify-center px-2 py-2 min-w-0 flex-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-all duration-200"
         >
-          <div className="p-1.5 rounded-lg mb-1 hover:bg-gray-100 transition-colors">
+          <div className="p-1.5 rounded-lg mb-1 hover:bg-gray-50 transition-all duration-200">
             <Menu className="h-5 w-5" />
           </div>
-          <span className="truncate text-xs">Menu</span>
+          <span className="truncate leading-tight">Menu</span>
         </button>
       </div>
     </nav>
   );
 };
+
+export default MobileBottomNav;
