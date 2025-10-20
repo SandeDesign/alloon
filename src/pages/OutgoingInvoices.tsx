@@ -23,6 +23,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
 import { EmptyState } from '../components/ui/EmptyState';
 import { outgoingInvoiceService, OutgoingInvoice } from '../services/outgoingInvoiceService';
+import { CreateInvoiceModal } from '../components/invoices/CreateInvoiceModal';
 
 const OutgoingInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -108,6 +109,10 @@ const OutgoingInvoices: React.FC = () => {
   const handleEditInvoice = (invoice: OutgoingInvoice) => {
     setEditingInvoice(invoice);
     setIsModalOpen(true);
+  };
+
+  const handleModalSuccess = () => {
+    loadInvoices();
   };
 
   const handleSendInvoice = async (invoiceId: string) => {
@@ -334,27 +339,13 @@ const OutgoingInvoices: React.FC = () => {
         </div>
       )}
 
-      {/* Invoice Modal - TODO: Implement InvoiceModal component */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">
-              {editingInvoice ? 'Factuur Bewerken' : 'Nieuwe Factuur'}
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Factuur formulier wordt hier geïmplementeerd...
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
-                Annuleren
-              </Button>
-              <Button onClick={() => setIsModalOpen(false)}>
-                Opslaan
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Create/Edit Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleModalSuccess}
+        editingInvoice={editingInvoice}
+      />
     </div>
   );
 };
