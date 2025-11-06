@@ -2,7 +2,7 @@
   "name": "Alloon HR Management",
   "short_name": "Alloon",
   "description": "Complete HR Management System voor Alloon",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
