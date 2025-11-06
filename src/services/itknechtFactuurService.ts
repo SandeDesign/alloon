@@ -22,7 +22,7 @@ export interface FactuurImportRequest {
 }
 
 export class ITKnechtFactuurService {
-  private static WEBHOOK_URL = 'https://hook.eu2.make.com/223n5535ioeop4mjrooygys09al7c2ib'; // Vervang met jouw Make webhook URL
+  private static WEBHOOK_URL = 'https://hook.eu2.make.com/223n5535ioeop4mjrooygys09al7c2ib';
 
   /**
    * Fetch factuurgegevens van ITKnecht via Make.com webhook
@@ -53,14 +53,24 @@ export class ITKnechtFactuurService {
       throw new Error(`ITKnecht webhook failed: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const responseData = await response.json();
     
-    // Validate response format
-    if (!Array.isArray(data)) {
+    console.log('✅ Raw Make response:', responseData);
+
+    // Make stuurt array met 1 object [{week, monteur, regels, totalUren}]
+    let data: FactuurWeekData[] = [];
+    
+    if (Array.isArray(responseData)) {
+      data = responseData;
+    } else if (responseData && typeof responseData === 'object') {
+      data = [responseData];
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
       throw new Error('Invalid response format from ITKnecht webhook');
     }
 
-    console.log('✅ Factuur data received:', data);
+    console.log('✅ Parsed factuur data:', data);
     return data as FactuurWeekData[];
   }
 
@@ -71,13 +81,11 @@ export class ITKnechtFactuurService {
     const items: any[] = [];
 
     weekDataList.forEach(weekData => {
-      const weekHeader = `Week ${weekData.week} ${weekData.monteur}`;
-      
       weekData.regels.forEach(regel => {
         items.push({
           description: `${regel.datum} ${regel.uren} ${regel.opdrachtgever} "${regel.locaties}"`,
           quantity: 1,
-          rate: 0, // Wordt ingevuld met dagtarief
+          rate: 0,
           amount: 0
         });
       });
