@@ -117,10 +117,8 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Check if this is werkbonnen factuur
-  const isWerkbonnenFactuur = 
-    selectedCompany?.id === WERKBONNEN_FACTUUR_CONFIG.companyId && 
-    formData.clientId === WERKBONNEN_FACTUUR_CONFIG.clientId;
+  // Check if this is werkbonnen factuur (alleen op bedrijfsnaam)
+  const isWerkbonnenFactuur = selectedCompany?.id === WERKBONNEN_FACTUUR_CONFIG.companyId;
 
   const calculateItemAmount = (quantity: number, rate: number) => quantity * rate;
 
@@ -195,8 +193,9 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       return;
     }
 
-    if (items.some(item => !item.description.trim())) {
-      error('Validatie fout', 'Alle items moeten een beschrijving hebben');
+    const validItems = items.filter(item => item.description.trim());
+    if (validItems.length === 0) {
+      error('Validatie fout', 'Voeg minimaal één factuuregel toe');
       return;
     }
 
@@ -228,7 +227,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         invoiceDate: new Date(formData.invoiceDate),
         dueDate: new Date(formData.dueDate),
         status: 'draft',
-        items: items.filter(item => item.description.trim()),
+        items: validItems,
         notes: formData.notes.trim() || ''
       };
 
