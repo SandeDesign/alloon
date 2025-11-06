@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, Employee, Branch, DashboardStats } from '../types';
-import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings } from '../services/firebase'; // Assuming getPendingTimesheets is also in firebase.ts or a similar service
-import { getPendingExpenses } from '../services/firebase'; // Assuming getPendingExpenses is also in firebase.ts or a similar service
-import { getPayrollCalculations } from '../services/payrollService'; // Assuming this service exists
-import { getPendingTimesheets } from '../services/timesheetService'; // Import getPendingTimesheets
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings } from '../services/firebase';
+import { getPendingExpenses } from '../services/firebase';
+import { getPayrollCalculations } from '../services/payrollService';
+import { getPendingTimesheets } from '../services/timesheetService';
 
 interface AppContextType {
   companies: Company[];
@@ -35,80 +35,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pendingApprovals: 0,
   });
 
-  // ✅ Use ref to track if we've already loaded to prevent duplicate calls
-  const hasLoadedRef = useRef(false);
-
   const calculateDashboardStats = useCallback(async (
     companiesData: Company[],
     employeesData: Employee[],
     branchesData: Branch[],
     userId: string
   ) => {
-    try {
-      const activeEmployees = employeesData.filter(emp => emp.status === 'active').length;
-      const companiesCount = companiesData.length;
-      const branchesCount = branchesData.length;
+    const activeEmployees = employeesData.filter(emp => emp.status === 'active').length;
+    const companiesCount = companiesData.length;
+    const branchesCount = branchesData.length;
 
-      let totalPendingApprovals = 0;
-      let totalGrossThisMonth = 0;
+    let totalPendingApprovals = 0;
+    let totalGrossThisMonth = 0;
 
-      if (companiesData.length > 0) {
-        try {
-          // Calculate pending leave approvals
-          const pendingLeaveRequests = await Promise.all(
-            companiesData.map(company => getPendingLeaveApprovals(company.id, userId).catch(() => []))
-          );
-          totalPendingApprovals += pendingLeaveRequests.flat().length;
-        } catch (error) {
-          console.error('Error calculating pending leaves:', error);
-        }
-
-        try {
-          // Calculate pending timesheet approvals
-          const pendingTimesheets = await Promise.all(
-            companiesData.map(company => getPendingTimesheets(userId, company.id).catch(() => []))
-          );
-          totalPendingApprovals += pendingTimesheets.flat().length;
-        } catch (error) {
-          console.error('Error calculating pending timesheets:', error);
-        }
-
-        try {
-          // Calculate pending expense approvals
-          const pendingExpenses = await Promise.all(
-            companiesData.map(company => getPendingExpenses(company.id, userId).catch(() => []))
-          );
-          totalPendingApprovals += pendingExpenses.flat().length;
-        } catch (error) {
-          console.error('Error calculating pending expenses:', error);
-        }
-
-        try {
-          // Calculate total gross this month (simplified for now, would need more complex payroll logic)
-          const currentMonth = new Date().getMonth();
-          const currentYear = new Date().getFullYear();
-          const payrollCalculations = await getPayrollCalculations(userId).catch(() => []);
-          totalGrossThisMonth = payrollCalculations.reduce((sum, calc) => {
-            if (calc.periodStartDate.getMonth() === currentMonth && calc.periodStartDate.getFullYear() === currentYear) {
-              return sum + calc.grossPay;
-            }
-            return sum;
-          }, 0);
-        } catch (error) {
-          console.error('Error calculating payroll:', error);
-        }
+    if (companiesData.length > 0) {
+      try {
+        const pendingLeaveRequests = await Promise.all(
+          companiesData.map(company => getPendingLeaveApprovals(company.id, userId).catch(() => []))
+        );
+        totalPendingApprovals += pendingLeaveRequests.flat().length;
+      } catch (error) {
+        console.error('Error calculating pending leaves:', error);
       }
 
-      setDashboardStats({
-        activeEmployees,
-        totalGrossThisMonth,
-        companiesCount,
-        branchesCount,
-        pendingApprovals: totalPendingApprovals,
-      });
-    } catch (error) {
-      console.error('Error in calculateDashboardStats:', error);
+      try {
+        const pendingTimesheets = await Promise.all(
+          companiesData.map(company => getPendingTimesheets(userId, company.id).catch(() => []))
+        );
+        totalPendingApprovals += pendingTimesheets.flat().length;
+      } catch (error) {
+        console.error('Error calculating pending timesheets:', error);
+      }
+
+      try {
+        const pendingExpenses = await Promise.all(
+          companiesData.map(company => getPendingExpenses(company.id, userId).catch(() => []))
+        );
+        totalPendingApprovals += pendingExpenses.flat().length;
+      } catch (error) {
+        console.error('Error calculating pending expenses:', error);
+      }
+
+      try {
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const payrollCalculations = await getPayrollCalculations(userId).catch(() => []);
+        totalGrossThisMonth = payrollCalculations.reduce((sum, calc) => {
+          if (calc.periodStartDate.getMonth() === currentMonth && calc.periodStartDate.getFullYear() === currentYear) {
+            return sum + calc.grossPay;
+          }
+          return sum;
+        }, 0);
+      } catch (error) {
+        console.error('Error calculating payroll:', error);
+      }
     }
+
+    setDashboardStats({
+      activeEmployees,
+      totalGrossThisMonth,
+      companiesCount,
+      branchesCount,
+      pendingApprovals: totalPendingApprovals,
+    });
   }, []);
 
   const loadData = useCallback(async () => {
@@ -139,8 +128,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let defaultCompanyId: string | null = null;
 
       if (userRole === 'admin') {
-        const userSettings = await getUserSettings(adminUserId);
-        defaultCompanyId = userSettings?.defaultCompanyId || null;
+        try {
+          const userSettings = await getUserSettings(adminUserId);
+          defaultCompanyId = userSettings?.defaultCompanyId || null;
+        } catch (error) {
+          console.error('Error loading user settings:', error);
+        }
       }
 
       // Fallback: check localStorage
@@ -186,18 +179,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user, adminUserId, userRole, currentEmployeeId, calculateDashboardStats]);
 
-  // ✅ FIXED: Only load once when user/adminUserId changes - NOT on every render
   useEffect(() => {
     if (user && adminUserId && (userRole === 'admin' || userRole === 'employee')) {
-      // Only load if we haven't loaded yet OR if the adminUserId changed
-      if (!hasLoadedRef.current || hasLoadedRef.current !== adminUserId) {
-        hasLoadedRef.current = adminUserId;
-        loadData();
-      }
+      loadData();
     } else {
       setLoading(false);
     }
-  }, [user?.uid, adminUserId, userRole]); // ✅ FIXED: Only depend on stable values
+  }, [user, adminUserId, userRole, currentEmployeeId]);
 
   const refreshDashboardStats = useCallback(async () => {
     if (user && adminUserId && userRole === 'admin') {
