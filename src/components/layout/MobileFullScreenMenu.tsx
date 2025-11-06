@@ -46,18 +46,11 @@ interface MenuCategory {
 export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOpen, onClose }) => {
   const { userRole } = useAuth();
   const { companies, selectedCompany, setSelectedCompany } = useApp();
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['Hoofdmenu']);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
   if (!isOpen) return null;
 
   const menuCategories: MenuCategory[] = [
-    {
-      title: 'Hoofdmenu',
-      icon: LayoutDashboard,
-      items: [
-        { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], color: 'text-purple-600' },
-      ]
-    },
     {
       title: 'Personeel',
       icon: Activity,
@@ -166,6 +159,35 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
           {/* Navigation Categories */}
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 space-y-4">
+              {/* ✅ DASHBOARD - SOLO (NO SECTION) */}
+              <NavLink
+                to="/"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `flex items-center space-x-3 p-4 rounded-lg transition-all duration-200 font-semibold ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'text-gray-700 hover:bg-white hover:shadow-sm'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className={`p-2 rounded-lg ${
+                      isActive ? 'bg-blue-500' : 'bg-gray-200'
+                    }`}>
+                      <LayoutDashboard className={`h-5 w-5 ${
+                        isActive ? 'text-white' : 'text-gray-600'
+                      }`} />
+                    </div>
+                    <span>Dashboard</span>
+                  </>
+                )}
+              </NavLink>
+
+              <div className="border-t border-gray-200 pt-4" />
+
+              {/* ✅ SECTIONS */}
               {filteredCategories.map((category) => (
                 <div key={category.title} className="bg-gray-50 rounded-xl overflow-hidden">
                   {/* Category Header */}
