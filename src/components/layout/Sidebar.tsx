@@ -261,13 +261,13 @@ const Sidebar: React.FC = () => {
     { 
       title: 'Personeel', 
       icon: Activity, 
-      defaultOpen: false, // ✅ CHANGED: Default dicht
+      defaultOpen: false,
       items: filteredNavigation.filter(i => ['Werknemers', 'Urenregistratie', 'Uren Goedkeuren', 'Verlof Goedkeuren', 'Verzuim Beheren'].includes(i.name)) 
     },
     { 
       title: 'Facturatie', 
       icon: Receipt, 
-      defaultOpen: false, // ✅ CHANGED: Default dicht
+      defaultOpen: false,
       items: filteredNavigation.filter(i => ['Relaties', 'Uitgaande Facturen', 'Inkomende Facturen'].includes(i.name)) 
     },
     { 
@@ -288,14 +288,14 @@ const Sidebar: React.FC = () => {
     <div className={`hidden lg:flex lg:flex-col lg:bg-white lg:border-r lg:border-gray-200 lg:shadow-sm transition-all duration-300 ${
       collapsed ? 'lg:w-20' : 'lg:w-72'
     }`}>
-      {/* Header */}
-      <div className="flex h-20 items-center justify-center border-b border-gray-100 px-6 bg-gradient-to-r from-slate-50 to-gray-50 relative">
+      {/* ✅ HEADER - GROTER LOGO */}
+      <div className="flex h-40 items-center justify-center border-b border-gray-100 px-4 bg-gradient-to-r from-slate-50 to-gray-50 relative">
         {!collapsed && (
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto" />
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-32 w-auto drop-shadow-sm" />
         )}
         {collapsed && (
-          <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">A</span>
+          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+            <span className="text-white font-bold text-2xl">A</span>
           </div>
         )}
         
