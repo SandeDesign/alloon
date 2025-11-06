@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, Employee, Branch, DashboardStats } from '../types';
-import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals } from '../services/firebase'; // Assuming getPendingTimesheets is also in firebase.ts or a similar service
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings } from '../services/firebase'; // Assuming getPendingTimesheets is also in firebase.ts or a similar service
 import { getPendingExpenses } from '../services/firebase'; // Assuming getPendingExpenses is also in firebase.ts or a similar service
 import { getPayrollCalculations } from '../services/payrollService'; // Assuming this service exists
 import { getPendingTimesheets } from '../services/timesheetService'; // Import getPendingTimesheets
@@ -113,6 +113,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setEmployees(employeesData);
       setBranches(branchesData);
 
+      // ✅ NIEUW: Load default company from database
+      let defaultCompanyId: string | null = null;
+
+      if (userRole === 'admin') {
+        const userSettings = await getUserSettings(adminUserId);
+        defaultCompanyId = userSettings?.defaultCompanyId || null;
+      }
+
+      // Fallback: check localStorage
+      if (!defaultCompanyId) {
+        const storedDefault = localStorage.getItem(`defaultCompany_${adminUserId}`);
+        defaultCompanyId = storedDefault || null;
+      }
+
       if (userRole === 'employee' && currentEmployeeId) {
         const currentEmployee = employeesData.find(e => e.id === currentEmployeeId);
         if (currentEmployee) {
@@ -127,12 +141,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
       } else if (companiesData.length > 0) {
-        setSelectedCompany(prev => {
-          if (!prev && companiesData.length > 0) {
-            return companiesData[0];
-          }
-          return prev;
-        });
+        const companyToSelect = defaultCompanyId 
+          ? companiesData.find(c => c.id === defaultCompanyId) 
+          : companiesData[0];
+        
+        setSelectedCompany(companyToSelect || companiesData[0]);
+        
+        // Save to localStorage as fallback
+        if (companyToSelect) {
+          localStorage.setItem(`defaultCompany_${adminUserId}`, companyToSelect.id);
+        }
       }
 
       if (userRole === 'admin') {
