@@ -125,7 +125,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         dueDate: new Date(formData.dueDate),
         status: 'draft',
         items: items.filter(item => item.description.trim()),
-        notes: formData.notes.trim() || undefined
+        notes: formData.notes.trim() || '' // ✅ FIXED: Lege string ipv undefined
       };
 
       if (editingInvoice?.id) {
