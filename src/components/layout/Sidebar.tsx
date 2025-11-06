@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -220,14 +220,36 @@ const SectionHeader: React.FC<{
 const Sidebar: React.FC = () => {
   const { signOut, userRole } = useAuth();
   const [collapsed, setCollapsed] = useState(true);
-  const [expandedSections, setExpandedSections] = useState<string[]>(['Personeel', 'Facturatie']);
+  const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
+  // ✅ LOAD STATE FROM LOCALSTORAGE ON MOUNT
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('sidebarCollapsed');
+    const savedExpanded = localStorage.getItem('sidebarExpandedSections');
+    
+    if (savedCollapsed !== null) {
+      setCollapsed(JSON.parse(savedCollapsed));
+    }
+    if (savedExpanded !== null) {
+      setExpandedSections(JSON.parse(savedExpanded));
+    }
+  }, []);
+
+  // ✅ SAVE COLLAPSED STATE TO LOCALSTORAGE
+  const handleToggleCollapsed = () => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
+  };
+
+  // ✅ SAVE EXPANDED SECTIONS TO LOCALSTORAGE
   const toggleSection = (sectionTitle: string) => {
-    setExpandedSections(prev =>
-      prev.includes(sectionTitle)
-        ? prev.filter(s => s !== sectionTitle)
-        : [...prev, sectionTitle]
-    );
+    const newExpandedSections = expandedSections.includes(sectionTitle)
+      ? expandedSections.filter(s => s !== sectionTitle)
+      : [...expandedSections, sectionTitle];
+    
+    setExpandedSections(newExpandedSections);
+    localStorage.setItem('sidebarExpandedSections', JSON.stringify(newExpandedSections));
   };
 
   const filteredNavigation = navigation.filter(item => userRole && item.roles.includes(userRole));
@@ -239,13 +261,13 @@ const Sidebar: React.FC = () => {
     { 
       title: 'Personeel', 
       icon: Activity, 
-      defaultOpen: true,
+      defaultOpen: false, // ✅ CHANGED: Default dicht
       items: filteredNavigation.filter(i => ['Werknemers', 'Urenregistratie', 'Uren Goedkeuren', 'Verlof Goedkeuren', 'Verzuim Beheren'].includes(i.name)) 
     },
     { 
       title: 'Facturatie', 
       icon: Receipt, 
-      defaultOpen: true,
+      defaultOpen: false, // ✅ CHANGED: Default dicht
       items: filteredNavigation.filter(i => ['Relaties', 'Uitgaande Facturen', 'Inkomende Facturen'].includes(i.name)) 
     },
     { 
@@ -278,7 +300,7 @@ const Sidebar: React.FC = () => {
         )}
         
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={handleToggleCollapsed}
           className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
         >
           <ChevronLeft className={`h-3 w-3 text-gray-600 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
