@@ -14,7 +14,7 @@ import {
 import { db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense, EmployeeWithCompanies, CompanyWithEmployees } from '../types';
+import { Company, Branch, Employee, TimeEntry, UserRole, LeaveRequest, LeaveBalance, SickLeave, AbsenceStatistics, Expense, EmployeeWithCompanies, CompanyWithEmployees, UserSettings } from '../types';
 import { generatePoortwachterMilestones, shouldActivatePoortwachter } from '../utils/poortwachterTracking';
 
 // Helper function to remove undefined values from objects (Firebase doesn't accept undefined)
@@ -1195,6 +1195,51 @@ export const submitExpense = async (id: string, userId: string, submittedBy: str
 
   const cleanedData = removeUndefinedValues(updateData);
   await updateDoc(docRef, cleanedData);
+};
+
+// ✅ NIEUW: User Settings functies
+export const getUserSettings = async (userId: string): Promise<UserSettings | null> => {
+  const q = query(
+    collection(db, 'userSettings'),
+    where('userId', '==', userId)
+  );
+  
+  const querySnapshot = await getDocs(q);
+  
+  if (querySnapshot.empty) return null;
+  
+  const docSnap = querySnapshot.docs[0];
+  return {
+    id: docSnap.id,
+    ...convertTimestamps(docSnap.data())
+  } as UserSettings;
+};
+
+export const saveUserSettings = async (userId: string, settings: Partial<UserSettings>): Promise<void> => {
+  const existingSettings = await getUserSettings(userId);
+  
+  const settingsData = convertToTimestamps({
+    userId,
+    ...settings,
+    updatedAt: new Date()
+  });
+  
+  const cleanedData = removeUndefinedValues(settingsData);
+  
+  if (existingSettings) {
+    // Update
+    const docRef = doc(db, 'userSettings', existingSettings.id);
+    await updateDoc(docRef, cleanedData);
+  } else {
+    // Create
+    const createData = convertToTimestamps({
+      userId,
+      ...settings,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    await addDoc(collection(db, 'userSettings'), removeUndefinedValues(createData));
+  }
 };
 
 // Helper function to check if user can manage a company
