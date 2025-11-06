@@ -18,29 +18,49 @@ export interface OutgoingInvoice {
   userId: string;
   companyId: string;
   invoiceNumber: string;
+  
+  // Client info - UITGEBREID
+  clientId?: string; // Referentie naar relatie
   clientName: string;
   clientEmail: string;
+  clientPhone?: string;
+  clientKvk?: string;
+  clientTaxNumber?: string;
   clientAddress: {
     street: string;
     city: string;
     zipCode: string;
     country: string;
   };
+  
+  // Bedrag gegevens
   amount: number;
   vatAmount: number;
   totalAmount: number;
+  
+  // Factuur details
   description: string;
   invoiceDate: Date;
   dueDate: Date;
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  
+  // Extra velden - NIEUW
+  purchaseOrder?: string;
+  projectCode?: string;
+  
+  // Payment tracking
   paidAt?: Date;
   sentAt?: Date;
+  
+  // Lineaire items
   items: {
     description: string;
     quantity: number;
     rate: number;
     amount: number;
   }[];
+  
+  // Admin
   notes?: string;
   pdfUrl?: string;
   createdAt: Date;
@@ -63,6 +83,7 @@ export const outgoingInvoiceService = {
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now)
       });
+      console.log('✅ Invoice created:', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -73,12 +94,9 @@ export const outgoingInvoiceService = {
   // Get invoices for company
   async getInvoices(userId: string, companyId?: string): Promise<OutgoingInvoice[]> {
     try {
-      let q = query(
-        collection(db, COLLECTION_NAME),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
+      console.log('🔍 Loading invoices - userId:', userId, 'companyId:', companyId);
 
+      let q;
       if (companyId) {
         q = query(
           collection(db, COLLECTION_NAME),
@@ -86,10 +104,16 @@ export const outgoingInvoiceService = {
           where('companyId', '==', companyId),
           orderBy('createdAt', 'desc')
         );
+      } else {
+        q = query(
+          collection(db, COLLECTION_NAME),
+          where('userId', '==', userId),
+          orderBy('createdAt', 'desc')
+        );
       }
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => {
+      const invoices = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -102,6 +126,9 @@ export const outgoingInvoiceService = {
           updatedAt: data.updatedAt.toDate()
         } as OutgoingInvoice;
       });
+
+      console.log('✅ Invoices loaded:', invoices.length);
+      return invoices;
     } catch (error) {
       console.error('Error getting invoices:', error);
       throw new Error('Kon facturen niet laden');
@@ -191,14 +218,14 @@ export const outgoingInvoiceService = {
     }
   },
 
-  // Generate PDF (implement with jsPDF or similar)
+  // Generate PDF (placeholder - implement with jsPDF)
   async generateInvoicePDF(invoice: OutgoingInvoice): Promise<Blob> {
-    // This is a placeholder - implement with jsPDF
     const htmlContent = `
       <html>
         <body>
           <h1>Factuur ${invoice.invoiceNumber}</h1>
           <p>Klant: ${invoice.clientName}</p>
+          <p>Email: ${invoice.clientEmail}</p>
           <p>Totaal: €${invoice.totalAmount.toFixed(2)}</p>
         </body>
       </html>
