@@ -8,7 +8,9 @@ import {
   Lock,
   AlertCircle,
   CheckCircle,
-  Edit
+  Edit,
+  Key,
+  Copy
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
@@ -25,6 +27,8 @@ import {
   saveTemporaryCredentials
 } from '../services/firebase';
 import { Employee } from '../types';
+import { doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const EmployeesNew: React.FC = () => {
   const { user } = useAuth();
@@ -36,7 +40,9 @@ const EmployeesNew: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [creatingAccount, setCreatingAccount] = useState<string | null>(null);
+  const [generatingPassword, setGeneratingPassword] = useState<string | null>(null);
   const [showCredentials, setShowCredentials] = useState<{ [key: string]: { email: string; password: string } }>({});
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   const loadEmployees = async () => {
     if (!user || !selectedCompany) return;
@@ -84,17 +90,14 @@ const EmployeesNew: React.FC = () => {
     }
   };
 
-  // ✅ Account aanmaken functie
   const handleCreateAccount = async (employee: Employee) => {
     if (!user) return;
 
     try {
       setCreatingAccount(employee.id);
       
-      // Genereer veilig wachtwoord
       const password = generateSecurePassword();
       
-      // Maak account aan in Firebase Auth
       const newUserId = await createEmployeeAuthAccount(
         employee.id,
         user.uid,
@@ -102,14 +105,12 @@ const EmployeesNew: React.FC = () => {
         password
       );
 
-      // Sla tijdelijke credentials op (optioneel, voor notificatie)
       await saveTemporaryCredentials(
         employee.id,
         employee.personalInfo.contactInfo.email,
         password
       );
 
-      // Toon credentials aan beheerder
       setShowCredentials({
         ...showCredentials,
         [employee.id]: {
@@ -129,6 +130,53 @@ const EmployeesNew: React.FC = () => {
       showError('Fout bij aanmaken', 'Kon account niet aanmaken');
     } finally {
       setCreatingAccount(null);
+    }
+  };
+
+  const generatePassword = (): string => {
+    const length = 12;
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+  };
+
+  const handleGenerateAndSavePassword = async (employeeId: string, employeeName: string) => {
+    try {
+      setGeneratingPassword(employeeId);
+      const newPassword = generatePassword();
+      
+      const employeeRef = doc(db, 'employees', employeeId);
+      await updateDoc(employeeRef, {
+        password: newPassword,
+        updatedAt: Timestamp.fromDate(new Date())
+      });
+      
+      setShowCredentials({
+        ...showCredentials,
+        [employeeId]: {
+          email: employees.find(e => e.id === employeeId)?.personalInfo.contactInfo.email || '',
+          password: newPassword
+        }
+      });
+
+      success('Wachtwoord gegenereerd en opgeslagen', `Nieuw wachtwoord voor ${employeeName} is opgeslagen`);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      showError('Fout bij bijwerken', 'Kon wachtwoord niet opslaan');
+    } finally {
+      setGeneratingPassword(null);
+    }
+  };
+
+  const handleCopyPassword = (employeeId: string) => {
+    const password = showCredentials[employeeId]?.password;
+    if (password) {
+      navigator.clipboard.writeText(password);
+      setCopiedUserId(employeeId);
+      setTimeout(() => setCopiedUserId(null), 2000);
     }
   };
 
@@ -256,66 +304,78 @@ const EmployeesNew: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Account Status Info */}
+                {/* Credentials Display */}
                 {showCredentials[employee.id] && (
-                  <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-medium text-green-800 dark:text-green-200">Account aangemaakt</p>
-                        <p className="text-green-700 dark:text-green-300 text-xs mt-1">
-                          <strong>Email:</strong> {showCredentials[employee.id].email}
-                        </p>
-                        <p className="text-green-700 dark:text-green-300 text-xs">
-                          <strong>Wachtwoord:</strong> {showCredentials[employee.id].password}
-                        </p>
-                      </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg mb-4 text-xs space-y-1">
+                    <p className="font-medium text-green-800 dark:text-green-200">Wachtwoord:</p>
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded border border-green-100 dark:border-green-800">
+                      <code className="text-green-600 dark:text-green-400 font-mono flex-1 break-all">{showCredentials[employee.id].password}</code>
+                      <button
+                        onClick={() => handleCopyPassword(employee.id)}
+                        className={`flex-shrink-0 p-1 rounded transition-colors ${copiedUserId === employee.id ? 'bg-green-100 text-green-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
+                        title={copiedUserId === employee.id ? 'Gekopieerd!' : 'Kopieer wachtwoord'}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
                   {!employee.hasAccount ? (
                     <button
                       onClick={() => handleCreateAccount(employee)}
                       disabled={creatingAccount === employee.id}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium text-sm transition-colors"
+                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                      title="Account aanmaken"
                     >
                       {creatingAccount === employee.id ? (
-                        <>
-                          <div className="animate-spin">
-                            <Lock className="h-4 w-4" />
-                          </div>
-                          Account...
-                        </>
+                        <div className="animate-spin">
+                          <Lock className="h-5 w-5" />
+                        </div>
                       ) : (
-                        <>
-                          <Lock className="h-4 w-4" />
-                          Account
-                        </>
+                        <Lock className="h-5 w-5" />
                       )}
                     </button>
                   ) : (
-                    <div className="flex-1 flex items-center justify-center px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg font-medium text-sm border border-green-200 dark:border-green-800">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Account Actief
-                    </div>
+                    <button
+                      className="p-2 text-green-600 rounded-lg cursor-default"
+                      title="Account actief"
+                    >
+                      <CheckCircle className="h-5 w-5" />
+                    </button>
                   )}
                   
                   <button
-                    onClick={() => handleEditEmployee(employee)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium text-sm transition-colors"
+                    onClick={() => handleGenerateAndSavePassword(employee.id, `${employee.personalInfo.firstName} ${employee.personalInfo.lastName}`)}
+                    disabled={generatingPassword === employee.id}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                    title="Genereer en sla wachtwoord op"
                   >
-                    <Edit className="h-4 w-4" />
-                    Bewerken
+                    {generatingPassword === employee.id ? (
+                      <div className="animate-spin">
+                        <Key className="h-5 w-5" />
+                      </div>
+                    ) : (
+                      <Key className="h-5 w-5" />
+                    )}
                   </button>
-                  
+
+                  <button
+                    onClick={() => handleEditEmployee(employee)}
+                    className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Bewerken"
+                  >
+                    <Edit className="h-5 w-5" />
+                  </button>
+
                   <button
                     onClick={() => handleDeleteEmployee(employee.id, `${employee.personalInfo.firstName} ${employee.personalInfo.lastName}`)}
-                    className="px-3 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 font-medium text-sm transition-colors"
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
+                    title="Verwijderen"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
               </Card>
