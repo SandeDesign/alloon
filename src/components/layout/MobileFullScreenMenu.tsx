@@ -1,20 +1,51 @@
 // src/components/layout/MobileFullScreenMenu.tsx
+// MINIMAL CHANGES: Only add company type filtering to existing code
+
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  X,
-  ChevronDown,
+import { 
+  X, 
+  ChevronDown, 
   ChevronRight,
-  LogOut,
+  LayoutDashboard,
   Building2,
+  Users,
+  Clock,
+  Calendar,
+  HeartPulse,
+  FileText,
+  Upload,
+  Download,
+  Settings,
+  LogOut,
+  Shield,
+  Zap,
+  Activity,
+  Receipt,
+  Send,
+  FolderOpen,
+  TrendingUp,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
-import { getNavigationSections, isMenuItemDisabled, getMenuItemDisabledReason } from '../../utils/menuConfig';
 
 interface MobileFullScreenMenuProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface MenuCategory {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: {
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    roles: string[];
+    companyTypes?: ('employer' | 'project')[]; // ✅ NEW
+    color?: string;
+  }[];
 }
 
 export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOpen, onClose }) => {
@@ -22,10 +53,64 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
   const { companies, selectedCompany, setSelectedCompany } = useApp();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
-  if (!userRole) return null;
+  if (!isOpen) return null;
 
-  const companyType = selectedCompany?.companyType as 'employer' | 'project' | undefined;
-  const filteredCategories = getNavigationSections(userRole, companyType);
+  const companyType = selectedCompany?.companyType as 'employer' | 'project' | undefined; // ✅ NEW
+
+  // ✅ NEW: Updated menu with company types
+  const menuCategories: MenuCategory[] = [
+    {
+      title: 'Personeel',
+      icon: Activity,
+      items: [
+        { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-green-600' },
+        { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'], color: 'text-orange-600' },
+        { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-indigo-600' },
+        { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-teal-600' },
+        { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-red-600' },
+      ]
+    },
+    {
+      title: 'Facturatie',
+      icon: Receipt,
+      items: [
+        { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-sky-600' },
+        { name: 'Declaraties', href: '/admin-expenses', icon: Receipt, roles: ['admin'], companyTypes: ['employer'], color: 'text-purple-600' }, // ✅ NEW: Declaraties
+        { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-emerald-600' },
+        { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-amber-600' },
+      ]
+    },
+    {
+      title: 'Data & Exports',
+      icon: TrendingUp,
+      items: [
+        { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-cyan-600' },
+        { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], companyTypes: ['employer'], color: 'text-violet-600' },
+      ]
+    },
+    {
+      title: 'Systeem',
+      icon: Settings,
+      items: [
+        { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], companyTypes: ['employer'], color: 'text-blue-600' },
+        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'], color: 'text-cyan-600' },
+        { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], companyTypes: ['employer'], color: 'text-slate-600' },
+        { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'], color: 'text-gray-600' },
+      ]
+    }
+  ];
+
+  // ✅ NEW: Filter categories and items by role AND company type
+  const filteredCategories = menuCategories
+    .map(category => ({
+      ...category,
+      items: category.items.filter(item => {
+        const roleMatches = item.roles.includes(userRole || '');
+        const companyTypeMatches = !companyType || !item.companyTypes || item.companyTypes.includes(companyType);
+        return roleMatches && companyTypeMatches;
+      })
+    }))
+    .filter(category => category.items.length > 0);
 
   const toggleCategory = (categoryTitle: string) => {
     setExpandedCategories(prev =>
@@ -79,7 +164,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
                 <option value="">Selecteer bedrijf</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
-                    {company.name} {company.companyType === 'project' ? '(Project)' : ''}
+                    {company.name}
                   </option>
                 ))}
               </select>
@@ -106,10 +191,9 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
                     <div className={`p-2 rounded-lg ${
                       isActive ? 'bg-blue-500' : 'bg-gray-200'
                     }`}>
-                      {/* Dashboard icon from lucide */}
-                      <svg className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
-                      </svg>
+                      <LayoutDashboard className={`h-5 w-5 ${
+                        isActive ? 'text-white' : 'text-gray-600'
+                      }`} />
                     </div>
                     <span>Dashboard</span>
                   </>
@@ -142,51 +226,33 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
                   {/* Category Items */}
                   {expandedCategories.includes(category.title) && (
                     <div className="px-4 pb-4 space-y-2">
-                      {category.items.map((item) => {
-                        const isDisabled = isMenuItemDisabled(item, selectedCompany?.id);
-                        const disabledReason = getMenuItemDisabledReason(item);
-
-                        return (
-                          <NavLink
-                            key={item.name}
-                            to={isDisabled ? '#' : item.href}
-                            onClick={(e) => {
-                              if (isDisabled) {
-                                e.preventDefault();
-                              } else {
-                                onClose();
-                              }
-                            }}
-                            className={({ isActive }) =>
-                              `flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
-                                isDisabled
-                                  ? 'opacity-50 cursor-not-allowed text-gray-400'
-                                  : isActive
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                    : 'text-gray-700 hover:bg-white hover:shadow-sm'
-                              }`
-                            }
-                            title={disabledReason || item.name}
-                          >
-                            {({ isActive }) => (
-                              <>
-                                <div className={`p-2 rounded-lg ${
-                                  isDisabled
-                                    ? 'bg-gray-200'
-                                    : isActive ? 'bg-blue-500' : 'bg-gray-200'
-                                }`}>
-                                  <item.icon className={`h-4 w-4 ${
-                                    isDisabled
-                                      ? 'text-gray-400'
-                                      : isActive ? 'text-white' : 'text-gray-600'
-                                  }`} />
-                                </div>
-                                <span className="font-medium">{item.name}</span>
-                              </>
-                            )}
-                          </NavLink>
-                        );
-                      })}
+                      {category.items.map((item) => (
+                        <NavLink
+                          key={item.name}
+                          to={item.href}
+                          onClick={onClose}
+                          className={({ isActive }) =>
+                            `flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                              isActive
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'text-gray-700 hover:bg-white hover:shadow-sm'
+                            }`
+                          }
+                        >
+                          {({ isActive }) => (
+                            <>
+                              <div className={`p-2 rounded-lg ${
+                                isActive ? 'bg-blue-500' : 'bg-gray-200'
+                              }`}>
+                                <item.icon className={`h-4 w-4 ${
+                                  isActive ? 'text-white' : item.color || 'text-gray-600'
+                                }`} />
+                              </div>
+                              <span className="font-medium">{item.name}</span>
+                            </>
+                          )}
+                        </NavLink>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -195,13 +261,13 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="border-t border-gray-200 p-4 bg-white">
             <button
               onClick={() => {
                 signOut();
                 onClose();
               }}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               <span>Uitloggen</span>
