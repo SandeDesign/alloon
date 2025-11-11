@@ -1,7 +1,3 @@
-// src/components/layout/Sidebar.tsx
-// MINIMAL CHANGES: Only add company type filtering to existing code
-// Keep ALL original styling and layout intact
-
 import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
@@ -27,6 +23,8 @@ import {
   Send,
   FolderOpen,
   UserCheck,
+  Briefcase,
+  BarChart3,
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -41,7 +39,7 @@ export interface NavigationItem {
   color?: string;
 }
 
-// ✅ NEW: Updated navigation with company type info
+// ✅ UPDATED: Navigation with company type filtering
 export const navigation: NavigationItem[] = [
   // ✅ DASHBOARD - SOLO (NO SECTION)
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], companyTypes: ['employer', 'project'] },
@@ -55,17 +53,20 @@ export const navigation: NavigationItem[] = [
   
   // FACTURATIE SECTION (both)
   { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Declaraties', href: '/admin-expenses', icon: Receipt, roles: ['admin'], companyTypes: ['employer'] }, // ✅ NEW: Declaraties added
   { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'] },
   { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'] },
+  
+  // PROJECT COMPANY SPECIFIC ✅ NEW
+  { name: 'Productie', href: '/projects', icon: Briefcase, roles: ['admin'], companyTypes: ['project'] },
+  { name: 'Statistieken', href: '/statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['project'] },
   
   // DATA & EXPORTS SECTION (employer only)
   { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin', 'manager'], companyTypes: ['employer'] },
   { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], companyTypes: ['employer'] },
   
-  // SYSTEEM SECTION (employer only)
+  // SYSTEEM SECTION
   { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], companyTypes: ['employer'] },
-  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'] },
+  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'] },
   { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], companyTypes: ['employer'] },
   { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'] },
 ];
@@ -225,7 +226,7 @@ const SectionHeader: React.FC<{
 
 const Sidebar: React.FC = () => {
   const { signOut, userRole } = useAuth();
-  const { selectedCompany } = useApp(); // ✅ NEW: Get selectedCompany
+  const { selectedCompany } = useApp();
   const [collapsed, setCollapsed] = useState(true);
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
@@ -281,7 +282,13 @@ const Sidebar: React.FC = () => {
       title: 'Facturatie', 
       icon: Receipt, 
       defaultOpen: false,
-      items: filteredNavigation.filter(i => ['Relaties', 'Declaraties', 'Uitgaande Facturen', 'Inkomende Facturen'].includes(i.name)) 
+      items: filteredNavigation.filter(i => ['Relaties', 'Uitgaande Facturen', 'Inkomende Facturen'].includes(i.name)) 
+    },
+    {
+      title: 'Project',
+      icon: Briefcase,
+      defaultOpen: false,
+      items: filteredNavigation.filter(i => ['Productie', 'Statistieken'].includes(i.name))
     },
     { 
       title: 'Data & Exports', 
