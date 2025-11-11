@@ -376,7 +376,7 @@ export const outgoingInvoiceService = {
 
     <!-- Footer -->
     <div class="footer">
-      <p>Factuur gegenereerd op ${new Date().toLocaleDateString('nl-NL')} om ${new Date().toLocaleTimeString('nl-NL')}</p>
+      <p>Factuur gegenereerd op ${new Date().toLocaleDateString('nl-NL')}</p>
     </div>
   </div>
 </body>
