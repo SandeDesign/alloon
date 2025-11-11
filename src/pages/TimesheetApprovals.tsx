@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, X, Clock, Building2, ChevronRight, AlertCircle, CheckCircle, User, ChevronDown } from 'lucide-react';
+import { Check, X, Clock, Building2, ChevronRight, AlertCircle, CheckCircle, User, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import Button from '../components/ui/Button';
@@ -23,6 +23,8 @@ interface EmployeeTimesheetSummary {
   contractHoursPerWeek: number;
   pendingTimesheets: WeeklyTimesheet[];
   hasPending: boolean;
+  totalPendingHours?: number;
+  hoursLacking?: number;
 }
 
 export default function TimesheetApprovals() {
@@ -54,14 +56,22 @@ export default function TimesheetApprovals() {
 
       employees.forEach(employee => {
         const employeePendingTimesheets = pendingTimesheets.filter(t => t.employeeId === employee.id);
+        
+        // Calculate totals
+        const totalPendingHours = employeePendingTimesheets.reduce((sum, t) => sum + t.totalRegularHours, 0);
+        const contractHours = employee.contractInfo?.hoursPerWeek || 40;
+        const expectedHours = contractHours * employeePendingTimesheets.length;
+        const hoursLacking = Math.max(0, expectedHours - totalPendingHours);
 
         summaries.push({
           employeeId: employee.id,
           firstName: employee.personalInfo.firstName,
           lastName: employee.personalInfo.lastName,
-          contractHoursPerWeek: employee.contractInfo?.hoursPerWeek || 40,
+          contractHoursPerWeek: contractHours,
           pendingTimesheets: employeePendingTimesheets,
-          hasPending: employeePendingTimesheets.length > 0
+          hasPending: employeePendingTimesheets.length > 0,
+          totalPendingHours,
+          hoursLacking
         });
       });
 
@@ -249,9 +259,24 @@ export default function TimesheetApprovals() {
                           {summary.firstName} {summary.lastName}
                         </p>
                         {summary.hasPending && (
-                          <p className="text-xs sm:text-sm text-orange-600 font-medium mt-0.5">
-                            {summary.pendingTimesheets.length} aanvraag{summary.pendingTimesheets.length !== 1 ? 'en' : ''} wachten
-                          </p>
+                          <div className="flex items-center gap-2 mt-1 text-xs">
+                            <span className="text-orange-600 font-medium">
+                              {summary.pendingTimesheets.length} week{summary.pendingTimesheets.length !== 1 ? 'en' : ''}
+                            </span>
+                            <span className="text-gray-500">•</span>
+                            <span className="text-blue-600 font-medium">
+                              {summary.totalPendingHours}u geregistreerd
+                            </span>
+                            {summary.hoursLacking && summary.hoursLacking > 0 && (
+                              <>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-red-600 font-medium flex items-center gap-0.5">
+                                  <TrendingDown className="h-3 w-3" />
+                                  -{summary.hoursLacking.toFixed(1)}u
+                                </span>
+                              </>
+                            )}
+                          </div>
                         )}
                         {!summary.hasPending && (
                           <p className="text-xs sm:text-sm text-green-600 font-medium mt-0.5 flex items-center gap-1">
