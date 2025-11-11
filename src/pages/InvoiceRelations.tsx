@@ -52,6 +52,7 @@ const InvoiceRelations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRelation, setEditingRelation] = useState<InvoiceRelation | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<InvoiceRelation>>({
     name: '',
     email: '',
@@ -146,6 +147,7 @@ const InvoiceRelations: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
     try {
       const now = new Date();
       const relationData = {
@@ -185,6 +187,8 @@ const InvoiceRelations: React.FC = () => {
     } catch (error) {
       console.error('Error saving relation:', error);
       showError('Fout bij opslaan', 'Kon relatie niet opslaan');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -224,7 +228,7 @@ const InvoiceRelations: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relaties</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Relaties (Klanten)</h1>
           <p className="mt-1 text-sm text-gray-500">
             Beheer klanten voor {selectedCompany.name}
           </p>
@@ -524,11 +528,20 @@ const InvoiceRelations: React.FC = () => {
             </div>
 
             <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
-              <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                icon={X}
+                onClick={() => setIsModalOpen(false)}
+              >
                 Annuleren
               </Button>
-              <Button onClick={handleSubmit}>
-                {editingRelation ? 'Bijwerken' : 'Aanmaken'}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={isSaving}
+                icon={editingRelation ? Edit : Plus}
+              >
+                {isSaving ? 'Opslaan...' : editingRelation ? 'Bijwerken' : 'Aanmaken'}
               </Button>
             </div>
           </div>
