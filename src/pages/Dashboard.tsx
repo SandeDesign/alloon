@@ -182,10 +182,10 @@ const Dashboard: React.FC = () => {
       count: pendingItems.filter(i => i.type === 'timesheet').length || undefined
     },
     {
-      title: 'Loonstroken',
+      title: 'Facturen',
       description: 'Genereren',
       icon: Briefcase,
-      action: () => navigate('/payslips'),
+      action: () => navigate('/invoices'),
       color: 'green'
     }
   ];
