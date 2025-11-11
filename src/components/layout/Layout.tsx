@@ -71,7 +71,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header */}
-        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
+        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 h-20 max-h-20">
           {/* LEFT: Back button OR Company Selector */}
           <div className="flex-1">
             {isDashboard ? (
@@ -132,7 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           
           {/* CENTER: GROTER LOGO */}
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-32 w-auto flex-shrink-0 mx-2" />
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto flex-shrink-0 mx-2" />
           
           {/* RIGHT: Notifications */}
           <div className="flex-1 flex justify-end">
