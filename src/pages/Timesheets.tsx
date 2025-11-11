@@ -211,7 +211,7 @@ export default function Timesheets() {
           eveningHours: 0,
           nightHours: 0,
           weekendHours: 0,
-          notes: `${selectedCompany?.name || 'Systeem'} import: ${dayEntries.length} entries`,
+          notes: ` Riset`,
           updatedAt: new Date()
         };
       }
