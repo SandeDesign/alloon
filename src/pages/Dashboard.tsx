@@ -20,6 +20,13 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
+import {
+  getPendingLeaveApprovals,
+  getTimeEntries,
+  getPendingExpenses,
+  getEmployees,
+  getLeaveRequests
+} from '../services/firebase';
 
 interface PendingItem {
   id: string;
@@ -42,74 +49,113 @@ interface QuickAction {
   count?: number;
 }
 
+interface ActivityLog {
+  id: string;
+  action: string;
+  employee?: string;
+  time: string;
+  status: 'completed' | 'pending';
+}
+
 const Dashboard: React.FC = () => {
   const { employees, companies, loading, selectedCompany } = useApp();
   const { user, userRole } = useAuth();
-  const { info } = useToast();
   const navigate = useNavigate();
 
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
+  const [dashLoading, setDashLoading] = useState(false);
 
-  useEffect(() => {
-    if (userRole === 'admin' && selectedCompany) {
-      // Simulated - in real app, fetch from Firebase
-      const mockPendingItems: PendingItem[] = [
-        {
-          id: '1',
+  // Fetch all pending items from Firebase
+  const fetchPendingItems = useCallback(async () => {
+    if (!user || !selectedCompany || userRole !== 'admin') return;
+
+    setDashLoading(true);
+    try {
+      const items: PendingItem[] = [];
+
+      // Get pending leave approvals
+      const leaveRequests = await getPendingLeaveApprovals(selectedCompany.id, user.uid);
+      leaveRequests.forEach((leave: any) => {
+        items.push({
+          id: `leave-${leave.id}`,
           type: 'leave',
-          title: 'Verlofaanvraag van Jan Jansen',
-          description: 'Zomervakantie aanvraag',
-          employee: 'Jan Jansen',
-          dateRange: '15-22 Augustus',
+          title: `Verlofaanvraag van ${leave.employeeName || 'Medewerker'}`,
+          description: leave.type || 'Verlofaanvraag',
+          employee: leave.employeeName,
+          dateRange: leave.startDate && leave.endDate 
+            ? `${new Date(leave.startDate).toLocaleDateString('nl-NL')} - ${new Date(leave.endDate).toLocaleDateString('nl-NL')}`
+            : undefined,
           icon: Calendar,
           color: 'orange',
           action: () => navigate('/admin/leave-approvals')
-        },
-        {
-          id: '2',
+        });
+      });
+
+      // Get pending time entries
+      const timeEntries = await getTimeEntries(user.uid);
+      const pendingTime = timeEntries.filter((t: any) => t.status === 'submitted' || t.status === 'pending');
+      if (pendingTime.length > 0) {
+        items.push({
+          id: 'timesheet-pending',
           type: 'timesheet',
-          title: 'Uren goedkeuring wachten',
-          description: '3 medewerkers',
+          title: `Uren goedkeuring wachten`,
+          description: `${pendingTime.length} medewerker${pendingTime.length !== 1 ? 's' : ''}`,
           icon: Clock,
           color: 'blue',
           action: () => navigate('/timesheet-approvals')
-        },
-        {
-          id: '3',
+        });
+      }
+
+      // Get pending expenses
+      const expenses = await getPendingExpenses(selectedCompany.id, user.uid);
+      if (expenses.length > 0) {
+        const totalAmount = expenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
+        items.push({
+          id: 'expense-pending',
           type: 'expense',
-          title: 'Onkosten ter goedkeuring',
-          description: 'Reiskosten € 145,50',
+          title: `Onkosten ter goedkeuring`,
+          description: `€ ${totalAmount.toFixed(2)}`,
           icon: AlertCircle,
           color: 'red',
           action: () => navigate('/admin/expenses')
-        }
-      ];
+        });
+      }
 
-      // Filter based on actual pending items
-      setPendingItems(mockPendingItems);
-      setPendingCount(mockPendingItems.length);
+      setPendingItems(items);
+      setPendingCount(items.length);
 
-      // Mock activity
-      setRecentActivity([
-        {
-          id: '1',
-          action: 'Loon verwerkt',
-          employee: 'Maria Garcia',
-          time: 'Vandaag om 14:30',
-          status: 'completed'
-        },
-        {
-          id: '2',
+      // Build activity log from leave requests (recent activities)
+      const activities: ActivityLog[] = [];
+      const approvedLeave = leaveRequests
+        .filter((l: any) => l.status === 'approved')
+        .sort((a: any, b: any) => new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime())
+        .slice(0, 3);
+
+      approvedLeave.forEach((leave: any) => {
+        activities.push({
+          id: `act-${leave.id}`,
           action: 'Verlof goedgekeurd',
-          employee: 'Peter van der Meer',
-          time: 'Gisteren om 10:15',
+          employee: leave.employeeName,
+          time: leave.approvedAt 
+            ? `${new Date(leave.approvedAt).toLocaleDateString('nl-NL')} om ${new Date(leave.approvedAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`
+            : 'Recent',
           status: 'completed'
-        }
-      ]);
+        });
+      });
+
+      setRecentActivity(activities);
+    } catch (error) {
+      console.error('Error fetching pending items:', error);
+    } finally {
+      setDashLoading(false);
     }
-  }, [userRole, selectedCompany, navigate]);
+  }, [user, selectedCompany, userRole, navigate]);
+
+  useEffect(() => {
+    fetchPendingItems();
+  }, [fetchPendingItems]);
 
   const quickActions: QuickAction[] = [
     {
@@ -125,14 +171,15 @@ const Dashboard: React.FC = () => {
       icon: Calendar,
       action: () => navigate('/admin/leave-approvals'),
       color: 'orange',
-      count: pendingCount > 0 ? pendingCount : undefined
+      count: pendingItems.filter(i => i.type === 'leave').length || undefined
     },
     {
       title: 'Uren',
       description: 'Verwerken',
       icon: Clock,
       action: () => navigate('/timesheet-approvals'),
-      color: 'purple'
+      color: 'purple',
+      count: pendingItems.filter(i => i.type === 'timesheet').length || undefined
     },
     {
       title: 'Loonstroken',
@@ -143,7 +190,7 @@ const Dashboard: React.FC = () => {
     }
   ];
 
-  if (loading) {
+  if (loading || dashLoading) {
     return <LoadingSpinner />;
   }
 
@@ -358,7 +405,9 @@ const Dashboard: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-900">
                     <span className="font-medium">{activity.action}</span>
-                    <span className="text-gray-600"> - {activity.employee}</span>
+                    {activity.employee && (
+                      <span className="text-gray-600"> - {activity.employee}</span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
                 </div>
