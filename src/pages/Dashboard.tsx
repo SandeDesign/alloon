@@ -352,7 +352,15 @@ const Dashboard: React.FC = () => {
   };
 
   // ============ DYNAMISCHE LAYOUT CHECK ============
-  const isProjectCompany = selectedCompany?.companyType === 'work_company';
+  const isProjectCompany = selectedCompany?.companyType === 'project';
+  
+  // DEBUG
+  console.log('🔍 Company Type Check:', {
+    companyName: selectedCompany?.name,
+    companyType: selectedCompany?.companyType,
+    isProjectCompany: isProjectCompany,
+    fullCompany: selectedCompany
+  });
 
   // ============ PROJECT COMPANY DASHBOARD ============
   if (isProjectCompany) {
