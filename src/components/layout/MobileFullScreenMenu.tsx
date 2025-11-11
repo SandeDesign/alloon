@@ -248,7 +248,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
           {/* Footer */}
           <div className="p-4 border-t border-gray-200 bg-gray-50">
             <div className="text-center text-sm text-gray-500">
-              AlloonApp v1.0
+              AlloonApp ontworpen door Marc
             </div>
           </div>
         </div>
