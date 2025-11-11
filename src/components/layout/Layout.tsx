@@ -79,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="fixed inset-0 z-10" 
                     onClick={() => setCompanyDropdownOpen(false)} 
                   />
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-64 max-h-60 overflow-y-auto lg:right-0">
+                  <div className="absolute -left-48 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-64 max-h-60 overflow-y-auto lg:right-0">
                     <div className="p-2 space-y-1">
                       {companies && companies.map((company) => (
                         <button
@@ -109,7 +109,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
         </header>
-        </header>
 
         {/* Desktop Header */}
         <header className="hidden lg:flex lg:items-center lg:justify-between lg:px-6 lg:py-4 lg:bg-white lg:border-b lg:border-gray-200">
@@ -135,7 +134,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   className="fixed inset-0 z-10" 
                   onClick={() => setCompanyDropdownOpen(false)} 
                 />
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-64 max-h-60 overflow-y-auto">
+                <div className="absolute -left-48 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-64 max-h-60 overflow-y-auto">
                   <div className="p-2 space-y-1">
                     {companies && companies.map((company) => (
                       <button
