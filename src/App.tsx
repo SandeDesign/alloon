@@ -12,6 +12,9 @@ import Absence from './pages/Absence';
 import Expenses from './pages/Expenses';
 import AdminLeaveApprovals from './pages/AdminLeaveApprovals';
 import AdminAbsenceManagement from './pages/AdminAbsenceManagement';
+
+import ProjectProduction from './pages/ProjectProduction';
+import ProjectStatistics from './pages/ProjectStatistics';
 // ✅ NEW ADMIN PAGES
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
