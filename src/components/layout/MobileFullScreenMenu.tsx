@@ -1,6 +1,3 @@
-// src/components/layout/MobileFullScreenMenu.tsx
-// MINIMAL CHANGES: Only add company type filtering + Better Design
-
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -25,6 +22,8 @@ import {
   FolderOpen,
   TrendingUp,
   UserCheck,
+  Briefcase,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
@@ -74,9 +73,16 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
       icon: Receipt,
       items: [
         { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-indigo-600' },
-        { name: 'Declaraties', href: '/admin-expenses', icon: Receipt, roles: ['admin'], companyTypes: ['employer'], color: 'text-violet-600' }, // ✅ NEW: Declaraties
         { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-green-600' },
         { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-orange-600' },
+      ]
+    },
+    {
+      title: 'Project',
+      icon: Briefcase,
+      items: [
+        { name: 'Productie', href: '/project-production', icon: Briefcase, roles: ['admin'], companyTypes: ['project'], color: 'text-cyan-600' },
+        { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['project'], color: 'text-purple-600' },
       ]
     },
     {
@@ -92,7 +98,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
       icon: Settings,
       items: [
         { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], companyTypes: ['employer'], color: 'text-blue-600' },
-        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'], color: 'text-teal-600' },
+        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'], color: 'text-teal-600' },
         { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], companyTypes: ['employer'], color: 'text-slate-600' },
         { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'], color: 'text-gray-600' },
       ]
