@@ -40,6 +40,8 @@ export default function TimesheetApprovals() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [employeeSummaries, setEmployeeSummaries] = useState<EmployeeTimesheetSummary[]>([]);
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
+  const [showDashboardModal, setShowDashboardModal] = useState(false);
+  const [dashboardEmployeeId, setDashboardEmployeeId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user || !selectedCompany) {
@@ -284,7 +286,18 @@ export default function TimesheetApprovals() {
                     </div>
 
                     {summary.hasPending && (
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDashboardEmployeeId(summary.employeeId);
+                            setShowDashboardModal(true);
+                          }}
+                          className="px-3 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold hover:bg-blue-200"
+                          title="Overzicht dashboard"
+                        >
+                          Dashboard
+                        </button>
                         <span className="inline-flex items-center justify-center h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold">
                           {summary.pendingTimesheets.length}
                         </span>
@@ -397,6 +410,95 @@ export default function TimesheetApprovals() {
           })}
         </div>
       )}
+
+      {/* EMPLOYEE DASHBOARD MODAL - KLIK OP MEDEWERKER */}
+      <Modal
+        isOpen={showDashboardModal}
+        onClose={() => {
+          setShowDashboardModal(false);
+          setDashboardEmployeeId(null);
+        }}
+        title={dashboardEmployeeId ? `Dashboard - ${employeeSummaries.find(e => e.employeeId === dashboardEmployeeId)?.firstName} ${employeeSummaries.find(e => e.employeeId === dashboardEmployeeId)?.lastName}` : 'Dashboard'}
+      >
+        {dashboardEmployeeId && (() => {
+          const emp = employeeSummaries.find(e => e.employeeId === dashboardEmployeeId);
+          if (!emp) return null;
+
+          return (
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Header Info */}
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                    <User className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">{emp.firstName} {emp.lastName}</h3>
+                    <p className="text-sm text-gray-600">Contract: {emp.contractHoursPerWeek}u/week</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-3 bg-white">
+                  <p className="text-xs text-gray-600">Weken wachtend</p>
+                  <p className="text-2xl font-bold text-orange-600">{emp.pendingTimesheets.length}</p>
+                </Card>
+                <Card className="p-3 bg-white">
+                  <p className="text-xs text-gray-600">Totaal uren</p>
+                  <p className="text-2xl font-bold text-blue-600">{emp.totalPendingHours || 0}u</p>
+                </Card>
+                <Card className="p-3 bg-white">
+                  <p className="text-xs text-gray-600">Achterstand</p>
+                  <p className="text-2xl font-bold text-red-600">{emp.hoursLacking || 0}u</p>
+                </Card>
+                <Card className="p-3 bg-white">
+                  <p className="text-xs text-gray-600">Gemiddeld/week</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {emp.pendingTimesheets.length > 0 
+                      ? (emp.totalPendingHours! / emp.pendingTimesheets.length).toFixed(1)
+                      : '0'}u
+                  </p>
+                </Card>
+              </div>
+
+              {/* Weken Details */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Weken Overzicht</h4>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {emp.pendingTimesheets.map((timesheet) => {
+                    const percentage = (timesheet.totalRegularHours / emp.contractHoursPerWeek) * 100;
+                    return (
+                      <div key={timesheet.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-medium text-sm">Week {timesheet.weekNumber}</span>
+                          <span className={`font-bold text-sm ${percentage < 85 ? 'text-red-600' : 'text-green-600'}`}>
+                            {timesheet.totalRegularHours}u
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-300 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-1.5 rounded-full ${percentage < 85 ? 'bg-red-500' : 'bg-green-500'}`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1 flex justify-between">
+                          <span>{percentage.toFixed(0)}% van contract</span>
+                          <span>{timesheet.totalTravelKilometers}km</span>
+                        </div>
+                        {timesheet.lowHoursExplanation && (
+                          <p className="text-xs text-red-600 mt-1 italic">⚠️ {timesheet.lowHoursExplanation}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Details Modal */}
       <Modal
