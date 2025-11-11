@@ -97,6 +97,19 @@ const OutgoingInvoices: React.FC = () => {
       const webhookPayload = {
         event: 'invoice.sent',
         timestamp: new Date().toISOString(),
+        client: {
+          name: invoice.clientName,
+          email: invoice.clientEmail,
+          phone: invoice.clientPhone || null,
+          kvk: invoice.clientKvk || null,
+          taxNumber: invoice.clientTaxNumber || null,
+          address: {
+            street: invoice.clientAddress.street,
+            city: invoice.clientAddress.city,
+            zipCode: invoice.clientAddress.zipCode,
+            country: invoice.clientAddress.country
+          }
+        },
         invoice: {
           id: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
@@ -110,17 +123,6 @@ const OutgoingInvoices: React.FC = () => {
           dueDate: invoice.dueDate.toISOString(),
           createdAt: invoice.createdAt.toISOString(),
           updatedAt: invoice.updatedAt.toISOString(),
-          client: {
-            name: invoice.clientName,
-            email: invoice.clientEmail,
-            phone: invoice.clientPhone || null,
-            address: {
-              street: invoice.clientAddress.street,
-              city: invoice.clientAddress.city,
-              zipCode: invoice.clientAddress.zipCode,
-              country: invoice.clientAddress.country
-            }
-          },
           items: invoice.items.map((item, index) => ({
             lineNumber: index + 1,
             description: item.description,
