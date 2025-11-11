@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, LogOut, Calendar, HeartPulse, Receipt, Clock, Menu, X, Home } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
+import { getEmployeeById } from '../../services/firebase';
 import Button from '../ui/Button';
 
 interface EmployeeLayoutProps {
@@ -18,11 +19,34 @@ const navigation = [
 ];
 
 const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, currentEmployeeId } = useAuth();
   const { selectedCompany } = useApp();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [employeeData, setEmployeeData] = useState<any>(null);
+
+  // Load employee data
+  useEffect(() => {
+    const loadEmployee = async () => {
+      if (currentEmployeeId) {
+        try {
+          const employee = await getEmployeeById(currentEmployeeId);
+          setEmployeeData(employee);
+        } catch (error) {
+          console.error('Error loading employee:', error);
+        }
+      }
+    };
+    loadEmployee();
+  }, [currentEmployeeId]);
+
+  const getFirstName = () => {
+    if (employeeData?.personalInfo?.firstName) {
+      return employeeData.personalInfo.firstName;
+    }
+    return user?.displayName?.split(' ')[0] || 'Gebruiker';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -88,7 +112,7 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">
-                  {user?.displayName?.split(' ')[0] || 'Gebruiker'}
+                  {getFirstName()}
                 </p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
