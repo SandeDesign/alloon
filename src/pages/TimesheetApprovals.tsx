@@ -143,9 +143,9 @@ export default function TimesheetApprovals() {
 
   if (!selectedCompany) {
     return (
-      <div className="space-y-6 px-3 sm:px-0">
+      <div className="space-y-6 px-4 sm:px-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Uren goedkeuren</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Uren goedkeuren</h1>
         </div>
         <EmptyState
           icon={Building2}
@@ -158,37 +158,54 @@ export default function TimesheetApprovals() {
 
   const pendingCount = employeeSummaries.reduce((sum, e) => sum + e.pendingTimesheets.length, 0);
   const employeesWithPending = employeeSummaries.filter(e => e.hasPending).length;
+  const approvedCount = employees.length - employeesWithPending;
 
   return (
-    <div className="space-y-2 sm:space-y-4 px-3 sm:px-0 pb-24 sm:pb-6">
+    <div className="space-y-4 sm:space-y-6 px-4 sm:px-0 pb-24 sm:pb-6">
       {/* Header */}
-      <div className="pt-2">
-        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Uren goedkeuren</h1>
-        <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
-          {pendingCount} aanvraag{pendingCount !== 1 ? 'en' : ''} • {employeesWithPending} medewerker{employeesWithPending !== 1 ? 's' : ''}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Uren goedkeuren</h1>
+        <p className="text-sm text-gray-600 mt-2">
+          {pendingCount} aanvraag{pendingCount !== 1 ? 'en' : ''} wachtend op goedkeuring
         </p>
       </div>
 
-      {/* Stats Cards - Mobiel: 2 kolommen, Desktop: 4 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <Card className="p-2 sm:p-4">
-          <p className="text-xs text-gray-600">Totaal</p>
-          <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-1">{employees.length}</p>
+      {/* Stats Cards - Proper spacing */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total Employees */}
+        <Card className="p-4 sm:p-6 bg-white">
+          <div className="space-y-2">
+            <p className="text-xs sm:text-sm font-medium text-gray-600">Totaal</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{employees.length}</p>
+            <p className="text-xs text-gray-500">medewerkers</p>
+          </div>
         </Card>
 
-        <Card className="p-2 sm:p-4 border border-orange-200 bg-orange-50">
-          <p className="text-xs text-orange-700">Wachten</p>
-          <p className="text-lg sm:text-2xl font-bold text-orange-700 mt-1">{pendingCount}</p>
+        {/* Pending */}
+        <Card className="p-4 sm:p-6 bg-orange-50 border border-orange-200">
+          <div className="space-y-2">
+            <p className="text-xs sm:text-sm font-medium text-orange-700">Wachten</p>
+            <p className="text-2xl sm:text-3xl font-bold text-orange-600">{pendingCount}</p>
+            <p className="text-xs text-orange-600">aanvragen</p>
+          </div>
         </Card>
 
-        <Card className="p-2 sm:p-4 border border-blue-200 bg-blue-50">
-          <p className="text-xs text-blue-700">Medewerkers</p>
-          <p className="text-lg sm:text-2xl font-bold text-blue-700 mt-1">{employeesWithPending}</p>
+        {/* With Pending */}
+        <Card className="p-4 sm:p-6 bg-blue-50 border border-blue-200">
+          <div className="space-y-2">
+            <p className="text-xs sm:text-sm font-medium text-blue-700">Medewerkers</p>
+            <p className="text-2xl sm:text-3xl font-bold text-blue-600">{employeesWithPending}</p>
+            <p className="text-xs text-blue-600">met aanvragen</p>
+          </div>
         </Card>
 
-        <Card className="p-2 sm:p-4 border border-green-200 bg-green-50">
-          <p className="text-xs text-green-700">Klaar</p>
-          <p className="text-lg sm:text-2xl font-bold text-green-700 mt-1">{employees.length - employeesWithPending}</p>
+        {/* Approved */}
+        <Card className="p-4 sm:p-6 bg-green-50 border border-green-200">
+          <div className="space-y-2">
+            <p className="text-xs sm:text-sm font-medium text-green-700">Klaar</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600">{approvedCount}</p>
+            <p className="text-xs text-green-600">deze week</p>
+          </div>
         </Card>
       </div>
 
@@ -202,12 +219,12 @@ export default function TimesheetApprovals() {
           />
         </Card>
       ) : (
-        <div className="space-y-1.5 sm:space-y-3">
+        <div className="space-y-3">
           {employeeSummaries.map((summary) => {
             const isExpanded = expandedEmployee === summary.employeeId;
 
             return (
-              <div key={summary.employeeId} className="space-y-1.5">
+              <div key={summary.employeeId} className="space-y-2">
                 {/* Employee Card */}
                 <button
                   onClick={() => {
@@ -216,52 +233,54 @@ export default function TimesheetApprovals() {
                     }
                   }}
                   disabled={!summary.hasPending}
-                  className={`w-full p-2.5 sm:p-4 rounded-lg border-l-4 transition-all text-left text-sm sm:text-base ${
+                  className={`w-full p-4 sm:p-5 rounded-lg border-2 transition-all text-left ${
                     summary.hasPending 
-                      ? 'border-l-orange-500 bg-white border border-gray-200 hover:bg-orange-50 active:bg-orange-100 cursor-pointer' 
-                      : 'border-l-gray-200 bg-white border border-gray-200 cursor-default'
+                      ? 'border-orange-300 bg-white hover:bg-orange-50 active:bg-orange-100 cursor-pointer' 
+                      : 'border-gray-200 bg-white cursor-default'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                        <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600" />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
+                        <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-gray-900 truncate">
+                        <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                           {summary.firstName} {summary.lastName}
                         </p>
                         {summary.hasPending && (
-                          <p className="text-xs text-orange-600 truncate">
-                            {summary.pendingTimesheets.length} wachtend
+                          <p className="text-xs sm:text-sm text-orange-600 font-medium mt-0.5">
+                            {summary.pendingTimesheets.length} aanvraag{summary.pendingTimesheets.length !== 1 ? 'en' : ''} wachten
                           </p>
                         )}
                         {!summary.hasPending && (
-                          <p className="text-xs text-green-600">Klaar</p>
+                          <p className="text-xs sm:text-sm text-green-600 font-medium mt-0.5 flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5" /> Alles goedgekeurd
+                          </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {summary.hasPending ? (
-                        <>
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700">
-                            {summary.pendingTimesheets.length}
-                          </span>
-                          <ChevronDown
-                            className={`h-4 w-4 text-gray-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
-                          />
-                        </>
-                      ) : (
-                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      )}
-                    </div>
+                    {summary.hasPending && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="inline-flex items-center justify-center h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold">
+                          {summary.pendingTimesheets.length}
+                        </span>
+                        <ChevronDown
+                          className={`h-5 w-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                      </div>
+                    )}
+
+                    {!summary.hasPending && (
+                      <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                    )}
                   </div>
                 </button>
 
                 {/* Expanded Pending Timesheets */}
                 {isExpanded && summary.hasPending && (
-                  <div className="space-y-1.5 pl-2 sm:pl-4 border-l-2 border-orange-200">
+                  <div className="space-y-2 ml-4 sm:ml-6 border-l-3 border-orange-300 pl-4">
                     {summary.pendingTimesheets.map((timesheet) => {
                       const hoursPercentage = (timesheet.totalRegularHours / summary.contractHoursPerWeek) * 100;
                       const isUnder = hoursPercentage < 85;
@@ -275,72 +294,75 @@ export default function TimesheetApprovals() {
                             setSelectedTimesheet(timesheet);
                             setShowDetailsModal(true);
                           }}
-                          className="w-full p-2.5 sm:p-4 bg-orange-50 border border-orange-200 rounded-lg hover:shadow-md active:shadow-sm transition-all text-left text-xs sm:text-sm"
+                          className="w-full p-4 bg-white border-2 border-orange-200 rounded-lg hover:shadow-md active:shadow-sm transition-all text-left"
                         >
-                          <div className="space-y-1.5 sm:space-y-2">
-                            {/* Week Info */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-gray-900">
-                                  Week {timesheet.weekNumber}
+                          <div className="space-y-3">
+                            {/* Week Header */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                                  Week {timesheet.weekNumber}, {timesheet.year}
                                 </p>
                                 {timesheet.submittedAt && (
-                                  <p className="text-xs text-gray-600">
-                                    {timesheet.submittedAt.toLocaleDateString('nl-NL')}
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Ingediend: {timesheet.submittedAt.toLocaleDateString('nl-NL')}
                                   </p>
                                 )}
                               </div>
-                              <span className="text-xs font-bold px-1.5 py-0.5 bg-white text-orange-700 rounded border border-orange-200 flex-shrink-0">
+                              <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 flex-shrink-0">
                                 Wachten
                               </span>
                             </div>
 
-                            {/* Hours Info - Compact */}
-                            <div className="bg-white rounded p-1.5">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs text-gray-600">Uren</span>
-                                <span className={`font-bold ${isUnder ? 'text-red-600' : 'text-gray-900'}`}>
-                                  {timesheet.totalRegularHours}u / {summary.contractHoursPerWeek}u
+                            {/* Hours Info */}
+                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 space-y-2">
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-xs text-gray-600 font-medium">Uren geregistreerd</span>
+                                <span className={`text-lg sm:text-xl font-bold ${isUnder ? 'text-red-600' : 'text-green-600'}`}>
+                                  {timesheet.totalRegularHours}u
                                 </span>
+                              </div>
+                              <div className="flex items-baseline justify-between text-xs text-gray-600">
+                                <span>Contract: {summary.contractHoursPerWeek}u/week</span>
+                                <span className="font-semibold">{hoursPercentage.toFixed(0)}%</span>
                               </div>
 
                               {/* Progress Bar */}
-                              <div className="w-full bg-gray-200 rounded-full h-1">
+                              <div className="w-full bg-gray-300 rounded-full h-2 overflow-hidden mt-2">
                                 <div
-                                  className={`h-1 rounded-full transition-all ${isUnder ? 'bg-red-500' : 'bg-green-500'}`}
+                                  className={`h-2 rounded-full transition-all ${isUnder ? 'bg-red-500' : 'bg-green-500'}`}
                                   style={{ width: `${Math.min(hoursPercentage, 100)}%` }}
                                 />
                               </div>
 
-                              <div className="flex items-center justify-between mt-1 text-xs text-gray-600">
-                                <span>{hoursPercentage.toFixed(0)}%</span>
-                                {isUnder && <AlertCircle className="h-3 w-3 text-red-500" />}
+                              {isUnder && (
+                                <div className="flex items-center gap-1 pt-1 text-xs text-red-600 font-medium">
+                                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                  Onder contract uren
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Quick Stats */}
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div className="p-2 bg-gray-50 rounded">
+                                <p className="text-xs text-gray-600">Werkdagen</p>
+                                <p className="font-bold text-gray-900 text-sm">{workDays}</p>
+                              </div>
+                              <div className="p-2 bg-gray-50 rounded">
+                                <p className="text-xs text-gray-600">Gem./dag</p>
+                                <p className="font-bold text-gray-900 text-sm">{avgPerDay}u</p>
+                              </div>
+                              <div className="p-2 bg-gray-50 rounded">
+                                <p className="text-xs text-gray-600">Kilometer</p>
+                                <p className="font-bold text-gray-900 text-sm">{timesheet.totalTravelKilometers}</p>
                               </div>
                             </div>
 
-                            {/* Quick Stats - Inline */}
-                            <div className="flex items-center justify-between gap-2 text-xs bg-white rounded p-1.5">
-                              <div className="text-center flex-1">
-                                <p className="text-gray-600">Dagen</p>
-                                <p className="font-bold text-gray-900">{workDays}</p>
-                              </div>
-                              <div className="w-px bg-gray-200" />
-                              <div className="text-center flex-1">
-                                <p className="text-gray-600">Gem.</p>
-                                <p className="font-bold text-gray-900">{avgPerDay}u</p>
-                              </div>
-                              <div className="w-px bg-gray-200" />
-                              <div className="text-center flex-1">
-                                <p className="text-gray-600">Km</p>
-                                <p className="font-bold text-gray-900">{timesheet.totalTravelKilometers}</p>
-                              </div>
-                            </div>
-
-                            {/* Action Hint */}
-                            <div className="flex items-center gap-1 text-blue-600 pt-1 border-t border-orange-100">
-                              <Clock className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">Klik voor details</span>
-                              <ChevronRight className="h-3 w-3 ml-auto flex-shrink-0" />
+                            {/* CTA */}
+                            <div className="flex items-center justify-between pt-2 border-t border-orange-100 text-blue-600 text-xs font-medium">
+                              <span>Klik voor volledige details</span>
+                              <ChevronRight className="h-4 w-4" />
                             </div>
                           </div>
                         </button>
@@ -353,151 +375,153 @@ export default function TimesheetApprovals() {
           })}
         </div>
       )}
+
+      {/* Details Modal */}
+      <Modal
+        isOpen={showDetailsModal}
+        onClose={closeDetailsModal}
+        title={selectedTimesheet ? `Week ${selectedTimesheet.weekNumber}, ${selectedTimesheet.year}` : 'Uren details'}
+      >
+        {selectedTimesheet && (
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Totaal uren</p>
+                <p className="text-2xl font-bold text-gray-900">{selectedTimesheet.totalRegularHours}u</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Reiskilometers</p>
+                <p className="text-2xl font-bold text-gray-900">{selectedTimesheet.totalTravelKilometers}km</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Werkdagen</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {selectedTimesheet.entries.filter(e => e.regularHours > 0).length}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Gemiddeld/dag</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {(() => {
+                    const workDays = selectedTimesheet.entries.filter(e => e.regularHours > 0).length;
+                    return workDays > 0 ? (selectedTimesheet.totalRegularHours / workDays).toFixed(1) : '0';
+                  })()} u
+                </p>
+              </div>
+            </div>
+
+            {/* Low Hours Warning */}
+            {(() => {
+              const employee = employees.find(emp => emp.id === selectedTimesheet.employeeId);
+              const contractHours = employee?.contractInfo?.hoursPerWeek || 40;
+              const actual = selectedTimesheet.totalRegularHours;
+              const threshold = contractHours * 0.85;
+
+              if (actual < threshold) {
+                return (
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg space-y-2">
+                    <div className="flex gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-red-900">⚠️ Onder contract uren</h4>
+                        <p className="text-sm text-red-700 mt-1">
+                          {actual}u van {contractHours}u contract ({(actual / contractHours * 100).toFixed(0)}%)
+                        </p>
+                        {selectedTimesheet.lowHoursExplanation && (
+                          <p className="text-xs text-red-600 mt-2">
+                            <strong>Verklaring:</strong> {selectedTimesheet.lowHoursExplanation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Daily Details */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Dagelijkse details</h4>
+              <div className="space-y-2">
+                {selectedTimesheet.entries.map((entry, idx) => (
+                  <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <span className="font-medium text-sm text-gray-900">
+                        {entry.date.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' })}
+                      </span>
+                      <span className="text-lg font-bold text-gray-900">{entry.regularHours}u</span>
+                    </div>
+                    {entry.workActivities && entry.workActivities.length > 0 && (
+                      <div className="space-y-1 mt-2 pl-3 border-l-2 border-gray-300">
+                        {entry.workActivities.map((activity, actIdx) => (
+                          <div key={actIdx} className="flex justify-between text-xs text-gray-600">
+                            <span>{activity.description}</span>
+                            <span className="font-semibold ml-2">{activity.hours}u</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            {!showRejectModal && (
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  onClick={() => handleApprove(selectedTimesheet)}
+                  variant="primary"
+                  className="flex-1"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Goedkeuren
+                </Button>
+                <Button
+                  onClick={handleRejectClick}
+                  variant="secondary"
+                  className="flex-1"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Afkeuren
+                </Button>
+              </div>
+            )}
+
+            {/* Rejection Form */}
+            {showRejectModal && (
+              <div className="space-y-3 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                <h4 className="font-semibold text-red-900">Reden voor afkeuring</h4>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="Bijvoorbeeld: Ongeldige uren op donderdag..."
+                />
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setShowRejectModal(false)}
+                    variant="secondary"
+                    className="flex-1"
+                  >
+                    Annuleren
+                  </Button>
+                  <Button
+                    onClick={handleRejectConfirm}
+                    disabled={!rejectionReason.trim()}
+                    className="flex-1"
+                  >
+                    Bevestigen
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
-
-/* Modal Component - Mobiel optimized */
-<Modal
-  isOpen={showDetailsModal}
-  onClose={closeDetailsModal}
-  title={selectedTimesheet ? `Week ${selectedTimesheet.weekNumber}` : 'Details'}
->
-  {selectedTimesheet && (
-    <div className="space-y-3 sm:space-y-4 max-h-[80vh] overflow-y-auto">
-      {/* Summary Stats - Compact on mobile */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 rounded-lg text-xs sm:text-sm">
-        <div>
-          <p className="text-gray-600">Totaal uren</p>
-          <p className="text-lg sm:text-xl font-bold text-gray-900">{selectedTimesheet.totalRegularHours}u</p>
-        </div>
-        <div>
-          <p className="text-gray-600">Reiskilometers</p>
-          <p className="text-lg sm:text-xl font-bold text-gray-900">{selectedTimesheet.totalTravelKilometers}km</p>
-        </div>
-        <div>
-          <p className="text-gray-600">Werkdagen</p>
-          <p className="text-lg sm:text-xl font-bold text-gray-900">
-            {selectedTimesheet.entries.filter(e => e.regularHours > 0).length}
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-600">Gem./dag</p>
-          <p className="text-lg sm:text-xl font-bold text-gray-900">
-            {(() => {
-              const workDays = selectedTimesheet.entries.filter(e => e.regularHours > 0).length;
-              return workDays > 0 ? (selectedTimesheet.totalRegularHours / workDays).toFixed(1) : '0';
-            })()} u
-          </p>
-        </div>
-      </div>
-
-      {/* Low Hours Warning */}
-      {(() => {
-        const employee = employees.find(emp => emp.id === selectedTimesheet.employeeId);
-        const contractHours = employee?.contractInfo?.hoursPerWeek || 40;
-        const actual = selectedTimesheet.totalRegularHours;
-        const threshold = contractHours * 0.85;
-
-        if (actual < threshold) {
-          return (
-            <div className="p-2 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <div className="text-xs sm:text-sm text-red-700">
-                  <strong>⚠️ Onder contract</strong>
-                  <p className="mt-1">
-                    {actual}u van {contractHours}u ({(actual / contractHours * 100).toFixed(0)}%)
-                  </p>
-                  {selectedTimesheet.lowHoursExplanation && (
-                    <p className="mt-1 text-red-600 text-xs">
-                      <strong>Verklaring:</strong> {selectedTimesheet.lowHoursExplanation}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        }
-        return null;
-      })()}
-
-      {/* Daily Details */}
-      <div>
-        <h4 className="font-semibold text-xs sm:text-sm mb-1.5">Dagelijkse details</h4>
-        <div className="space-y-1 text-xs">
-          {selectedTimesheet.entries.map((entry, idx) => (
-            <div key={idx} className="p-1.5 sm:p-2 bg-gray-50 rounded">
-              <div className="flex justify-between mb-1">
-                <span className="font-medium">{entry.date.toLocaleDateString('nl-NL')}</span>
-                <span className="font-bold">{entry.regularHours}u</span>
-              </div>
-              {entry.workActivities && entry.workActivities.length > 0 && (
-                <div className="space-y-0.5 mt-1 pl-2 border-l border-gray-300">
-                  {entry.workActivities.map((activity, actIdx) => (
-                    <div key={actIdx} className="flex justify-between text-gray-600">
-                      <span className="truncate">{activity.description}</span>
-                      <span className="font-semibold ml-1 flex-shrink-0">{activity.hours}u</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      {!showRejectModal && (
-        <div className="flex gap-2 pt-3 sm:pt-4 border-t">
-          <Button
-            onClick={() => handleApprove(selectedTimesheet)}
-            variant="primary"
-            className="flex-1 text-xs sm:text-base py-2"
-          >
-            <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-            Goedkeuren
-          </Button>
-          <Button
-            onClick={handleRejectClick}
-            variant="secondary"
-            className="flex-1 text-xs sm:text-base py-2"
-          >
-            <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-            Afkeuren
-          </Button>
-        </div>
-      )}
-
-      {/* Rejection Form */}
-      {showRejectModal && (
-        <div className="space-y-2 sm:space-y-3 p-2 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-xs sm:text-sm font-semibold text-red-900">Reden voor afkeuring:</p>
-          <textarea
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            className="w-full px-2 py-1.5 text-xs sm:text-sm border border-red-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
-            rows={3}
-            placeholder="Bijvoorbeeld: Ongeldige uren..."
-          />
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setShowRejectModal(false)}
-              variant="secondary"
-              className="flex-1 text-xs sm:text-base py-2"
-            >
-              Annuleren
-            </Button>
-            <Button
-              onClick={handleRejectConfirm}
-              disabled={!rejectionReason.trim()}
-              className="flex-1 text-xs sm:text-base py-2"
-            >
-              Bevestigen
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  )}
-</Modal>
