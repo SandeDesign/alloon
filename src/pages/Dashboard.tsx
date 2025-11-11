@@ -676,7 +676,7 @@ const Dashboard: React.FC = () => {
       {/* Info Footer */}
       <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
         <p className="text-xs sm:text-sm text-blue-900">
-          Dashboard geupdate op: {new Date().toLocaleDateString('nl-NL')} om {new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-minute' })}
+          Dashboard geupdate op: {new Date().toLocaleDateString('nl-NL')} om {new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
     </div>
