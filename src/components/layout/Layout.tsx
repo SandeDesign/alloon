@@ -79,12 +79,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="relative">
                 <button
                   onClick={() => setCompanyDropdownOpen(!companyDropdownOpen)}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center space-x-2 px-2 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <Building2 className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900 truncate max-w-[120px]">
-                    {selectedCompany?.name || 'Selecteer bedrijf'}
-                  </span>
                   <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${companyDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -135,7 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           
           {/* CENTER: GROTER LOGO */}
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-16 w-auto flex-shrink-0 mx-2" />
+          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-20 w-auto flex-shrink-0 mx-2" />
           
           {/* RIGHT: Notifications */}
           <div className="flex-1 flex justify-end">
