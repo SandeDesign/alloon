@@ -1,5 +1,3 @@
-// src/components/invoices/CreateInvoiceModal.tsx (AANGEPAST MET WERKBONNEN)
-
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,6 +56,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [relations, setRelations] = useState<InvoiceRelation[]>([]);
   const [isRelationsOpen, setIsRelationsOpen] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
 
   const [formData, setFormData] = useState({
     clientId: editingInvoice?.clientId || '',
@@ -86,14 +85,13 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     ]
   );
 
-  // Load relations
+  // Load relations and generate invoice number
   useEffect(() => {
-    if (!isOpen || !selectedCompany) return;
+    if (!isOpen || !selectedCompany || !user) return;
 
-    const loadRelations = async () => {
+    const loadData = async () => {
       try {
-        if (!user) return;
-        
+        // Load relations
         const q = query(
           collection(db, 'invoiceRelations'),
           where('userId', '==', user.uid),
@@ -107,13 +105,24 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         })) as InvoiceRelation[];
 
         setRelations(relationsData);
+
+        // Generate next invoice number
+        if (!editingInvoice) {
+          const nextNumber = await outgoingInvoiceService.getNextInvoiceNumber(
+            user.uid,
+            selectedCompany.id
+          );
+          setInvoiceNumber(nextNumber);
+        } else {
+          setInvoiceNumber(editingInvoice.invoiceNumber);
+        }
       } catch (err) {
-        console.error('Error loading relations:', err);
+        console.error('Error loading data:', err);
       }
     };
 
-    loadRelations();
-  }, [isOpen, selectedCompany, user]);
+    loadData();
+  }, [isOpen, selectedCompany, user, editingInvoice]);
 
   if (!isOpen) return null;
 
@@ -169,12 +178,6 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const vatAmount = subtotal * 0.21;
   const total = subtotal + vatAmount;
 
-  const generateInvoiceNumber = () => {
-    const year = new Date().getFullYear();
-    const timestamp = Date.now().toString().slice(-6);
-    return `INV-${year}-${timestamp}`;
-  };
-
   // HANDLER VOOR WERKBONNEN IMPORT
   const handleImportWerkbonnen = (importedItems: any[]) => {
     setItems([...items, ...importedItems]);
@@ -204,7 +207,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const invoiceData: Omit<OutgoingInvoice, 'id' | 'createdAt' | 'updatedAt'> = {
         userId: user.uid,
         companyId: selectedCompany.id,
-        invoiceNumber: editingInvoice?.invoiceNumber || generateInvoiceNumber(),
+        invoiceNumber: invoiceNumber,
         
         // Client gegevens
         clientId: formData.clientId,
@@ -266,6 +269,16 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
         <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* FACTUURNUMMER DISPLAY */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Factuurnummer
+              </label>
+              <div className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium text-gray-900">
+                {invoiceNumber}
+              </div>
+            </div>
+
             {/* KLANTEN SELECTOR */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
