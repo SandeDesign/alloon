@@ -78,85 +78,6 @@ interface Section {
   defaultOpen?: boolean;
 }
 
-const CompanySelector: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
-  const { companies, selectedCompany, setSelectedCompany } = useApp();
-  const { userRole } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (userRole !== 'admin' || !companies || companies.length === 0) {
-    return null;
-  }
-
-  if (collapsed) {
-    return (
-      <div className="px-3 py-4">
-        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-          <Building2 className="h-6 w-6 text-blue-600" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 border-b border-gray-100">
-      <div className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="p-1.5 bg-blue-500 rounded-lg">
-              <Building2 className="h-4 w-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">
-                {selectedCompany?.name || 'Selecteer bedrijf'}
-              </div>
-              <div className="text-xs text-gray-500">
-                {companies.length} bedrijven
-              </div>
-            </div>
-          </div>
-          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {isOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto">
-              <div className="p-2 space-y-1">
-                {companies.map((company) => (
-                  <button
-                    key={company.id}
-                    onClick={() => {
-                      setSelectedCompany(company);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors ${
-                      selectedCompany?.id === company.id
-                        ? 'bg-blue-50 border border-blue-200 text-blue-900'
-                        : 'hover:bg-gray-50 text-gray-700'
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-lg ${
-                      selectedCompany?.id === company.id ? 'bg-blue-500' : 'bg-gray-400'
-                    }`}>
-                      <Building2 className="h-3 w-3 text-white" />
-                    </div>
-                    <div className="text-left flex-1">
-                      <div className="text-sm font-medium">{company.name}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // Navigation Item
 const NavItem: React.FC<{ item: NavigationItem; collapsed: boolean }> = ({ item, collapsed }) => (
   <NavLink
@@ -309,7 +230,7 @@ const Sidebar: React.FC = () => {
       collapsed ? 'lg:w-20' : 'lg:w-72'
     }`}>
       {/* ✅ HEADER - GROTER LOGO - DUNNER VAK */}
-      <div className="flex h-28 items-center justify-center border-b border-gray-100 px-4 bg-gradient-to-r from-slate-50 to-gray-50 relative">
+      <div className="flex h-20 items-center justify-center border-b border-gray-100 px-4 bg-gradient-to-r from-slate-50 to-gray-50 relative">
         {!collapsed && (
           <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-32 w-auto drop-shadow-sm" />
         )}
@@ -327,8 +248,7 @@ const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* Company Selector */}
-      <CompanySelector collapsed={collapsed} />
+      {/* ❌ COMPANY SELECTOR REMOVED - NOW ONLY IN MOBILE HEADER */}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2 px-4 py-6 overflow-y-auto">
