@@ -224,7 +224,7 @@ const InvoiceRelations: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relaties (Klanten)</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Relaties</h1>
           <p className="mt-1 text-sm text-gray-500">
             Beheer klanten voor {selectedCompany.name}
           </p>
