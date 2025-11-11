@@ -399,7 +399,7 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* PRODUCTIE */}
           <button
-            onClick={() => navigate('/projects')}
+            onClick={() => navigate('/project-production')}
             className="p-4 rounded-lg border border-blue-200 hover:shadow-md transition-all flex flex-col items-start gap-3 bg-blue-50 group"
           >
             <div className="p-2 rounded-lg bg-blue-100">
@@ -414,7 +414,7 @@ const Dashboard: React.FC = () => {
 
           {/* STATISTIEKEN */}
           <button
-            onClick={() => navigate('/statistics')}
+            onClick={() => navigate('/project-statistics')}
             className="p-4 rounded-lg border border-purple-200 hover:shadow-md transition-all flex flex-col items-start gap-3 bg-purple-50 group"
           >
             <div className="p-2 rounded-lg bg-purple-100">
