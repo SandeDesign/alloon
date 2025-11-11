@@ -230,64 +230,62 @@ export const outgoingInvoiceService = {
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.6; background-color: #f9fafb; }
-    .container { max-width: 900px; margin: 0 auto; padding: 40px; background-color: white; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1f2937; line-height: 1.5; background-color: #f9fafb; }
+    .container { max-width: 900px; margin: 0 auto; padding: 20px 30px; background-color: white; }
     
     /* Header */
-    .header { display: flex; justify-content: space-between; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 3px solid #2563eb; align-items: flex-start; }
-    .company-info h1 { font-size: 32px; color: #2563eb; margin-bottom: 15px; font-weight: 700; letter-spacing: -0.5px; }
-    .company-info p { font-size: 13px; color: #6b7280; margin-bottom: 4px; }
-    .company-details { font-size: 13px; color: #6b7280; text-align: right; }
-    .company-details p { margin-bottom: 6px; }
+    .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #2563eb; align-items: flex-start; gap: 30px; }
+    .company-info h1 { font-size: 18px; color: #2563eb; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.5px; }
+    .company-info p { font-size: 11px; color: #6b7280; margin-bottom: 2px; line-height: 1.3; }
+    .company-details { font-size: 11px; color: #6b7280; text-align: right; }
+    .company-details p { margin-bottom: 2px; line-height: 1.3; }
     .company-details strong { color: #374151; }
     
     /* Invoice Title Section */
-    .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-    .invoice-header h2 { font-size: 28px; color: #111827; font-weight: 700; }
-    .invoice-meta { background-color: #f3f4f6; border-radius: 8px; padding: 16px 20px; font-size: 13px; }
-    .invoice-meta p { margin-bottom: 8px; display: flex; justify-content: space-between; gap: 30px; }
+    .invoice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 30px; }
+    .invoice-header h2 { font-size: 18px; color: #111827; font-weight: 700; }
+    .invoice-meta { background-color: #f3f4f6; border-radius: 6px; padding: 10px 14px; font-size: 11px; }
+    .invoice-meta p { margin-bottom: 4px; display: flex; justify-content: space-between; gap: 20px; }
     .invoice-meta strong { color: #374151; }
     .invoice-meta span { color: #111827; font-weight: 600; }
     
     /* Section */
-    .section { margin-bottom: 40px; }
-    .section h3 { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section { margin-bottom: 20px; }
+    .section h3 { font-size: 11px; font-weight: 700; margin-bottom: 8px; color: #374151; text-transform: uppercase; letter-spacing: 0.3px; display: none; }
     
     /* Customer Box */
-    .customer-box { background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; font-size: 13px; }
-    .customer-box p { margin-bottom: 4px; color: #374151; }
+    .customer-box { background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 12px; font-size: 11px; line-height: 1.4; }
+    .customer-box p { margin-bottom: 2px; color: #374151; }
     .customer-box strong { color: #111827; }
     
     /* Table */
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; margin-top: 15px; }
     table thead { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; }
-    table th { padding: 14px 12px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
-    table td { padding: 14px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; color: #374151; }
+    table th { padding: 10px 10px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+    table td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-size: 11px; color: #374151; }
     table tbody tr:hover { background-color: #f9fafb; }
     table tbody tr:last-child td { border-bottom: 2px solid #e5e7eb; }
     
     /* Item Description Formatting */
-    .item-title { font-weight: 600; color: #111827; margin-bottom: 3px; }
-    .item-description { color: #6b7280; font-size: 12px; white-space: pre-wrap; line-height: 1.4; margin-top: 4px; }
+    .item-title { font-weight: 600; color: #111827; margin-bottom: 2px; }
+    .item-description { color: #6b7280; font-size: 10px; white-space: pre-wrap; line-height: 1.3; margin-top: 3px; }
     .item-quantity { text-align: right; }
     .item-rate { text-align: right; }
     .item-amount { text-align: right; font-weight: 600; color: #111827; }
     
     /* Totals */
-    .totals-section { margin-top: 40px; }
-    .totals-box { display: flex; justify-content: flex-end; margin-bottom: 40px; }
-    .totals-content { width: 320px; }
-    .totals-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
-    .totals-row.total { border-top: 2px solid #2563eb; border-bottom: 2px solid #2563eb; padding: 12px 0; font-size: 16px; font-weight: 700; color: #2563eb; margin-bottom: 0; }
+    .totals-section { margin-top: 20px; }
+    .totals-box { display: flex; justify-content: flex-end; margin-bottom: 25px; }
+    .totals-content { width: 280px; }
+    .totals-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 11px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+    .totals-row.total { border-top: 2px solid #2563eb; border-bottom: 2px solid #2563eb; padding: 8px 0; font-size: 13px; font-weight: 700; color: #2563eb; margin-bottom: 0; }
     .totals-label { color: #6b7280; }
     .totals-value { font-weight: 600; color: #111827; }
     .totals-row.total .totals-value { color: #2563eb; }
     
     /* Footer */
-    .footer { margin-top: 50px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; line-height: 1.6; }
+    .footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; text-align: center; line-height: 1.4; }
     
-    /* Spacer */
-    .spacer { height: 20px; }
   </style>
 </head>
 <body>
@@ -298,11 +296,10 @@ export const outgoingInvoiceService = {
         <h1>${company.name}</h1>
         <p>${company.address.street}</p>
         <p>${company.address.zipCode} ${company.address.city}</p>
-        <p>${company.address.country}</p>
       </div>
       <div class="company-details">
-        <p><strong>KvK nr.:</strong> <span>${company.kvk}</span></p>
-        <p><strong>BTW nr.:</strong> <span>${company.taxNumber}</span></p>
+        <p><strong>KvK:</strong> <span>${company.kvk}</span></p>
+        <p><strong>BTW:</strong> <span>${company.taxNumber}</span></p>
         <p><strong>E-mail:</strong> <span>${company.contactInfo.email}</span></p>
         <p><strong>Tel:</strong> <span>${company.contactInfo.phone}</span></p>
       </div>
@@ -312,8 +309,8 @@ export const outgoingInvoiceService = {
     <div class="invoice-header">
       <h2>FACTUUR</h2>
       <div class="invoice-meta">
-        <p><strong>Factuurnummer:</strong> <span>${invoice.invoiceNumber}</span></p>
-        <p><strong>Factuurdatum:</strong> <span>${new Date(invoice.invoiceDate).toLocaleDateString('nl-NL')}</span></p>
+        <p><strong>Nr:</strong> <span>${invoice.invoiceNumber}</span></p>
+        <p><strong>Datum:</strong> <span>${new Date(invoice.invoiceDate).toLocaleDateString('nl-NL')}</span></p>
         <p><strong>Vervaldatum:</strong> <span>${new Date(invoice.dueDate).toLocaleDateString('nl-NL')}</span></p>
       </div>
     </div>
@@ -325,8 +322,7 @@ export const outgoingInvoiceService = {
         <p><strong>${invoice.clientName}</strong></p>
         <p>${invoice.clientAddress.street}</p>
         <p>${invoice.clientAddress.zipCode} ${invoice.clientAddress.city}</p>
-        <p>${invoice.clientAddress.country}</p>
-        <p>E-mail: ${invoice.clientEmail}</p>
+        ${invoice.clientEmail ? `<p>E-mail: ${invoice.clientEmail}</p>` : ''}
         ${invoice.clientPhone ? `<p>Tel: ${invoice.clientPhone}</p>` : ''}
       </div>
     </div>
