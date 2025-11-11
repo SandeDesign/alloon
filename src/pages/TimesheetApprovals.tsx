@@ -258,27 +258,24 @@ export default function TimesheetApprovals() {
                         <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                           {summary.firstName} {summary.lastName}
                         </p>
-                        {summary.hasPending && (
-                          <div className="flex items-center gap-2 mt-1 text-xs">
-                            <span className="text-orange-600 font-medium">
-                              {summary.pendingTimesheets.length} week{summary.pendingTimesheets.length !== 1 ? 'en' : ''}
-                            </span>
-                            <span className="text-gray-500">•</span>
-                            <span className="text-blue-600 font-medium">
-                              {summary.totalPendingHours}u geregistreerd
-                            </span>
-                            {summary.hoursLacking && summary.hoursLacking > 0 && (
-                              <>
-                                <span className="text-gray-500">•</span>
-                                <span className="text-red-600 font-medium flex items-center gap-0.5">
+                        {summary.hasPending ? (
+                          <div className="flex flex-col gap-1 mt-2 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold whitespace-nowrap">
+                                {summary.pendingTimesheets.length} week{summary.pendingTimesheets.length !== 1 ? 'en' : ''}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold whitespace-nowrap">
+                                {summary.totalPendingHours}u uren
+                              </span>
+                              {summary.hoursLacking && summary.hoursLacking > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold whitespace-nowrap flex items-center gap-1">
                                   <TrendingDown className="h-3 w-3" />
                                   -{summary.hoursLacking.toFixed(1)}u
                                 </span>
-                              </>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        )}
-                        {!summary.hasPending && (
+                        ) : (
                           <p className="text-xs sm:text-sm text-green-600 font-medium mt-0.5 flex items-center gap-1">
                             <CheckCircle className="h-3.5 w-3.5" /> Alles goedgekeurd
                           </p>
