@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   LogOut,
   Building2,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -217,11 +218,14 @@ const Sidebar: React.FC = () => {
   const companyType = selectedCompany?.companyType as 'employer' | 'project' | undefined;
   const sections = getNavigationSections(userRole, companyType);
 
-  // Dashboard item
-  const dashboardItem = sections
-    .flatMap(s => s.items)
-    .find(i => i.name === 'Dashboard') || 
-    { name: 'Dashboard', href: '/', icon: require('lucide-react').LayoutDashboard, roles: ['admin'], companyTypes: ['employer', 'project'] };
+  // Dashboard item - use the LayoutDashboard icon directly
+  const dashboardItem = {
+    name: 'Dashboard',
+    href: '/',
+    icon: LayoutDashboard,
+    roles: ['admin'],
+    companyTypes: ['employer', 'project']
+  };
 
   return (
     <div className={`hidden lg:flex lg:flex-col lg:bg-white lg:border-r lg:border-gray-200 lg:shadow-sm transition-all duration-300 ${
