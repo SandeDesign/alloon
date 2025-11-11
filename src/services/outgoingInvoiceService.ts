@@ -72,6 +72,42 @@ export interface CompanyInfo {
 const COLLECTION_NAME = 'outgoingInvoices';
 
 export const outgoingInvoiceService = {
+  async getNextInvoiceNumber(userId: string, companyId: string): Promise<string> {
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('userId', '==', userId),
+        where('companyId', '==', companyId),
+        orderBy('createdAt', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        const year = new Date().getFullYear();
+        return `${year}-001`;
+      }
+
+      const lastInvoice = querySnapshot.docs[0].data();
+      const lastNumber = lastInvoice.invoiceNumber;
+      
+      const match = lastNumber.match(/(\d+)$/);
+      if (!match) {
+        const year = new Date().getFullYear();
+        return `${year}-001`;
+      }
+      
+      const nextNum = (parseInt(match[1]) + 1).toString().padStart(3, '0');
+      const year = new Date().getFullYear();
+      
+      return `${year}-${nextNum}`;
+    } catch (error) {
+      console.error('Error getting next invoice number:', error);
+      const year = new Date().getFullYear();
+      return `${year}-001`;
+    }
+  },
+
   async createInvoice(invoice: Omit<OutgoingInvoice, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
       const now = new Date();
