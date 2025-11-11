@@ -111,11 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </header>
 
         {/* Desktop Header */}
-        <header className="hidden lg:flex lg:items-center lg:justify-between lg:px-6 lg:py-4 lg:bg-white lg:border-b lg:border-gray-200">
-          <h1 className="text-2xl font-semibold text-gray-900">
-            AlloonApp
-          </h1>
-          
+        <header className="hidden lg:flex lg:items-center lg:justify-end lg:px-6 lg:py-4 lg:bg-white lg:border-b lg:border-gray-200">
           {/* RIGHT: Company Selector */}
           <div className="relative">
             <button
