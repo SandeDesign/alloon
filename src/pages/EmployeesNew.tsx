@@ -252,7 +252,7 @@ const EmployeesNew: React.FC = () => {
                     <span className="font-medium">Contract:</span> {employee.contractInfo.type}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-medium">Uren/week:</span> {employee.contractInfo.hoursPerWeek}
+                    <span className="font-medium">Uren per week:</span> {employee.contractInfo.hoursPerWeek}
                   </div>
                 </div>
 
