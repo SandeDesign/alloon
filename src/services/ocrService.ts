@@ -1,6 +1,20 @@
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
+// Fix WebSocket error in webcontainer environment
+if (typeof window !== 'undefined' && !window.WebSocket) {
+  (window as any).WebSocket = class FakeWebSocket {
+    constructor(url: string) {
+      // Ignore WebSocket errors in non-supported environments
+      console.warn('WebSocket not available, continuing anyway');
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 // Set worker path for pdf.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
