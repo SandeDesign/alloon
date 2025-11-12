@@ -2,18 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import {
-  BarChart3, Building2, TrendingUp, TrendingDown, DollarSign, Clock,
-  Users, AlertCircle, CheckCircle2, PieChart as PieChartIcon,
-  Calendar, FileText, Zap, Target, ArrowUpRight, ArrowDownLeft
+  BarChart3, Calendar, MapPin, Users, Zap, TrendingUp,
+  AlertCircle, CheckCircle2, Activity, DollarSign
 } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import Card from '../components/ui/Card';
 import { projectStatisticsService } from '../services/projectStatisticsService';
-import type { ProjectStatistics, InvoiceMetrics, ProductionMetrics, EmployeeMetrics } from '../types/statistics';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ScatterChart, Scatter
+  ScatterChart, Scatter, ComposedChart, Area, AreaChart
 } from 'recharts';
 
 const ProjectStatistics: React.FC = () => {
@@ -22,14 +20,15 @@ const ProjectStatistics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for different data sections
-  const [stats, setStats] = useState<ProjectStatistics | null>(null);
-  const [invoiceMetrics, setInvoiceMetrics] = useState<InvoiceMetrics | null>(null);
-  const [productionMetrics, setProductionMetrics] = useState<ProductionMetrics | null>(null);
-  const [employeeMetrics, setEmployeeMetrics] = useState<EmployeeMetrics | null>(null);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [dailyData, setDailyData] = useState<any[]>([]);
+  const [branchData, setBranchData] = useState<any[]>([]);
+  const [employeeLocationMatrix, setEmployeeLocationMatrix] = useState<any[]>([]);
+  const [averagePerAddress, setAveragePerAddress] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any>(null);
 
   useEffect(() => {
-    const loadStatistics = async () => {
+    const loadData = async () => {
       if (!selectedCompany?.id || !user?.uid) {
         setLoading(false);
         return;
@@ -39,18 +38,24 @@ const ProjectStatistics: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Parallel loading of all statistics
-        const [stats, invoices, production, employees] = await Promise.all([
-          projectStatisticsService.getProjectStatistics(selectedCompany.id, user.uid),
-          projectStatisticsService.getInvoiceMetrics(selectedCompany.id, user.uid),
-          projectStatisticsService.getProductionMetrics(selectedCompany.id, user.uid),
-          projectStatisticsService.getEmployeeMetrics(selectedCompany.id, user.uid)
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const [weeks, days, branches, matrix, addresses, advInsights] = await Promise.all([
+          projectStatisticsService.getWeeklyBreakdown(selectedCompany.id, user.uid, now.getFullYear()),
+          projectStatisticsService.getDailyBreakdown(selectedCompany.id, user.uid, startDate, now),
+          projectStatisticsService.getBranchPerformance(selectedCompany.id, user.uid),
+          projectStatisticsService.getEmployeeLocationMatrix(selectedCompany.id, user.uid),
+          projectStatisticsService.getAverageEurPerAddress(selectedCompany.id, user.uid),
+          projectStatisticsService.getAdvancedInsights(selectedCompany.id, user.uid),
         ]);
 
-        setStats(stats);
-        setInvoiceMetrics(invoices);
-        setProductionMetrics(production);
-        setEmployeeMetrics(employees);
+        setWeeklyData(weeks || []);
+        setDailyData(days || []);
+        setBranchData(branches || []);
+        setEmployeeLocationMatrix(matrix || []);
+        setAveragePerAddress(addresses || []);
+        setInsights(advInsights || {});
       } catch (err) {
         console.error('Error loading statistics:', err);
         setError('Kon statistieken niet laden');
@@ -59,25 +64,15 @@ const ProjectStatistics: React.FC = () => {
       }
     };
 
-    loadStatistics();
+    loadData();
   }, [selectedCompany, user]);
 
   if (!selectedCompany) {
     return (
       <EmptyState
-        icon={Building2}
-        title="Geen bedrijf geselecteerd"
-        description="Selecteer een projectbedrijf om statistieken te bekijken."
-      />
-    );
-  }
-
-  if (selectedCompany.companyType !== 'project') {
-    return (
-      <EmptyState
         icon={BarChart3}
-        title="Dit is geen projectbedrijf"
-        description="Statistieken zijn alleen beschikbaar voor projectbedrijven."
+        title="No company selected"
+        description="Select a company to view statistics."
       />
     );
   }
@@ -86,349 +81,265 @@ const ProjectStatistics: React.FC = () => {
     return (
       <EmptyState
         icon={AlertCircle}
-        title="Fout bij laden"
+        title="Error loading"
         description={error}
       />
     );
   }
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-8 pb-12">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Statistieken</h1>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Statistics</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Compleet overzicht voor {selectedCompany.name}
+          Analytics for {selectedCompany.name}
         </p>
       </div>
 
-      {/* KPI Cards - Top Row */}
-      {stats && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Invoice Value */}
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Totaal Gefactureerd</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                €{stats.totalInvoiceValue.toLocaleString('nl-NL', { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                {stats.totalInvoices} facturen
-              </p>
-            </div>
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </Card>
-
-        {/* Total Production Hours */}
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Totaal Gewerkte Uren</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {stats.totalProductionHours.toLocaleString('nl-NL')}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                {stats.averageHoursPerEmployee.toFixed(1)}h per medewerker
-              </p>
-            </div>
-            <div className="p-3 bg-green-500/20 rounded-lg">
-              <Clock className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </Card>
-
-        {/* Active Employees */}
-        <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Actieve Medewerkers</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                {stats.activeEmployees}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                {stats.totalEmployees} totaal
-              </p>
-            </div>
-            <div className="p-3 bg-purple-500/20 rounded-lg">
-              <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-          </div>
-        </Card>
-
-        {/* Average Invoice Amount */}
-        <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Gemiddelde Factuur</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                €{(stats.totalInvoiceValue / stats.totalInvoices).toLocaleString('nl-NL', { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                per factuur
-              </p>
-            </div>
-            <div className="p-3 bg-orange-500/20 rounded-lg">
-              <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-          </div>
-        </Card>
-      </div>}
-
-      {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Invoice Value Trend */}
-        {invoiceMetrics && invoiceMetrics.monthlyTrend.length > 0 && <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Facturatie Trend
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={invoiceMetrics.monthlyTrend}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(value) => `€${value.toLocaleString('nl-NL')}`} />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="#3b82f6"
-                dot={{ r: 4 }}
-                name="Totaal Gefactureerd"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="count"
-                stroke="#10b981"
-                yAxisId="right"
-                dot={{ r: 4 }}
-                name="Aantal Facturen"
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>}
-
-        {/* Production Hours Distribution */}
-        {productionMetrics && productionMetrics.hoursByType.length > 0 && <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <PieChartIcon className="w-5 h-5" />
-            Uurverdeling
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={productionMetrics.hoursByType}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {productionMetrics.hoursByType.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => `${value}h`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>}
+      {/* WEEK ANALYSIS */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <Calendar className="w-6 h-6" />
+          Weekly Analysis (52 weeks)
+        </h2>
+        
+        {weeklyData.length > 0 && (
+          <Card className="p-6">
+            <ResponsiveContainer width="100%" height={400}>
+              <AreaChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey="totalHours" stackId="1" stroke="#3b82f6" fill="#3b82f6" name="Regular hours" />
+                <Area type="monotone" dataKey="totalOvertime" stackId="1" stroke="#ef4444" fill="#ef4444" name="Overtime" />
+                <Area type="monotone" dataKey="totalEveningHours" stackId="1" stroke="#f59e0b" fill="#f59e0b" name="Evening hours" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
       </div>
 
-      {/* Invoice Status & Production Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Invoice Status Distribution */}
-        {invoiceMetrics && <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Factuurstatus
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(invoiceMetrics.statusBreakdown).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {status === 'draft' && <AlertCircle className="w-4 h-4 text-yellow-500" />}
-                  {status === 'approved' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                  {status === 'paid' && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
-                    {status === 'draft' && 'Concept'}
-                    {status === 'approved' && 'Goedgekeurd'}
-                    {status === 'paid' && 'Betaald'}
-                    {status === 'rejected' && 'Afgewezen'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{count}</span>
-              </div>
-            ))}
-          </div>
-        </Card>}
-
-        {/* Production Status */}
-        {productionMetrics && <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5" />
-            Productiestatus
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(productionMetrics.statusBreakdown).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {status === 'draft' && <AlertCircle className="w-4 h-4 text-yellow-500" />}
-                  {status === 'ready' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                  {status === 'invoiced' && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
-                    {status === 'draft' && 'Concept'}
-                    {status === 'ready' && 'Klaar'}
-                    {status === 'invoiced' && 'Gefactureerd'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{count}</span>
-              </div>
-            ))}
-          </div>
-        </Card>}
+      {/* DAY BREAKDOWN */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <Activity className="w-6 h-6" />
+          Daily Overview
+        </h2>
+        
+        {dailyData.length > 0 && (
+          <Card className="p-6">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dailyData.slice(-31)} >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="totalHours" fill="#3b82f6" name="Total hours" />
+                <Bar dataKey="employeeCount" fill="#10b981" name="Employee count" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
       </div>
 
-      {/* Employee Performance */}
-      {employeeMetrics && employeeMetrics.topPerformers.length > 0 && <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Medewerker Prestaties
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Medewerker</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Uren</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Gefactureerd</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Gem. Uurtarief</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employeeMetrics.topPerformers.map((emp, idx) => (
-                <tr key={idx} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="py-3 px-4 font-medium text-gray-900 dark:text-white">{emp.name}</td>
-                  <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">{emp.totalHours}h</td>
-                  <td className="text-right py-3 px-4 font-semibold text-gray-900 dark:text-white">
-                    €{emp.totalInvoiced.toLocaleString('nl-NL')}
-                  </td>
-                  <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
-                    €{(emp.totalInvoiced / emp.totalHours).toFixed(2)}
-                  </td>
-                </tr>
+      {/* LOCATION PERFORMANCE */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <MapPin className="w-6 h-6" />
+          Location Performance
+        </h2>
+
+        {branchData.length > 0 && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {branchData.slice(0, 6).map((branch, idx) => (
+                <Card key={idx} className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                  <p className="font-bold text-gray-900 dark:text-white">{branch.branchName}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{branch.location}</p>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-2xl font-bold text-blue-600">€{branch.totalInvoiced.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{branch.totalHours}h • {branch.employeeCount} employees</p>
+                    <p className="text-xs text-gray-500">€{branch.averageRevenue.toFixed(2)}/hour</p>
+                  </div>
+                </Card>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            <Card className="p-6">
+              <h3 className="font-bold mb-4">Efficiency per Location</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={branchData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="branchName" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="efficiency" fill="#10b981" name="Efficiency %" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </>
+        )}
+      </div>
+
+      {/* EMPLOYEE × LOCATION MATRIX */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <Users className="w-6 h-6" />
+          Employee × Location Matrix
+        </h2>
+
+        {employeeLocationMatrix.length > 0 && (
+          <Card className="p-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-gray-200 dark:border-gray-700">
+                  <th className="text-left py-2 px-4 font-bold">Employee</th>
+                  <th className="text-left py-2 px-4 font-bold">Location</th>
+                  <th className="text-right py-2 px-4 font-bold">Hours</th>
+                  <th className="text-right py-2 px-4 font-bold">€/hour</th>
+                  <th className="text-right py-2 px-4 font-bold">Total €</th>
+                  <th className="text-right py-2 px-4 font-bold">Efficiency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employeeLocationMatrix.slice(0, 15).map((item, idx) => (
+                  <tr key={idx} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="py-2 px-4 font-medium">{item.employeeName}</td>
+                    <td className="py-2 px-4">{item.location}</td>
+                    <td className="text-right py-2 px-4">{item.totalHours}h</td>
+                    <td className="text-right py-2 px-4 font-bold">€{item.averagePerHour.toFixed(2)}</td>
+                    <td className="text-right py-2 px-4">€{item.totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                    <td className="text-right py-2 px-4">
+                      <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                        {item.efficiency.toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </div>
+
+      {/* AVERAGE EURO PER ADDRESS */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <DollarSign className="w-6 h-6" />
+          Average € per Location
+        </h2>
+
+        {averagePerAddress.length > 0 && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {averagePerAddress.map((address, idx) => (
+                <Card key={idx} className="p-4 border-l-4 border-l-blue-500">
+                  <p className="font-bold text-lg text-gray-900 dark:text-white">{address.location}</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-2">€{address.averageEuroPerHour.toFixed(2)}/hour</p>
+                  <div className="mt-3 space-y-1 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400">Total hours: <span className="font-bold">{address.totalHours}h</span></p>
+                    <p className="text-gray-600 dark:text-gray-400">Employees: <span className="font-bold">{address.employeeCount}</span></p>
+                    <p className="text-gray-600 dark:text-gray-400">Avg per employee: <span className="font-bold">€{address.averageCostPerEmployee.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span></p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="p-6">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={averagePerAddress}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="location" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `€${value.toFixed(2)}`} />
+                  <Bar dataKey="averageEuroPerHour" fill="#10b981" name="€/hour" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </>
+        )}
+      </div>
+
+      {/* ADVANCED INSIGHTS */}
+      {insights && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Zap className="w-6 h-6" />
+            Advanced Insights
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {insights.topPerformers && insights.topPerformers.length > 0 && (
+              <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+                <p className="font-bold text-gray-900 dark:text-white mb-3">Top Performers</p>
+                <div className="space-y-2">
+                  {insights.topPerformers.slice(0, 3).map((emp: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <span>{emp.name}</span>
+                      <span className="font-bold text-green-600">€{emp.efficiency.toFixed(0)}/h</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {insights.leaveCompliance && (
+              <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+                <p className="font-bold text-gray-900 dark:text-white mb-3">Leave Compliance</p>
+                <p className="text-2xl font-bold text-blue-600">{insights.leaveCompliance.complianceRate.toFixed(0)}%</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  {insights.leaveCompliance.approved} approved • {insights.leaveCompliance.pending} pending
+                </p>
+              </Card>
+            )}
+
+            {insights.overtimeAnalysis && (
+              <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
+                <p className="font-bold text-gray-900 dark:text-white mb-3">Overtime Analysis</p>
+                <p className="text-2xl font-bold text-orange-600">{insights.overtimeAnalysis.totalOvertimeHours.toFixed(0)}h</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  {insights.overtimeAnalysis.employeesWithOvertime} employees
+                </p>
+              </Card>
+            )}
+
+            {insights.profitMargin && (
+              <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+                <p className="font-bold text-gray-900 dark:text-white mb-3">Profit Margin</p>
+                <p className="text-2xl font-bold text-purple-600">{insights.profitMargin.margin.toFixed(1)}%</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                  € {insights.profitMargin.profit.toLocaleString('en-US', { maximumFractionDigits: 0 })} profit
+                </p>
+              </Card>
+            )}
+          </div>
         </div>
-      </Card>}
+      )}
 
-      {/* Customer Performance */}
-      {invoiceMetrics && invoiceMetrics.topCustomers.length > 0 && <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Building2 className="w-5 h-5" />
-          Top Klanten
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={invoiceMetrics.topCustomers}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => `€${value.toLocaleString('nl-NL')}`} />
-            <Bar dataKey="value" fill="#3b82f6" name="Gefactureerd" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>}
-
-      {/* Invoice-Production Correlation */}
-      {invoiceMetrics && productionMetrics && <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <ArrowUpRight className="w-5 h-5" />
-          Correlatie: Productie ↔ Facturatie
-        </h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Conversieratio</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-              {invoiceMetrics.conversionRate.toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Gemiddelde waarde/uur</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-              €{invoiceMetrics.averageValuePerHour.toFixed(2)}
-            </p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Wachttijd factuur</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-              {invoiceMetrics.averageDaysToInvoice.toFixed(0)} dagen
-            </p>
-          </div>
-        </div>
-      </Card>}
-
-      {/* Additional Insights */}
-      {stats && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* PEAK PATTERNS */}
+      {insights && insights.peakDaysOfWeek && (
         <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <TrendingDown className="w-5 h-5" />
-            Inzichten
-          </h3>
-          <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <li className="flex items-start gap-2">
-              <span className="text-blue-500 font-bold mt-0.5">•</span>
-              <span>Gemiddelde productie per week: {(stats.totalProductionHours / 52).toFixed(1)}h</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-green-500 font-bold mt-0.5">•</span>
-              <span>Medewerkers per project: {(stats.totalEmployees / stats.projectCount || 1).toFixed(1)}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-purple-500 font-bold mt-0.5">•</span>
-              <span>Facturatie snelheid: {stats.invoiceProcessingSpeed}% op tijd</span>
-            </li>
-          </ul>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Activiteit deze maand
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Producties gemaakt:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{stats.productionsThisMonth}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Facturen gemaakt:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{stats.invoicesThisMonth}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Waarde gegenereerd:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">
-                €{stats.valueThisMonth.toLocaleString('nl-NL', { maximumFractionDigits: 0 })}
-              </span>
-            </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Peak Work Days</h3>
+          <div className="grid grid-cols-7 gap-2">
+            {insights.peakDaysOfWeek.map((day: any, idx: number) => (
+              <div key={idx} className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded text-center">
+                <p className="text-xs font-bold text-gray-600 dark:text-gray-400">{day.day}</p>
+                <p className="text-lg font-bold text-blue-600">{day.hours.toFixed(0)}h</p>
+              </div>
+            ))}
           </div>
         </Card>
-      </div>}
+      )}
 
       {loading && (
         <div className="text-center py-12">
-          <div className="inline-block">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 mt-4">Statistieken laden...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <p className="text-gray-500 dark:text-gray-400 mt-4">Loading analytics...</p>
         </div>
       )}
     </div>
