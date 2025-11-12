@@ -134,7 +134,7 @@ const OutgoingInvoices: React.FC = () => {
     }
   }, [user, selectedCompany]);
 
-  // Load production weeks from Firebase
+  // 🔥 Load production weeks from Firebase
   const handleLoadProductionWeeks = async () => {
     if (!selectedProductionEmployeeId || !user || !selectedCompany) {
       showError('Fout', 'Selecteer een medewerker');
@@ -169,6 +169,8 @@ const OutgoingInvoices: React.FC = () => {
       setProductionWeeks(weeks);
       if (weeks.length === 0) {
         showError('Geen data', `Geen productie weken gevonden voor deze medewerker`);
+      } else {
+        success('Geladen', `${weeks.length} weken gevonden`);
       }
     } catch (error) {
       console.error('Error loading production weeks:', error);
@@ -178,26 +180,47 @@ const OutgoingInvoices: React.FC = () => {
     }
   };
 
-  // Add all entries from selected week
+  // 🔥 Add production week as ONE invoice item with proper format
   const addAllProductionItems = () => {
     if (!selectedProductionWeek || selectedProductionWeek.entries.length === 0) {
       showError('Fout', 'Geen entries in geselecteerde week');
       return;
     }
 
-    const newItems = selectedProductionWeek.entries.map(entry => ({
-      title: 'Productie',
-      description: `${entry.datum} - ${entry.monteur}\n${entry.uren}u @ ${entry.opdrachtgever}\nLocatie: ${entry.locaties}`,
-      quantity: entry.uren,
-      rate: 0,
-      amount: 0
-    }));
+    const employee = employees.find(e => e.id === selectedProductionEmployeeId);
+    const employeeName = employee 
+      ? `${employee.personalInfo.firstName} ${employee.personalInfo.lastName}`
+      : 'Onbekend';
 
-    setItems([...items, ...newItems]);
+    // Build description in table format
+    const tableHeader = 'Monteur\tDatum\tUren\tOpdrachtgever\tLocaties';
+    const tableRows = selectedProductionWeek.entries
+      .map(entry => `${entry.monteur}\t${entry.datum}\t${entry.uren}\t${entry.opdrachtgever}\t${entry.locaties}`)
+      .join('\n');
+    
+    const description = `${tableHeader}\n${tableRows}`;
+
+    // Create ONE invoice item for the entire week
+    const totalUren = selectedProductionWeek.totalHours;
+    const rate = 44; // Standard 44 euro ex BTW
+    const amount = totalUren * rate;
+
+    const newItem: InvoiceItem = {
+      title: `Week ${selectedProductionWeek.week} ${employeeName}`,
+      description: description,
+      quantity: totalUren,
+      rate: rate,
+      amount: amount
+    };
+
+    // Remove empty first item if it exists
+    const updatedItems = items.filter(i => i.title.trim() !== '');
+    setItems([...updatedItems, newItem]);
+    
     setSelectedProductionWeek(null);
     setProductionWeeks([]);
     setShowProductionImport(false);
-    success('Toegevoegd', `${newItems.length} production regels toegevoegd`);
+    success('Toegevoegd', `Week ${selectedProductionWeek.week} met ${selectedProductionWeek.entries.length} entries`);
   };
 
   const handleCreateNew = () => {
@@ -635,6 +658,7 @@ const OutgoingInvoices: React.FC = () => {
             
             {showProductionImport && (
               <div className="mt-3 pt-3 border-t border-amber-200 space-y-3">
+                {/* Employee Selector */}
                 <div>
                   <label className="block text-xs font-medium text-amber-700 mb-1">Medewerker</label>
                   <select
@@ -655,6 +679,7 @@ const OutgoingInvoices: React.FC = () => {
                   </select>
                 </div>
 
+                {/* Load Button */}
                 <button
                   type="button"
                   onClick={handleLoadProductionWeeks}
@@ -664,6 +689,7 @@ const OutgoingInvoices: React.FC = () => {
                   {loadingProduction ? 'Laden...' : 'Laad weken'}
                 </button>
 
+                {/* Week Selector */}
                 {productionWeeks.length > 0 && (
                   <div>
                     <label className="block text-xs font-medium text-amber-700 mb-1">Selecteer week</label>
@@ -685,20 +711,28 @@ const OutgoingInvoices: React.FC = () => {
                   </div>
                 )}
 
+                {/* Show entries of selected week in table format */}
                 {selectedProductionWeek && selectedProductionWeek.entries.length > 0 && (
                   <div className="space-y-2">
-                    <div className="bg-white p-3 rounded border border-amber-200 space-y-2 max-h-48 overflow-y-auto">
+                    <div className="bg-white p-3 rounded border border-amber-200 space-y-1 max-h-48 overflow-y-auto">
+                      <div className="text-xs font-mono font-semibold text-amber-900 pb-2 border-b border-amber-200">
+                        <div className="grid grid-cols-5 gap-1">
+                          <div>Monteur</div>
+                          <div>Datum</div>
+                          <div>Uren</div>
+                          <div>Opdrachtgever</div>
+                          <div>Locaties</div>
+                        </div>
+                      </div>
                       {selectedProductionWeek.entries.map((entry, idx) => (
-                        <div key={idx} className="text-xs bg-amber-50 p-2 rounded border border-amber-100">
-                          <p className="font-medium text-amber-900">
-                            {entry.datum} - {entry.monteur}
-                          </p>
-                          <p className="text-amber-700 text-xs mt-1">
-                            {entry.uren}u @ {entry.opdrachtgever}
-                          </p>
-                          {entry.locaties && (
-                            <p className="text-amber-600 text-xs mt-1">📍 {entry.locaties}</p>
-                          )}
+                        <div key={idx} className="text-xs font-mono text-amber-800 py-1">
+                          <div className="grid grid-cols-5 gap-1">
+                            <div className="truncate">{entry.monteur}</div>
+                            <div>{entry.datum}</div>
+                            <div className="text-right">{entry.uren}</div>
+                            <div className="truncate">{entry.opdrachtgever}</div>
+                            <div className="truncate">{entry.locaties}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -707,7 +741,7 @@ const OutgoingInvoices: React.FC = () => {
                       onClick={addAllProductionItems}
                       className="w-full px-3 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
                     >
-                      Voeg alle entries toe
+                      Voeg als 1 factuurlijn toe
                     </button>
                   </div>
                 )}
@@ -740,7 +774,7 @@ const OutgoingInvoices: React.FC = () => {
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
                     <input
-                      placeholder="Bijv: Webdesign diensten"
+                      placeholder="Bijv: Week 40 Jan Jansen"
                       value={item.title}
                       onChange={e => updateItem(i, 'title', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -750,17 +784,17 @@ const OutgoingInvoices: React.FC = () => {
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Beschrijving</label>
                     <textarea
-                      placeholder="Optioneel: Detailbeschrijving van het product/dienst..."
+                      placeholder="Monteur	Datum	Uren	Opdrachtgever	Locaties"
                       value={item.description}
                       onChange={e => updateItem(i, 'description', e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none font-mono"
                     />
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Hoeveelheid</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Hoeveelheid (uren)</label>
                       <input
                         type="number"
                         value={item.quantity}
@@ -771,7 +805,7 @@ const OutgoingInvoices: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Tarief</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tarief €/uur</label>
                       <input
                         type="number"
                         value={item.rate}
@@ -929,7 +963,6 @@ const OutgoingInvoices: React.FC = () => {
             const StatusIcon = getStatusIcon(invoice.status);
             const isExpanded = expandedInvoice === invoice.id;
             const isLoading = sendingWebhook === invoice.id;
-            const daysUntilDue = Math.ceil((invoice.dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
             return (
               <Card
@@ -998,7 +1031,7 @@ const OutgoingInvoices: React.FC = () => {
                               <p className="text-gray-900 font-semibold text-sm">{item.title}</p>
                             )}
                             {item.description && (
-                              <p className="text-gray-600 text-xs mt-1 whitespace-pre-wrap">{item.description}</p>
+                              <p className="text-gray-600 text-xs mt-1 whitespace-pre-wrap font-mono">{item.description}</p>
                             )}
                             <div className="flex justify-between items-baseline mt-2 text-xs text-gray-700">
                               <span>{item.quantity}x @ €{item.rate.toFixed(2)}</span>
