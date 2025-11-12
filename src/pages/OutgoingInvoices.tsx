@@ -68,7 +68,7 @@ const OutgoingInvoices: React.FC = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // 🔥 Production Import State
+  // Production Import State
   const [showProductionImport, setShowProductionImport] = useState(false);
   const [productionWeeks, setProductionWeeks] = useState<ProductionWeek[]>([]);
   const [selectedProductionWeek, setSelectedProductionWeek] = useState<ProductionWeek | null>(null);
@@ -134,7 +134,7 @@ const OutgoingInvoices: React.FC = () => {
     }
   }, [user, selectedCompany]);
 
-  // 🔥 Load production weeks from Firebase
+  // Load production weeks from Firebase
   const handleLoadProductionWeeks = async () => {
     if (!selectedProductionEmployeeId || !user || !selectedCompany) {
       showError('Fout', 'Selecteer een medewerker');
@@ -178,21 +178,7 @@ const OutgoingInvoices: React.FC = () => {
     }
   };
 
-  // 🔥 Add production entry to invoice
-  const addProductionItem = (entry: ProductionEntry) => {
-    const newItem = {
-      title: 'Productie',
-      description: `${entry.datum} - ${entry.monteur}\n${entry.uren}u @ ${entry.opdrachtgever}\nLocatie: ${entry.locaties}`,
-      quantity: entry.uren,
-      rate: 0,
-      amount: 0
-    };
-
-    setItems([...items, newItem]);
-    success('Toegevoegd', 'Production regel toegevoegd');
-  };
-
-  // 🔥 Add all entries from selected week
+  // Add all entries from selected week
   const addAllProductionItems = () => {
     if (!selectedProductionWeek || selectedProductionWeek.entries.length === 0) {
       showError('Fout', 'Geen entries in geselecteerde week');
@@ -463,7 +449,6 @@ const OutgoingInvoices: React.FC = () => {
   const draftCount = filteredInvoices.filter(inv => inv.status === 'draft').length;
   const sentCount = filteredInvoices.filter(inv => inv.status === 'sent').length;
   const paidCount = filteredInvoices.filter(inv => inv.status === 'paid').length;
-  const overdueCount = filteredInvoices.filter(inv => inv.status === 'overdue').length;
 
   if (loading && view === 'list') {
     return (
@@ -491,7 +476,6 @@ const OutgoingInvoices: React.FC = () => {
   if (view === 'create') {
     return (
       <div className="space-y-4 sm:space-y-6 px-4 sm:px-0 pb-24 sm:pb-6">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => setView('list')}
@@ -628,7 +612,7 @@ const OutgoingInvoices: React.FC = () => {
             </div>
           </Card>
 
-          {/* 🔥 Production Data - Firebase via Dropdowns */}
+          {/* Production Data */}
           <Card className="p-4 sm:p-5 bg-amber-50 border-amber-200">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -651,7 +635,6 @@ const OutgoingInvoices: React.FC = () => {
             
             {showProductionImport && (
               <div className="mt-3 pt-3 border-t border-amber-200 space-y-3">
-                {/* Employee Selector */}
                 <div>
                   <label className="block text-xs font-medium text-amber-700 mb-1">Medewerker</label>
                   <select
@@ -672,7 +655,6 @@ const OutgoingInvoices: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Load Button */}
                 <button
                   type="button"
                   onClick={handleLoadProductionWeeks}
@@ -682,7 +664,6 @@ const OutgoingInvoices: React.FC = () => {
                   {loadingProduction ? 'Laden...' : 'Laad weken'}
                 </button>
 
-                {/* Week Selector */}
                 {productionWeeks.length > 0 && (
                   <div>
                     <label className="block text-xs font-medium text-amber-700 mb-1">Selecteer week</label>
@@ -704,7 +685,6 @@ const OutgoingInvoices: React.FC = () => {
                   </div>
                 )}
 
-                {/* Show entries of selected week */}
                 {selectedProductionWeek && selectedProductionWeek.entries.length > 0 && (
                   <div className="space-y-2">
                     <div className="bg-white p-3 rounded border border-amber-200 space-y-2 max-h-48 overflow-y-auto">
@@ -877,7 +857,6 @@ const OutgoingInvoices: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0 pb-6">
-      {/* Header with Filter Button */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Facturen</h1>
@@ -900,7 +879,6 @@ const OutgoingInvoices: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Filter - Collapsible */}
       {showFilters && (
         <Card className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -935,7 +913,6 @@ const OutgoingInvoices: React.FC = () => {
         </Card>
       )}
 
-      {/* Invoice List */}
       {filteredInvoices.length === 0 ? (
         <Card>
           <EmptyState
@@ -993,11 +970,6 @@ const OutgoingInvoices: React.FC = () => {
                           <StatusIcon className="h-3 w-3" />
                           {getStatusText(invoice.status)}
                         </span>
-                        {daysUntilDue > 0 && daysUntilDue <= 7 && invoice.status === 'sent' && (
-                          <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
-                            {daysUntilDue} dag{daysUntilDue !== 1 ? 'en' : ''} restant
-                          </span>
-                        )}
                       </div>
                       <div className="text-xs sm:text-sm text-gray-600">{invoice.clientName}</div>
                     </div>
