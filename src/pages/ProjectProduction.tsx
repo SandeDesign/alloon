@@ -189,6 +189,12 @@ const ProjectProduction: React.FC = () => {
       }
 
       console.log('✅ Webhook response:', productionResponse);
+      console.log('Response type:', typeof productionResponse);
+      console.log('Is array:', Array.isArray(productionResponse));
+      if (Array.isArray(productionResponse) && productionResponse.length > 0) {
+        console.log('First entry:', JSON.stringify(productionResponse[0], null, 2));
+        console.log('First entry keys:', Object.keys(productionResponse[0]));
+      }
 
       if (
         productionResponse &&
@@ -213,15 +219,49 @@ const ProjectProduction: React.FC = () => {
 
   const processProductionData = async (rawData: any[], employeeId: string) => {
     // 🔥 Zelfde pattern als Timesheets.tsx
-    const normalizedEntries = rawData.map(record => {
+    console.log('🔍 Raw data received:', rawData);
+    console.log('🔍 Raw data length:', rawData.length);
+    
+    const normalizedEntries = rawData.map((record, idx) => {
       const data = record.data || record;
-      return {
-        dag: data.Datum || data.datum || '',
-        monteur: data.Monteur || data.monteur || '',
-        uren: parseFloat(data.Uren || data.uren || 0),
-        opdrachtgever: data.Opdrachtgever || data.opdrachtgever || '',
-        locaties: data.Locaties || data.locaties || ''
+      console.log(`Entry ${idx} raw:`, record);
+      console.log(`Entry ${idx} extracted data:`, data);
+      
+      // Extract data - Make.com returns with numeric keys (0, 1, 2, 3, 4, 5)
+      // 0: Monteur, 1: Datum, 2: Uren, 3: Opdrachtgever, 4: Locaties, 5: Week
+      let monteur = '';
+      let datum = '';
+      let uren = 0;
+      let opdrachtgever = '';
+      let locaties = '';
+      
+      // Try numeric indices first (Make.com format)
+      if (data['0'] !== undefined) {
+        console.log(`Entry ${idx} using numeric indices`);
+        monteur = data['0'] || '';
+        datum = data['1'] ? data['1'].replace(/['"]/g, '') : ''; // Remove quotes
+        uren = parseFloat(data['2']) || 0;
+        opdrachtgever = data['3'] || '';
+        locaties = data['4'] ? data['4'].replace(/\n/g, ' ').trim() : ''; // Remove newlines
+      } else {
+        // Fallback to named properties
+        console.log(`Entry ${idx} using named properties`);
+        monteur = data.Monteur || data.monteur || '';
+        datum = data.Datum || data.datum || '';
+        uren = parseFloat(data.Uren || data.uren || 0);
+        opdrachtgever = data.Opdrachtgever || data.opdrachtgever || '';
+        locaties = data.Locaties || data.locaties || '';
+      }
+      
+      const normalized = {
+        dag: datum,
+        monteur,
+        uren,
+        opdrachtgever,
+        locaties
       };
+      console.log(`Entry ${idx} normalized:`, normalized);
+      return normalized;
     });
 
     console.log('✅ Normalized entries:', normalizedEntries);
