@@ -307,8 +307,8 @@ const Settings: React.FC = () => {
                     if (!user) return;
                     try {
                       setSaving(true);
-                      const { signInToGoogleDrive, saveGoogleDriveToken } = await import('../services/googleDriveService');
-                      const token = await signInToGoogleDrive();
+                      const { requestGoogleDriveToken, saveGoogleDriveToken } = await import('../services/googleDriveService');
+                      const token = await requestGoogleDriveToken();
                       await saveGoogleDriveToken(user.uid, token);
                       success('Verbonden!', 'Google Drive is succesvol gekoppeld');
                       // Refresh page to update status
