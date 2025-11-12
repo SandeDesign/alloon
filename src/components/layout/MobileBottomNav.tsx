@@ -51,7 +51,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/employees', icon: Users, label: 'Team' },
         { href: '/timesheets', icon: Clock, label: 'Uren' },
-        { href: '/timesheet-approvals', icon: CheckCircle2, label: 'Goedkeuren' },
+        { href: '/timesheet-approvals', icon: CheckCircle2, label: 'Beheren' },
       ],
       admin: [
         { href: '/', icon: Home, label: 'Dashboard' },
