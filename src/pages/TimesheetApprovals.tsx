@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, X, Clock, Building2, ChevronRight, AlertCircle, CheckCircle, User, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { Check, X, Clock, Building2, ChevronRight, AlertCircle, CheckCircle, User, ChevronDown, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import Button from '../components/ui/Button';
@@ -10,11 +10,14 @@ import { WeeklyTimesheet } from '../types/timesheet';
 import {
   getPendingTimesheets,
   approveWeeklyTimesheet,
-  rejectWeeklyTimesheet
+  rejectWeeklyTimesheet,
+  getTimeEntries
 } from '../services/timesheetService';
 import { getEmployees } from '../services/firebase';
 import { useToast } from '../hooks/useToast';
 import { EmptyState } from '../components/ui/EmptyState';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 interface EmployeeTimesheetSummary {
   employeeId: string;
@@ -22,9 +25,11 @@ interface EmployeeTimesheetSummary {
   lastName: string;
   contractHoursPerWeek: number;
   pendingTimesheets: WeeklyTimesheet[];
+  allTimesheets: WeeklyTimesheet[];
   hasPending: boolean;
   totalPendingHours?: number;
   hoursLacking?: number;
+  totalAllHours?: number;
 }
 
 export default function TimesheetApprovals() {
@@ -34,6 +39,7 @@ export default function TimesheetApprovals() {
 
   const [loading, setLoading] = useState(true);
   const [timesheets, setTimesheets] = useState<WeeklyTimesheet[]>([]);
+  const [allTimesheets, setAllTimesheets] = useState<WeeklyTimesheet[]>([]);
   const [selectedTimesheet, setSelectedTimesheet] = useState<WeeklyTimesheet | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -43,6 +49,36 @@ export default function TimesheetApprovals() {
   const [showDashboardModal, setShowDashboardModal] = useState(false);
   const [dashboardEmployeeId, setDashboardEmployeeId] = useState<string | null>(null);
 
+  // 🔥 Load ALL timesheets from Firebase (not just pending)
+  const loadAllTimesheets = useCallback(async (userId: string, companyId: string) => {
+    try {
+      const q = query(
+        collection(db, 'weeklyTimesheets'),
+        where('userId', '==', userId),
+        where('companyId', '==', companyId)
+      );
+      const querySnapshot = await getDocs(q);
+      const docs = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          entries: (data.entries || []).map((entry: any) => ({
+            ...entry,
+            date: entry.date instanceof Timestamp ? entry.date.toDate() : new Date(entry.date)
+          })),
+          submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : data.submittedAt,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt
+        } as WeeklyTimesheet;
+      });
+      return docs;
+    } catch (error) {
+      console.error('Error loading all timesheets:', error);
+      return [];
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!user || !selectedCompany) {
       setLoading(false);
@@ -51,19 +87,29 @@ export default function TimesheetApprovals() {
 
     try {
       setLoading(true);
+      
+      // Get pending timesheets
       const pendingTimesheets = await getPendingTimesheets(user.uid, selectedCompany.id);
       setTimesheets(pendingTimesheets);
+
+      // Get ALL timesheets
+      const allTimesheetsData = await loadAllTimesheets(user.uid, selectedCompany.id);
+      setAllTimesheets(allTimesheetsData);
 
       const summaries: EmployeeTimesheetSummary[] = [];
 
       employees.forEach(employee => {
         const employeePendingTimesheets = pendingTimesheets.filter(t => t.employeeId === employee.id);
+        const employeeAllTimesheets = allTimesheetsData.filter(t => t.employeeId === employee.id);
         
-        // Calculate totals
+        // Calculate pending totals
         const totalPendingHours = employeePendingTimesheets.reduce((sum, t) => sum + t.totalRegularHours, 0);
         const contractHours = employee.contractInfo?.hoursPerWeek || 40;
         const expectedHours = contractHours * employeePendingTimesheets.length;
         const hoursLacking = Math.max(0, expectedHours - totalPendingHours);
+
+        // Calculate all timesheets totals
+        const totalAllHours = employeeAllTimesheets.reduce((sum, t) => sum + t.totalRegularHours, 0);
 
         summaries.push({
           employeeId: employee.id,
@@ -71,9 +117,11 @@ export default function TimesheetApprovals() {
           lastName: employee.personalInfo.lastName,
           contractHoursPerWeek: contractHours,
           pendingTimesheets: employeePendingTimesheets,
+          allTimesheets: employeeAllTimesheets,
           hasPending: employeePendingTimesheets.length > 0,
           totalPendingHours,
-          hoursLacking
+          hoursLacking,
+          totalAllHours
         });
       });
 
@@ -88,7 +136,7 @@ export default function TimesheetApprovals() {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedCompany, employees, showError]);
+  }, [user, selectedCompany, employees, showError, loadAllTimesheets]);
 
   useEffect(() => {
     loadData();
@@ -182,42 +230,19 @@ export default function TimesheetApprovals() {
         </p>
       </div>
 
-      {/* Stats Cards - Proper spacing */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Employees */}
-        <Card className="p-4 sm:p-6 bg-white">
-          <div className="space-y-2">
-            <p className="text-xs sm:text-sm font-medium text-gray-600">Totaal</p>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{employees.length}</p>
-            <p className="text-xs text-gray-500">medewerkers</p>
-          </div>
+      {/* Minimale Stats Cards - Veel kleiner */}
+      <div className="grid grid-cols-3 gap-2">
+        <Card className="p-3 bg-white">
+          <p className="text-xs font-medium text-gray-600">Wachten</p>
+          <p className="text-xl font-bold text-orange-600 mt-1">{pendingCount}</p>
         </Card>
-
-        {/* Pending */}
-        <Card className="p-4 sm:p-6 bg-orange-50 border border-orange-200">
-          <div className="space-y-2">
-            <p className="text-xs sm:text-sm font-medium text-orange-700">Wachten</p>
-            <p className="text-2xl sm:text-3xl font-bold text-orange-600">{pendingCount}</p>
-            <p className="text-xs text-orange-600">aanvragen</p>
-          </div>
+        <Card className="p-3 bg-white">
+          <p className="text-xs font-medium text-gray-600">Medewerkers</p>
+          <p className="text-xl font-bold text-blue-600 mt-1">{employeesWithPending}</p>
         </Card>
-
-        {/* With Pending */}
-        <Card className="p-4 sm:p-6 bg-blue-50 border border-blue-200">
-          <div className="space-y-2">
-            <p className="text-xs sm:text-sm font-medium text-blue-700">Medewerkers</p>
-            <p className="text-2xl sm:text-3xl font-bold text-blue-600">{employeesWithPending}</p>
-            <p className="text-xs text-blue-600">met aanvragen</p>
-          </div>
-        </Card>
-
-        {/* Approved */}
-        <Card className="p-4 sm:p-6 bg-green-50 border border-green-200">
-          <div className="space-y-2">
-            <p className="text-xs sm:text-sm font-medium text-green-700">Klaar</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-600">{approvedCount}</p>
-            <p className="text-xs text-green-600">deze week</p>
-          </div>
+        <Card className="p-3 bg-white">
+          <p className="text-xs font-medium text-gray-600">Klaar</p>
+          <p className="text-xl font-bold text-green-600 mt-1">{approvedCount}</p>
         </Card>
       </div>
 
@@ -237,7 +262,7 @@ export default function TimesheetApprovals() {
 
             return (
               <div key={summary.employeeId} className="space-y-2">
-                {/* Employee Card */}
+                {/* Employee Card - ALTIJD MET DASHBOARD BUTTON */}
                 <button
                   onClick={() => {
                     if (summary.hasPending) {
@@ -260,56 +285,68 @@ export default function TimesheetApprovals() {
                         <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                           {summary.firstName} {summary.lastName}
                         </p>
-                        {summary.hasPending ? (
-                          <div className="flex flex-col gap-1 mt-2 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold whitespace-nowrap">
-                                {summary.pendingTimesheets.length} week{summary.pendingTimesheets.length !== 1 ? 'en' : ''}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold whitespace-nowrap">
-                                {summary.totalPendingHours}u uren
-                              </span>
-                              {summary.hoursLacking && summary.hoursLacking > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold whitespace-nowrap flex items-center gap-1">
-                                  <TrendingDown className="h-3 w-3" />
-                                  -{summary.hoursLacking.toFixed(1)}u
+                        {/* Info sous le nom - TOUJOURS visible */}
+                        <div className="flex flex-col gap-1 mt-2 text-xs">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {summary.hasPending ? (
+                              <>
+                                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold whitespace-nowrap">
+                                  {summary.pendingTimesheets.length} week{summary.pendingTimesheets.length !== 1 ? 'en' : ''}
                                 </span>
-                              )}
-                            </div>
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold whitespace-nowrap">
+                                  {summary.totalPendingHours}u uren
+                                </span>
+                                {summary.hoursLacking && summary.hoursLacking > 0 && (
+                                  <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold whitespace-nowrap flex items-center gap-1">
+                                    <TrendingDown className="h-3 w-3" />
+                                    -{summary.hoursLacking.toFixed(1)}u
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold whitespace-nowrap">
+                                  {summary.allTimesheets.length} weken
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold whitespace-nowrap flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  {summary.totalAllHours}u totaal
+                                </span>
+                              </>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-xs sm:text-sm text-green-600 font-medium mt-0.5 flex items-center gap-1">
-                            <CheckCircle className="h-3.5 w-3.5" /> Alles goedgekeurd
-                          </p>
-                        )}
+                        </div>
                       </div>
                     </div>
 
-                    {summary.hasPending && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDashboardEmployeeId(summary.employeeId);
-                            setShowDashboardModal(true);
-                          }}
-                          className="px-3 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold hover:bg-blue-200"
-                          title="Overzicht dashboard"
-                        >
-                          Dashboard
-                        </button>
-                        <span className="inline-flex items-center justify-center h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold">
-                          {summary.pendingTimesheets.length}
-                        </span>
-                        <ChevronDown
-                          className={`h-5 w-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
-                        />
-                      </div>
-                    )}
-
-                    {!summary.hasPending && (
-                      <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
-                    )}
+                    {/* Buttons Container - ALTIJD zichtbaar */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDashboardEmployeeId(summary.employeeId);
+                          setShowDashboardModal(true);
+                        }}
+                        className="px-2 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold hover:bg-blue-200 flex items-center gap-1 whitespace-nowrap"
+                        title="Dashboard met alle weken"
+                      >
+                        <BarChart3 className="h-3 w-3" />
+                        Dashboard
+                      </button>
+                      {summary.hasPending && (
+                        <>
+                          <span className="inline-flex items-center justify-center h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-orange-100 text-orange-700 text-xs sm:text-sm font-bold">
+                            {summary.pendingTimesheets.length}
+                          </span>
+                          <ChevronDown
+                            className={`h-5 w-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                          />
+                        </>
+                      )}
+                      {!summary.hasPending && (
+                        <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
+                      )}
+                    </div>
                   </div>
                 </button>
 
@@ -411,7 +448,7 @@ export default function TimesheetApprovals() {
         </div>
       )}
 
-      {/* EMPLOYEE DASHBOARD MODAL - KLIK OP MEDEWERKER */}
+      {/* DASHBOARD MODAL - ALLE WEKEN UIT FIREBASE */}
       <Modal
         isOpen={showDashboardModal}
         onClose={() => {
@@ -442,57 +479,69 @@ export default function TimesheetApprovals() {
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-3">
                 <Card className="p-3 bg-white">
-                  <p className="text-xs text-gray-600">Weken wachtend</p>
-                  <p className="text-2xl font-bold text-orange-600">{emp.pendingTimesheets.length}</p>
+                  <p className="text-xs text-gray-600">Totaal weken</p>
+                  <p className="text-2xl font-bold text-blue-600">{emp.allTimesheets.length}</p>
                 </Card>
                 <Card className="p-3 bg-white">
                   <p className="text-xs text-gray-600">Totaal uren</p>
-                  <p className="text-2xl font-bold text-blue-600">{emp.totalPendingHours || 0}u</p>
+                  <p className="text-2xl font-bold text-green-600">{emp.totalAllHours || 0}u</p>
                 </Card>
                 <Card className="p-3 bg-white">
-                  <p className="text-xs text-gray-600">Achterstand</p>
-                  <p className="text-2xl font-bold text-red-600">{emp.hoursLacking || 0}u</p>
+                  <p className="text-xs text-gray-600">Wachten</p>
+                  <p className="text-2xl font-bold text-orange-600">{emp.pendingTimesheets.length}</p>
                 </Card>
                 <Card className="p-3 bg-white">
                   <p className="text-xs text-gray-600">Gemiddeld/week</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {emp.pendingTimesheets.length > 0 
-                      ? (emp.totalPendingHours! / emp.pendingTimesheets.length).toFixed(1)
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {emp.allTimesheets.length > 0 
+                      ? (emp.totalAllHours! / emp.allTimesheets.length).toFixed(1)
                       : '0'}u
                   </p>
                 </Card>
               </div>
 
-              {/* Weken Details */}
+              {/* Alle Weken uit Firebase */}
               <div>
-                <h4 className="font-semibold text-sm mb-2">Weken Overzicht</h4>
+                <h4 className="font-semibold text-sm mb-2">Alle Ingevoerde Weken</h4>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {emp.pendingTimesheets.map((timesheet) => {
-                    const percentage = (timesheet.totalRegularHours / emp.contractHoursPerWeek) * 100;
-                    return (
-                      <div key={timesheet.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium text-sm">Week {timesheet.weekNumber}</span>
-                          <span className={`font-bold text-sm ${percentage < 85 ? 'text-red-600' : 'text-green-600'}`}>
-                            {timesheet.totalRegularHours}u
-                          </span>
+                  {emp.allTimesheets.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">Geen weken ingevoerd</p>
+                  ) : (
+                    emp.allTimesheets.map((timesheet) => {
+                      const percentage = (timesheet.totalRegularHours / emp.contractHoursPerWeek) * 100;
+                      const isPending = emp.pendingTimesheets.some(t => t.id === timesheet.id);
+                      return (
+                        <div key={timesheet.id} className={`p-3 rounded-lg border ${isPending ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium text-sm">Week {timesheet.weekNumber} ({timesheet.year})</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-bold text-sm ${percentage < 85 ? 'text-red-600' : 'text-green-600'}`}>
+                                {timesheet.totalRegularHours}u
+                              </span>
+                              {isPending && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-200 text-orange-700 font-semibold">
+                                  Wachten
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="w-full bg-gray-300 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-1.5 rounded-full ${percentage < 85 ? 'bg-red-500' : 'bg-green-500'}`}
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1 flex justify-between">
+                            <span>{percentage.toFixed(0)}% van contract ({emp.contractHoursPerWeek}u)</span>
+                            <span>{timesheet.totalTravelKilometers}km</span>
+                          </div>
+                          {timesheet.lowHoursExplanation && (
+                            <p className="text-xs text-red-600 mt-1 italic">⚠️ {timesheet.lowHoursExplanation}</p>
+                          )}
                         </div>
-                        <div className="w-full bg-gray-300 h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-1.5 rounded-full ${percentage < 85 ? 'bg-red-500' : 'bg-green-500'}`}
-                            style={{ width: `${Math.min(percentage, 100)}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1 flex justify-between">
-                          <span>{percentage.toFixed(0)}% van contract</span>
-                          <span>{timesheet.totalTravelKilometers}km</span>
-                        </div>
-                        {timesheet.lowHoursExplanation && (
-                          <p className="text-xs text-red-600 mt-1 italic">⚠️ {timesheet.lowHoursExplanation}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
