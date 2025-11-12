@@ -8,7 +8,8 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  User as UserIcon
+  Calendar,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
@@ -21,23 +22,15 @@ import { useToast } from '../hooks/useToast';
 import { collection, addDoc, Timestamp, getDocs, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-export interface ProductionEntry {
-  id?: string;
+interface ProductionEntry {
   monteur: string;
   datum: string;
   uren: number;
   opdrachtgever: string;
   locaties: string;
-  week: number;
-  year: number;
-  companyId: string;
-  employeeId: string;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
-export interface ProductionWeek {
+interface ProductionWeek {
   id?: string;
   week: number;
   year: number;
@@ -57,19 +50,18 @@ const ProjectProduction: React.FC = () => {
   const { selectedCompany, employees } = useApp();
   const { success, error: showError } = useToast();
 
+  // State
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date()));
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-  const [productionData, setProductionData] = useState<ProductionWeek | null>(null);
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
   const [linkedEmployees, setLinkedEmployees] = useState<any[]>([]);
-  const [existingWeek, setExistingWeek] = useState<ProductionWeek | null>(null);
+  const [allFirebaseWeeks, setAllFirebaseWeeks] = useState<ProductionWeek[]>([]);
 
-  // 🔥 Load production data
-  const loadProductionData = useCallback(async () => {
+  // Load all Firebase weeks for this company
+  const loadAllWeeks = useCallback(async () => {
     if (!user || !adminUserId || !selectedCompany) {
       setLoading(false);
       return;
@@ -83,377 +75,159 @@ const ProjectProduction: React.FC = () => {
         emp.workCompanies?.includes(selectedCompany.id) ||
         emp.projectCompanies?.includes(selectedCompany.id)
       );
-
       setLinkedEmployees(linked);
 
       // Auto-select first employee
-      let empId = selectedEmployeeId;
-      if (!empId && linked.length > 0) {
-        empId = linked[0].id;
-        setSelectedEmployeeId(empId);
+      if (!selectedEmployeeId && linked.length > 0) {
+        setSelectedEmployeeId(linked[0].id);
       }
 
-      // Check if week already exists in Firebase
-      if (empId) {
-        const q = query(
-          collection(db, 'productionWeeks'),
-          where('userId', '==', adminUserId),
-          where('week', '==', selectedWeek),
-          where('year', '==', selectedYear),
-          where('companyId', '==', selectedCompany.id),
-          where('employeeId', '==', empId)
-        );
-        const snap = await getDocs(q);
-        
-        if (snap.docs.length > 0) {
-          const doc = snap.docs[0];
-          const data = doc.data();
-          const existing: ProductionWeek = {
-            id: doc.id,
-            week: data.week,
-            year: data.year,
-            companyId: data.companyId,
-            employeeId: data.employeeId,
-            userId: data.userId,
-            entries: data.entries || [],
-            status: data.status,
-            totalHours: data.totalHours,
-            totalEntries: data.totalEntries,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date()
-          };
-          setExistingWeek(existing);
-          setProductionData(existing);
-          setEntries(existing.entries || []);
-          setLoading(false);
-          return;
-        }
-      }
+      // Get ALL weeks from Firebase for this company
+      const q = query(
+        collection(db, 'productionWeeks'),
+        where('userId', '==', adminUserId),
+        where('companyId', '==', selectedCompany.id),
+        orderBy('week', 'desc')
+      );
 
-      // No existing week, create new
-      setExistingWeek(null);
-      const newWeek: ProductionWeek = {
-        week: selectedWeek,
-        year: selectedYear,
-        companyId: selectedCompany.id,
-        employeeId: empId,
-        userId: adminUserId,
-        entries: [],
-        status: 'draft',
-        totalHours: 0,
-        totalEntries: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+      const snap = await getDocs(q);
+      const weeks: ProductionWeek[] = snap.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          week: data.week,
+          year: data.year,
+          companyId: data.companyId,
+          employeeId: data.employeeId,
+          userId: data.userId,
+          entries: data.entries || [],
+          status: data.status,
+          totalHours: data.totalHours || 0,
+          totalEntries: data.totalEntries || 0,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        };
+      });
 
-      setProductionData(newWeek);
-      setEntries([]);
+      setAllFirebaseWeeks(weeks);
     } catch (error) {
-      console.error('Error loading production data:', error);
-      showError('Fout bij laden', 'Kan productie gegevens niet laden');
+      console.error('Error loading weeks:', error);
+      showError('Fout', 'Kon weken niet laden');
     } finally {
       setLoading(false);
     }
-  }, [user, adminUserId, selectedCompany, selectedEmployeeId, employees, selectedWeek, selectedYear, showError]);
+  }, [user, adminUserId, selectedCompany, employees, selectedEmployeeId, showError]);
 
-  // 🔥 Import from Make webhook
-  const handleImportFromMake = async () => {
-    if (!selectedCompany) {
-      showError('Fout', 'Selecteer eerst een bedrijf');
-      return;
-    }
+  // Load current week entries
+  const loadCurrentWeek = useCallback(async () => {
+    if (!selectedEmployeeId || !user || !adminUserId || !selectedCompany) return;
 
-    if (!selectedEmployeeId) {
-      showError('Fout', 'Selecteer een medewerker');
-      return;
-    }
-
-    const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
-
-    if (!selectedEmployee) {
-      showError('Fout', 'Medewerker niet gevonden');
-      return;
-    }
-
-    setImporting(true);
     try {
-      const response = await fetch(
-        'https://hook.eu2.make.com/qmvow9qbpesofmm9p8srgvck550i7xr6',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'get_production_data',
-            week: selectedWeek,
-            year: selectedYear,
-            companyId: selectedCompany.id,
-            employee: {
-              id: selectedEmployee.id,
-              firstName: selectedEmployee.personalInfo.firstName,
-              lastName: selectedEmployee.personalInfo.lastName,
-              fullName: `${selectedEmployee.personalInfo.firstName} ${selectedEmployee.personalInfo.lastName}`
-            },
-            employeeName: `${selectedEmployee.personalInfo.firstName} ${selectedEmployee.personalInfo.lastName}`
-          })
-        }
+      const q = query(
+        collection(db, 'productionWeeks'),
+        where('userId', '==', adminUserId),
+        where('week', '==', selectedWeek),
+        where('year', '==', selectedYear),
+        where('companyId', '==', selectedCompany.id),
+        where('employeeId', '==', selectedEmployeeId)
       );
 
-      if (!response.ok) {
-        throw new Error(`Webhook call failed: ${response.status}`);
-      }
-
-      let productionResponse;
-      const contentType = response.headers.get('content-type');
-      
-      try {
-        if (contentType && contentType.includes('application/json')) {
-          productionResponse = await response.json();
-        } else {
-          const text = await response.text();
-          console.log('Raw webhook response:', text);
-          
-          try {
-            productionResponse = JSON.parse(text);
-          } catch {
-            if (text.toLowerCase().includes('accepted') || text === '202') {
-              showError('Verwerking loopt', 'Make.com verwerkt je aanvraag. Dit kan enkele seconden duren. Probeer opnieuw.');
-              setImporting(false);
-              return;
-            }
-            throw new Error(`Onverwacht antwoord: ${text}`);
-          }
-        }
-      } catch (parseError) {
-        console.error('Error parsing webhook response:', parseError);
-        showError('Parse fout', 'Kon webhook antwoord niet interpreteren');
-        setImporting(false);
-        return;
-      }
-
-      console.log('✅ Webhook response:', productionResponse);
-
-      if (
-        productionResponse &&
-        Array.isArray(productionResponse) &&
-        productionResponse.length > 0
-      ) {
-        await processProductionData(productionResponse, selectedEmployeeId);
-        success('Import geslaagd', `${productionResponse.length} productie entries geïmporteerd`);
-      } else if (productionResponse) {
-        console.log('Webhook response:', productionResponse);
-        showError('Geen data', 'Geen productie gegevens gevonden voor deze week/medewerker');
+      const snap = await getDocs(q);
+      if (snap.docs.length > 0) {
+        const data = snap.docs[0].data();
+        setEntries(data.entries || []);
       } else {
-        showError('Leeg antwoord', 'Webhook gaf geen data terug');
+        setEntries([]);
       }
     } catch (error) {
-      console.error('Error importing production data:', error);
-      showError('Import fout', 'Kon productie gegevens niet ophalen');
-    } finally {
-      setImporting(false);
+      console.error('Error loading current week:', error);
     }
-  };
+  }, [user, adminUserId, selectedCompany, selectedEmployeeId, selectedWeek, selectedYear]);
 
-  const processProductionData = async (rawData: any[], employeeId: string) => {
-    console.log('🔍 Raw data received:', rawData);
-    
-    const normalizedEntries = rawData.map((record, idx) => {
-      const data = record.data || record;
-      
-      let monteur = '';
-      let datum = '';
-      let uren = 0;
-      let opdrachtgever = '';
-      let locaties = '';
-      
-      // Try numeric indices first (Make.com format)
-      if (data['0'] !== undefined) {
-        monteur = data['0'] || '';
-        datum = data['1'] ? data['1'].replace(/['"]/g, '') : '';
-        uren = parseFloat(data['2']) || 0;
-        opdrachtgever = data['3'] || '';
-        locaties = data['4'] ? data['4'].replace(/\n/g, ' ').trim() : '';
-      } else {
-        // Fallback to named properties
-        monteur = data.Monteur || data.monteur || '';
-        datum = data.Datum || data.datum || '';
-        uren = parseFloat(data.Uren || data.uren || 0);
-        opdrachtgever = data.Opdrachtgever || data.opdrachtgever || '';
-        locaties = data.Locaties || data.locaties || '';
-      }
-      
-      return {
-        dag: datum,
-        monteur,
-        uren,
-        opdrachtgever,
-        locaties
-      };
-    });
+  useEffect(() => {
+    loadAllWeeks();
+  }, [loadAllWeeks]);
 
-    const updatedEntries: ProductionEntry[] = normalizedEntries.map((entry) => ({
-      monteur: entry.monteur,
-      datum: entry.dag,
-      uren: entry.uren,
-      opdrachtgever: entry.opdrachtgever,
-      locaties: entry.locaties,
-      week: selectedWeek,
-      year: selectedYear,
-      companyId: selectedCompany!.id,
-      employeeId: employeeId,
-      userId: adminUserId!,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }));
+  useEffect(() => {
+    loadCurrentWeek();
+  }, [loadCurrentWeek]);
 
-    const totalHours = updatedEntries.reduce((sum, entry) => sum + entry.uren, 0);
-
-    const updatedWeek: ProductionWeek = {
-      week: selectedWeek,
-      year: selectedYear,
-      companyId: selectedCompany!.id,
-      employeeId: employeeId,
-      userId: adminUserId!,
-      entries: updatedEntries,
-      status: 'draft',
-      totalHours: totalHours,
-      totalEntries: updatedEntries.length,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    setProductionData(updatedWeek);
-    setEntries(updatedEntries);
-  };
-
-  const updateEntry = (index: number, field: keyof ProductionEntry, value: any) => {
-    const updatedEntries = [...entries];
-    updatedEntries[index] = {
-      ...updatedEntries[index],
-      [field]: field === 'uren' ? parseFloat(value) || 0 : value,
-      updatedAt: new Date()
-    };
-
-    const totalHours = updatedEntries.reduce((sum, entry) => sum + entry.uren, 0);
-
-    setEntries(updatedEntries);
-    if (productionData) {
-      setProductionData({
-        ...productionData,
-        entries: updatedEntries,
-        totalHours: totalHours,
-        totalEntries: updatedEntries.length,
-        updatedAt: new Date()
-      });
-    }
-  };
-
-  const addEntry = () => {
-    const newEntry: ProductionEntry = {
-      monteur: '',
-      datum: new Date().toISOString().split('T')[0],
-      uren: 0,
-      opdrachtgever: '',
-      locaties: '',
-      week: selectedWeek,
-      year: selectedYear,
-      companyId: selectedCompany!.id,
-      employeeId: selectedEmployeeId,
-      userId: adminUserId!,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const updatedEntries = [...entries, newEntry];
-    setEntries(updatedEntries);
-
-    if (productionData) {
-      setProductionData({
-        ...productionData,
-        entries: updatedEntries,
-        totalEntries: updatedEntries.length,
-        updatedAt: new Date()
-      });
-    }
-  };
-
-  const removeEntry = (index: number) => {
-    const updatedEntries = entries.filter((_, i) => i !== index);
-    const totalHours = updatedEntries.reduce((sum, entry) => sum + entry.uren, 0);
-
-    setEntries(updatedEntries);
-    if (productionData) {
-      setProductionData({
-        ...productionData,
-        entries: updatedEntries,
-        totalHours: totalHours,
-        totalEntries: updatedEntries.length,
-        updatedAt: new Date()
-      });
-    }
-  };
-
-  // 🔥 FIREBASE: Save or update production week
   const handleSave = async () => {
-    if (!productionData || !user || !adminUserId || entries.length === 0) {
-      showError('Fout', 'Voeg minstens 1 entry toe voordat je opslaat');
+    if (!user || !adminUserId || !selectedCompany || !selectedEmployeeId || entries.length === 0) {
+      showError('Fout', 'Voeg minstens 1 entry toe');
       return;
     }
 
     setSaving(true);
     try {
+      const totalHours = entries.reduce((sum, e) => sum + e.uren, 0);
+
       const dataToSave = {
-        week: productionData.week,
-        year: productionData.year,
-        companyId: productionData.companyId,
-        employeeId: productionData.employeeId,
+        week: selectedWeek,
+        year: selectedYear,
+        companyId: selectedCompany.id,
+        employeeId: selectedEmployeeId,
         userId: adminUserId,
-        entries: entries.map(entry => ({
-          monteur: entry.monteur,
-          datum: entry.datum,
-          uren: entry.uren,
-          opdrachtgever: entry.opdrachtgever,
-          locaties: entry.locaties,
-          week: entry.week,
-          year: entry.year,
-          companyId: entry.companyId,
-          employeeId: entry.employeeId,
-          userId: entry.userId,
-          createdAt: Timestamp.fromDate(entry.createdAt),
-          updatedAt: Timestamp.fromDate(entry.updatedAt)
-        })),
+        entries,
         status: 'draft',
-        totalHours: productionData.totalHours,
-        totalEntries: productionData.totalEntries,
-        createdAt: Timestamp.fromDate(productionData.createdAt),
-        updatedAt: Timestamp.fromDate(new Date())
+        totalHours,
+        totalEntries: entries.length,
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date()),
       };
 
-      console.log('💾 Saving production week:', dataToSave);
+      // Check if exists
+      const q = query(
+        collection(db, 'productionWeeks'),
+        where('userId', '==', adminUserId),
+        where('week', '==', selectedWeek),
+        where('year', '==', selectedYear),
+        where('companyId', '==', selectedCompany.id),
+        where('employeeId', '==', selectedEmployeeId)
+      );
 
-      if (existingWeek?.id) {
-        // Update existing
-        await updateDoc(doc(db, 'productionWeeks', existingWeek.id), dataToSave);
-        console.log('✅ Updated with ID:', existingWeek.id);
-        success('Bijgewerkt', `Week ${selectedWeek} productie bijgewerkt met ${entries.length} entries`);
+      const snap = await getDocs(q);
+
+      if (snap.docs.length > 0) {
+        await updateDoc(doc(db, 'productionWeeks', snap.docs[0].id), dataToSave);
+        success('Bijgewerkt', `Week ${selectedWeek} bijgewerkt`);
       } else {
-        // Create new
-        const docRef = await addDoc(collection(db, 'productionWeeks'), dataToSave);
-        console.log('✅ Saved with ID:', docRef.id);
-        setExistingWeek({ ...productionData, id: docRef.id });
-        success('Opgeslagen', `Week ${selectedWeek} productie opgeslagen met ${entries.length} entries`);
+        await addDoc(collection(db, 'productionWeeks'), dataToSave);
+        success('Opgeslagen', `Week ${selectedWeek} opgeslagen`);
       }
-      
-      setTimeout(() => {
-        loadProductionData();
-      }, 500);
+
+      await loadAllWeeks();
     } catch (error) {
-      console.error('Error saving production data:', error);
-      showError('Fout bij opslaan', `Kon productie niet opslaan: ${error instanceof Error ? error.message : 'Onbekende fout'}`);
+      showError('Fout', 'Kon niet opslaan');
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateEntry = (index: number, field: keyof ProductionEntry, value: any) => {
+    const updated = [...entries];
+    updated[index] = {
+      ...updated[index],
+      [field]: field === 'uren' ? parseFloat(value) || 0 : value,
+    };
+    setEntries(updated);
+  };
+
+  const addEntry = () => {
+    setEntries([
+      ...entries,
+      {
+        monteur: '',
+        datum: new Date().toISOString().split('T')[0],
+        uren: 0,
+        opdrachtgever: '',
+        locaties: '',
+      },
+    ]);
+  };
+
+  const removeEntry = (index: number) => {
+    setEntries(entries.filter((_, i) => i !== index));
   };
 
   const changeWeek = (delta: number) => {
@@ -472,10 +246,6 @@ const ProjectProduction: React.FC = () => {
     setSelectedYear(newYear);
   };
 
-  useEffect(() => {
-    loadProductionData();
-  }, [loadProductionData]);
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -484,359 +254,224 @@ const ProjectProduction: React.FC = () => {
     );
   }
 
-  if (!selectedCompany) {
+  if (!selectedCompany || selectedCompany.companyType !== 'project' || linkedEmployees.length === 0) {
     return (
       <div className="space-y-6 px-4 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie Verwerking</h1>
-        <EmptyState
-          icon={Building2}
-          title="Geen bedrijf geselecteerd"
-          description="Selecteer een projectbedrijf om productie te verwerken."
-        />
-      </div>
-    );
-  }
-
-  if (selectedCompany.companyType !== 'project') {
-    return (
-      <div className="space-y-6 px-4 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie Verwerking</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie</h1>
         <EmptyState
           icon={Factory}
-          title="Dit is geen projectbedrijf"
-          description="Productie verwerking is alleen beschikbaar voor projectbedrijven."
+          title="Productie niet beschikbaar"
+          description="Dit bedrijf heeft geen gekoppelde medewerkers."
         />
       </div>
     );
   }
 
-  if (linkedEmployees.length === 0) {
-    return (
-      <div className="space-y-6 px-4 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie Verwerking</h1>
-        <EmptyState
-          icon={UserIcon}
-          title="Geen medewerkers gekoppeld"
-          description="Koppel eerst medewerkers aan dit projectbedrijf om productie in te voeren."
-        />
-      </div>
-    );
-  }
-
-  const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+  const currentEmployee = employees.find((e) => e.id === selectedEmployeeId);
+  const totalHours = entries.reduce((sum, e) => sum + e.uren, 0);
+  const currentWeekData = allFirebaseWeeks.find(
+    (w) => w.week === selectedWeek && w.year === selectedYear && w.employeeId === selectedEmployeeId
+  );
 
   return (
-    <div className="space-y-3 sm:space-y-6 px-4 sm:px-0 pb-24 sm:pb-6">
+    <div className="space-y-4 pb-24 sm:pb-6 px-4 sm:px-0">
       {/* Header */}
-      <div className="space-y-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie Verwerking</h1>
-          <p className="text-xs sm:text-sm text-gray-600 mt-2">
-            Beheer productie voor {selectedCompany.name}
-          </p>
-        </div>
-
-        {/* Week Navigation + Employee Selector + Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Week Selector */}
-          <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
-            <button
-              onClick={() => changeWeek(-1)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
-              title="Vorige week"
-            >
-              <ChevronLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div className="text-center px-4 min-w-[120px]">
-              <p className="text-sm font-semibold text-gray-900">Week {selectedWeek}</p>
-              <p className="text-xs text-gray-500">{selectedYear}</p>
-            </div>
-            <button
-              onClick={() => changeWeek(1)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
-              title="Volgende week"
-            >
-              <ChevronRight className="h-5 w-5 text-gray-600" />
-            </button>
-          </div>
-
-          {/* Employee Selector */}
-          {linkedEmployees.length > 1 && (
-            <select
-              value={selectedEmployeeId}
-              onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">Selecteer medewerker...</option>
-              {linkedEmployees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.personalInfo.firstName} {emp.personalInfo.lastName}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Import Button */}
-          <Button
-            onClick={handleImportFromMake}
-            disabled={importing || saving || !selectedEmployeeId}
-            variant="secondary"
-            size="sm"
-            className="text-xs sm:text-sm"
-          >
-            {importing ? (
-              <>
-                <LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                Laden...
-              </>
-            ) : (
-              <>
-                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                Ophalen
-              </>
-            )}
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie</h1>
+        <p className="text-sm text-gray-600 mt-1">{selectedCompany.name}</p>
       </div>
 
-      {/* Selected Employee Info */}
-      {selectedEmployee && (
-        <Card className="bg-blue-50 border-blue-200 p-3 sm:p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-100 rounded-full p-2">
-              <UserIcon className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-blue-600 font-medium">Geselecteerde medewerker</p>
-              <p className="font-semibold text-gray-900">
-                {selectedEmployee.personalInfo.firstName} {selectedEmployee.personalInfo.lastName}
-              </p>
-            </div>
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Week Navigator */}
+        <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-300">
+          <button onClick={() => changeWeek(-1)} className="p-1.5 hover:bg-gray-100 rounded">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="text-center px-4 min-w-[100px]">
+            <p className="font-semibold text-gray-900">Week {selectedWeek}</p>
+            <p className="text-xs text-gray-500">{selectedYear}</p>
           </div>
+          <button onClick={() => changeWeek(1)} className="p-1.5 hover:bg-gray-100 rounded">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Employee Selector */}
+        {linkedEmployees.length > 1 && (
+          <select
+            value={selectedEmployeeId}
+            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {linkedEmployees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.personalInfo.firstName} {emp.personalInfo.lastName}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <Button onClick={handleSave} disabled={saving || entries.length === 0} loading={saving} className="sm:ml-auto">
+          <Save className="h-4 w-4 mr-2" />
+          Opslaan
+        </Button>
+      </div>
+
+      {/* Current Week Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="p-3 bg-blue-50 border-blue-200">
+          <p className="text-xs text-blue-700 font-medium">Totaal Uren</p>
+          <p className="text-2xl font-bold text-blue-900 mt-1">{totalHours}u</p>
         </Card>
-      )}
-
-      {/* Summary Card */}
-      {productionData && (
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 p-4 sm:p-6">
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Week {selectedWeek} Samenvatting</h3>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="p-2 sm:p-3 bg-white rounded-lg text-center">
-                <p className="text-xs text-gray-600 mb-1">Totaal Uren</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">
-                  {productionData.totalHours}u
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-white rounded-lg text-center">
-                <p className="text-xs text-gray-600 mb-1">Entries</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                  {productionData.totalEntries}
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-white rounded-lg text-center">
-                <p className="text-xs text-gray-600 mb-1">Status</p>
-                <p className="text-xs font-bold text-gray-600 capitalize">
-                  {productionData.status}
-                </p>
-              </div>
-            </div>
-          </div>
+        <Card className="p-3 bg-green-50 border-green-200">
+          <p className="text-xs text-green-700 font-medium">Entries</p>
+          <p className="text-2xl font-bold text-green-900 mt-1">{entries.length}</p>
         </Card>
-      )}
+        <Card className="p-3 bg-purple-50 border-purple-200">
+          <p className="text-xs text-purple-700 font-medium">Status</p>
+          <p className="text-xs font-bold text-purple-900 mt-2 capitalize">{currentWeekData?.status || 'Nieuw'}</p>
+        </Card>
+      </div>
 
-      {/* Production Entries Table */}
-      {entries.length > 0 ? (
-        <Card className="p-3 sm:p-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Productie Entries</h3>
-              <Button
-                onClick={addEntry}
-                size="sm"
-                variant="secondary"
-                className="text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Toevoegen
-              </Button>
-            </div>
+      {/* Current Week Entries */}
+      <Card>
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="font-semibold text-gray-900">Week {selectedWeek} Entries</h3>
+          <Button onClick={addEntry} size="sm" variant="secondary">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-2 px-3">Monteur</th>
-                    <th className="text-left py-2 px-3">Datum</th>
-                    <th className="text-left py-2 px-3">Uren</th>
-                    <th className="text-left py-2 px-3">Opdrachtgever</th>
-                    <th className="text-left py-2 px-3">Locaties</th>
-                    <th className="text-center py-2 px-3">Acties</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, index) => (
-                    <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                      <td className="py-2 px-3">
-                        <Input
-                          type="text"
-                          value={entry.monteur}
-                          onChange={(e) => updateEntry(index, 'monteur', e.target.value)}
-                          className="text-xs"
-                          placeholder="Monteur"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <Input
-                          type="date"
-                          value={entry.datum}
-                          onChange={(e) => updateEntry(index, 'datum', e.target.value)}
-                          className="text-xs"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={entry.uren}
-                          onChange={(e) => updateEntry(index, 'uren', e.target.value)}
-                          className="text-xs text-center"
-                          placeholder="0"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <Input
-                          type="text"
-                          value={entry.opdrachtgever}
-                          onChange={(e) => updateEntry(index, 'opdrachtgever', e.target.value)}
-                          className="text-xs"
-                          placeholder="Opdrachtgever"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <Input
-                          type="text"
-                          value={entry.locaties}
-                          onChange={(e) => updateEntry(index, 'locaties', e.target.value)}
-                          className="text-xs"
-                          placeholder="Locaties"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <button
-                          onClick={() => removeEntry(index)}
-                          className="text-red-600 hover:text-red-800 p-1"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-2">
-              {entries.map((entry, index) => (
-                <Card key={index} className="p-3 bg-gray-50">
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium">Monteur</label>
-                        <Input
-                          type="text"
-                          value={entry.monteur}
-                          onChange={(e) => updateEntry(index, 'monteur', e.target.value)}
-                          className="text-xs"
-                          placeholder="Monteur"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium">Datum</label>
-                        <Input
-                          type="date"
-                          value={entry.datum}
-                          onChange={(e) => updateEntry(index, 'datum', e.target.value)}
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium">Uren</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={entry.uren}
-                          onChange={(e) => updateEntry(index, 'uren', e.target.value)}
-                          className="text-xs text-center"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <button
-                          onClick={() => removeEntry(index)}
-                          className="w-full text-red-600 hover:text-red-800 p-2 bg-red-50 rounded"
-                        >
-                          <Trash2 className="h-4 w-4 mx-auto" />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-medium">Opdrachtgever</label>
+        {entries.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left py-2 px-3">Monteur</th>
+                  <th className="text-left py-2 px-3">Datum</th>
+                  <th className="text-center py-2 px-3">Uren</th>
+                  <th className="text-left py-2 px-3">Opdrachtgever</th>
+                  <th className="text-left py-2 px-3 hidden sm:table-cell">Locaties</th>
+                  <th className="text-center py-2 px-3">Verwijder</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry, idx) => (
+                  <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="py-2 px-3">
+                      <Input
+                        type="text"
+                        value={entry.monteur}
+                        onChange={(e) => updateEntry(idx, 'monteur', e.target.value)}
+                        className="text-xs"
+                        placeholder="Monteur"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <Input
+                        type="date"
+                        value={entry.datum}
+                        onChange={(e) => updateEntry(idx, 'datum', e.target.value)}
+                        className="text-xs"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        value={entry.uren}
+                        onChange={(e) => updateEntry(idx, 'uren', e.target.value)}
+                        className="text-xs text-center"
+                      />
+                    </td>
+                    <td className="py-2 px-3">
                       <Input
                         type="text"
                         value={entry.opdrachtgever}
-                        onChange={(e) => updateEntry(index, 'opdrachtgever', e.target.value)}
+                        onChange={(e) => updateEntry(idx, 'opdrachtgever', e.target.value)}
                         className="text-xs"
                         placeholder="Opdrachtgever"
                       />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 font-medium">Locaties</label>
+                    </td>
+                    <td className="py-2 px-3 hidden sm:table-cell">
                       <Input
                         type="text"
                         value={entry.locaties}
-                        onChange={(e) => updateEntry(index, 'locaties', e.target.value)}
+                        onChange={(e) => updateEntry(idx, 'locaties', e.target.value)}
                         className="text-xs"
                         placeholder="Locaties"
                       />
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <button onClick={() => removeEntry(idx)} className="text-red-600 hover:text-red-800">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </Card>
-      ) : (
-        <Card className="p-8">
-          <div className="text-center">
-            <Factory className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-500 mb-4">Geen productie entries beschikbaar</p>
-            <Button onClick={addEntry} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Eerste Entry Toevoegen
-            </Button>
+        ) : (
+          <div className="p-8 text-center text-gray-500">
+            Geen entries. Klik "+" om een entry toe te voegen.
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
-      {/* Action Buttons */}
-      <div className="flex gap-2 sm:gap-3">
-        <Button
-          onClick={handleSave}
-          disabled={saving || entries.length === 0}
-          loading={saving}
-          className="flex-1 sm:flex-none"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Opslaan...' : existingWeek ? 'Bijwerken' : 'Opslaan'}
-        </Button>
+      {/* All Firebase Weeks */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Alle Weken</h3>
+        <div className="space-y-2">
+          {allFirebaseWeeks.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm bg-white rounded-lg border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left py-3 px-4">Medewerker</th>
+                    <th className="text-center py-3 px-4">Week</th>
+                    <th className="text-center py-3 px-4">Jaar</th>
+                    <th className="text-center py-3 px-4">Uren</th>
+                    <th className="text-center py-3 px-4">Entries</th>
+                    <th className="text-left py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allFirebaseWeeks.map((week) => {
+                    const emp = employees.find((e) => e.id === week.employeeId);
+                    return (
+                      <tr key={week.id} className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-xs">
+                          {emp?.personalInfo.firstName} {emp?.personalInfo.lastName}
+                        </td>
+                        <td className="py-3 px-4 text-center font-medium">{week.week}</td>
+                        <td className="py-3 px-4 text-center">{week.year}</td>
+                        <td className="py-3 px-4 text-center font-bold text-blue-600">{week.totalHours}u</td>
+                        <td className="py-3 px-4 text-center">{week.totalEntries}</td>
+                        <td className="py-3 px-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                            week.status === 'draft' ? 'bg-gray-100 text-gray-700' :
+                            week.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                            week.status === 'approved' ? 'bg-green-100 text-green-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {week.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Card className="p-8 text-center text-gray-500">
+              Geen weken opgeslagen
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
