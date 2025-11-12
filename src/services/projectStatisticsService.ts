@@ -1,15 +1,11 @@
 import {
-  collection, query, where, getDocs, Timestamp, getFirestore,
+  collection, query, where, getDocs, Timestamp, getFirestore, orderBy, limit,
 } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import type {
-  Company, Employee, TimeEntry, WeeklyTimesheet, Branch,
-  LeaveRequest, Expense, PayrollPeriod, HourlyRate
-} from '../types';
 
 const db = getFirestore(getApp());
 
-export const advancedStatisticsService = {
+export const projectStatisticsService = {
   async getWeeklyBreakdown(companyId: string, userId: string, year: number) {
     try {
       const timesheetsSnap = await getDocs(
@@ -147,11 +143,10 @@ export const advancedStatisticsService = {
 
   async getEmployeeLocationMatrix(companyId: string, userId: string) {
     try {
-      const [employeesSnap, timeEntriesSnap, branchesSnap, hourlyRatesSnap] = await Promise.all([
+      const [employeesSnap, timeEntriesSnap, branchesSnap] = await Promise.all([
         getDocs(query(collection(db, 'employees'), where('companyId', '==', companyId))),
         getDocs(query(collection(db, 'timeEntries'), where('companyId', '==', companyId), where('userId', '==', userId))),
         getDocs(query(collection(db, 'branches'), where('companyId', '==', companyId))),
-        getDocs(query(collection(db, 'hourlyRates'), where('companyId', '==', companyId))),
       ]);
 
       const employees = employeesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -235,59 +230,90 @@ export const advancedStatisticsService = {
       throw error;
     }
   },
+
+  async getAdvancedInsights(companyId: string, userId: string) {
+    try {
+      const [employeesSnap, timeEntriesSnap, leaveSnap, expensesSnap, timesheetsSnap, invoicesSnap] = await Promise.all([
+        getDocs(query(collection(db, 'employees'), where('companyId', '==', companyId))),
+        getDocs(query(collection(db, 'timeEntries'), where('companyId', '==', companyId), where('userId', '==', userId))),
+        getDocs(query(collection(db, 'leaveRequests'), where('companyId', '==', companyId))),
+        getDocs(query(collection(db, 'expenses'), where('companyId', '==', companyId))),
+        getDocs(query(collection(db, 'weeklyTimesheets'), where('companyId', '==', companyId))),
+        getDocs(query(collection(db, 'outgoingInvoices'), where('companyId', '==', companyId))),
+      ]);
+
+      const employees = employeesSnap.docs.map(doc => doc.data());
+      const timeEntries = timeEntriesSnap.docs.map(doc => doc.data());
+      const leave = leaveSnap.docs.map(doc => doc.data());
+      const expenses = expensesSnap.docs.map(doc => doc.data());
+      const timesheets = timesheetsSnap.docs.map(doc => doc.data());
+      const invoices = invoicesSnap.docs.map(doc => doc.data());
+
+      const topPerformers = employees.map((emp: any) => {
+        const empHours = timeEntries
+          .filter((te: any) => te.employeeId === emp.id)
+          .reduce((sum, te: any) => sum + (te.regularHours || 0), 0);
+        
+        const empInvoiced = invoices
+          .filter((inv: any) => inv.items?.some((item: any) => item.employeeIds?.includes(emp.id)))
+          .reduce((sum, inv: any) => sum + (inv.totalAmount || 0), 0);
+
+        return {
+          id: emp.id,
+          name: `${emp.personalInfo?.firstName} ${emp.personalInfo?.lastName}`,
+          hours: empHours,
+          revenue: empInvoiced,
+          efficiency: empHours > 0 ? empInvoiced / empHours : 0,
+        };
+      }).sort((a, b) => b.efficiency - a.efficiency).slice(0, 10);
+
+      const leaveCompliance = employees.length > 0 ? (leave.filter((l: any) => l.status === 'approved').length / employees.length) * 100 : 0;
+
+      const totalOvertime = timeEntries.reduce((sum, te: any) => sum + (te.overtimeHours || 0), 0);
+      const employeesWithOvertime = new Set(timeEntries.filter((te: any) => te.overtimeHours > 0).map((te: any) => te.employeeId)).size;
+
+      const revenue = invoices.reduce((sum, inv: any) => sum + (inv.totalAmount || 0), 0);
+      const costs = expenses.reduce((sum, e: any) => sum + (e.amount || 0), 0);
+      const profit = revenue - costs;
+      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+      const dayData = new Map<number, number>();
+      timeEntries.forEach((te: any) => {
+        const date = te.date?.toDate?.() || new Date(te.date);
+        const dayOfWeek = date.getDay();
+        const hours = dayData.get(dayOfWeek) || 0;
+        dayData.set(dayOfWeek, hours + (te.regularHours || 0));
+      });
+
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const peakDaysOfWeek = Array.from(dayData.entries())
+        .map(([day, hours]) => ({ day: days[day], hours }))
+        .sort((a, b) => b.hours - a.hours);
+
+      return {
+        topPerformers,
+        leaveCompliance: {
+          complianceRate: leaveCompliance,
+          totalRequests: leave.length,
+          approved: leave.filter((l: any) => l.status === 'approved').length,
+          pending: leave.filter((l: any) => l.status === 'pending').length,
+        },
+        overtimeAnalysis: {
+          totalOvertimeHours: totalOvertime,
+          employeesWithOvertime,
+          averageOvertimePerEmployee: employeesWithOvertime > 0 ? totalOvertime / employeesWithOvertime : 0,
+        },
+        profitMargin: {
+          revenue,
+          costs,
+          profit,
+          margin,
+        },
+        peakDaysOfWeek,
+      };
+    } catch (error) {
+      console.error('Error getting advanced insights:', error);
+      throw error;
+    }
+  },
 };
-
-function getTopPerformers(employees: any[], timeEntries: any[], invoices: any[]) {
-  return employees.map((emp: any) => {
-    const empHours = timeEntries
-      .filter((te: any) => te.employeeId === emp.id)
-      .reduce((sum, te: any) => sum + (te.regularHours || 0), 0);
-    
-    const empInvoiced = invoices
-      .filter((inv: any) => inv.items?.some((item: any) => item.employeeIds?.includes(emp.id)))
-      .reduce((sum, inv: any) => sum + (inv.totalAmount || 0), 0);
-
-    return {
-      id: emp.id,
-      name: `${emp.personalInfo?.firstName} ${emp.personalInfo?.lastName}`,
-      hours: empHours,
-      revenue: empInvoiced,
-      efficiency: empHours > 0 ? empInvoiced / empHours : 0,
-    };
-  }).sort((a, b) => b.efficiency - a.efficiency).slice(0, 10);
-}
-
-function getLeaveCompliance(leave: any[], employees: any[]) {
-  const compliant = employees.length > 0 ? (leave.filter((l: any) => l.status === 'approved').length / employees.length) * 100 : 0;
-  return {
-    totalRequests: leave.length,
-    approved: leave.filter((l: any) => l.status === 'approved').length,
-    pending: leave.filter((l: any) => l.status === 'pending').length,
-    rejected: leave.filter((l: any) => l.status === 'rejected').length,
-    complianceRate: compliant,
-  };
-}
-
-function getOvertimeAnalysis(timeEntries: any[]) {
-  const totalOvertime = timeEntries.reduce((sum, te: any) => sum + (te.overtimeHours || 0), 0);
-  const employeesWithOvertime = new Set(timeEntries.filter((te: any) => te.overtimeHours > 0).map((te: any) => te.employeeId)).size;
-  
-  return {
-    totalOvertimeHours: totalOvertime,
-    employeesWithOvertime,
-    averageOvertimePerEmployee: employeesWithOvertime > 0 ? totalOvertime / employeesWithOvertime : 0,
-  };
-}
-
-function calculateProfitMargin(invoices: any[], expenses: any[]) {
-  const revenue = invoices.reduce((sum, inv: any) => sum + (inv.totalAmount || 0), 0);
-  const costs = expenses.reduce((sum, e: any) => sum + (e.amount || 0), 0);
-  const profit = revenue - costs;
-
-  return {
-    revenue,
-    costs,
-    profit,
-    margin: revenue > 0 ? (profit / revenue) * 100 : 0,
-  };
-}
