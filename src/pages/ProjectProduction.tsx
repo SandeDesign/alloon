@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  AlertCircle,
   User as UserIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -146,7 +145,6 @@ const ProjectProduction: React.FC = () => {
             week: selectedWeek,
             year: selectedYear,
             companyId: selectedCompany.id,
-            // 🔥 Specifieke medewerker
             employee: {
               id: selectedEmployee.id,
               firstName: selectedEmployee.personalInfo.firstName,
@@ -172,11 +170,9 @@ const ProjectProduction: React.FC = () => {
           const text = await response.text();
           console.log('Raw webhook response:', text);
           
-          // Try to parse as JSON anyway
           try {
             productionResponse = JSON.parse(text);
           } catch {
-            // If response is "Accepted" or other status, treat as pending
             if (text.toLowerCase().includes('accepted') || text === '202') {
               showError('Verwerking loopt', 'Make.com verwerkt je aanvraag. Dit kan enkele seconden duren. Probeer opnieuw.');
               setImporting(false);
@@ -191,6 +187,8 @@ const ProjectProduction: React.FC = () => {
         setImporting(false);
         return;
       }
+
+      console.log('✅ Webhook response:', productionResponse);
 
       if (
         productionResponse &&
@@ -214,25 +212,36 @@ const ProjectProduction: React.FC = () => {
   };
 
   const processProductionData = async (rawData: any[], employeeId: string) => {
-    const normalizedEntries: ProductionEntry[] = rawData.map((record) => {
+    // 🔥 Zelfde pattern als Timesheets.tsx
+    const normalizedEntries = rawData.map(record => {
       const data = record.data || record;
       return {
+        dag: data.Datum || data.datum || '',
         monteur: data.Monteur || data.monteur || '',
-        datum: data.Datum || data.datum || '',
         uren: parseFloat(data.Uren || data.uren || 0),
         opdrachtgever: data.Opdrachtgever || data.opdrachtgever || '',
-        locaties: data.Locaties || data.locaties || '',
-        week: selectedWeek,
-        year: selectedYear,
-        companyId: selectedCompany!.id,
-        employeeId: employeeId,
-        userId: adminUserId!,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        locaties: data.Locaties || data.locaties || ''
       };
     });
 
-    const totalHours = normalizedEntries.reduce((sum, entry) => sum + entry.uren, 0);
+    console.log('✅ Normalized entries:', normalizedEntries);
+
+    const updatedEntries: ProductionEntry[] = normalizedEntries.map((entry) => ({
+      monteur: entry.monteur,
+      datum: entry.dag,
+      uren: entry.uren,
+      opdrachtgever: entry.opdrachtgever,
+      locaties: entry.locaties,
+      week: selectedWeek,
+      year: selectedYear,
+      companyId: selectedCompany!.id,
+      employeeId: employeeId,
+      userId: adminUserId!,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+
+    const totalHours = updatedEntries.reduce((sum, entry) => sum + entry.uren, 0);
 
     const updatedWeek: ProductionWeek = {
       week: selectedWeek,
@@ -240,16 +249,16 @@ const ProjectProduction: React.FC = () => {
       companyId: selectedCompany!.id,
       employeeId: employeeId,
       userId: adminUserId!,
-      entries: normalizedEntries,
+      entries: updatedEntries,
       status: 'draft',
       totalHours: totalHours,
-      totalEntries: normalizedEntries.length,
+      totalEntries: updatedEntries.length,
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
     setProductionData(updatedWeek);
-    setEntries(normalizedEntries);
+    setEntries(updatedEntries);
   };
 
   const updateEntry = (index: number, field: keyof ProductionEntry, value: any) => {
@@ -324,7 +333,6 @@ const ProjectProduction: React.FC = () => {
 
     setSaving(true);
     try {
-      // TODO: Implement Firebase save logic
       success('Gegevens opgeslagen', 'Productie gegevens succesvol opgeslagen');
     } catch (error) {
       console.error('Error saving production data:', error);
@@ -401,7 +409,6 @@ const ProjectProduction: React.FC = () => {
     );
   }
 
-  // Get selected employee info
   const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
 
   return (
