@@ -23,7 +23,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
 import { EmptyState } from '../components/ui/EmptyState';
 import { incomingInvoiceService, IncomingInvoice } from '../services/incomingInvoiceService';
-import { uploadInvoiceToDrive, requestGoogleDriveAccess } from '../services/googleDriveService';
+import { uploadInvoiceToDrive } from '../services/googleDriveService';
 
 const IncomingInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -64,9 +64,8 @@ const IncomingInvoices: React.FC = () => {
   // Initialize Google Drive access on mount
   useEffect(() => {
     if (user) {
-      requestGoogleDriveAccess().catch(err => {
-        console.warn('Google Drive not initialized yet:', err);
-      });
+      // Token wordt nu vanuit Settings opgeslagen
+      // Geen popup nodig meer
     }
   }, [user]);
 
