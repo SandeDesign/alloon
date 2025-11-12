@@ -14,7 +14,9 @@ import {
   FileText,
   Scan,
   RefreshCw,
-  Trash2
+  Trash2,
+  Archive,
+  HardDrive
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
@@ -32,9 +34,11 @@ const IncomingInvoices: React.FC = () => {
   const [invoices, setInvoices] = useState<IncomingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [archiving, setArchiving] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showArchiveInfo, setShowArchiveInfo] = useState(false);
 
   const loadInvoices = useCallback(async () => {
     if (!user) {
@@ -86,6 +90,33 @@ const IncomingInvoices: React.FC = () => {
       showError('Fout bij uploaden', 'Kon bestanden niet uploaden');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleArchiveToGoogleDrive = async (invoiceId: string) => {
+    if (!user || !selectedCompany) return;
+
+    setArchiving(invoiceId);
+    try {
+      const invoice = invoices.find(inv => inv.id === invoiceId);
+      if (!invoice) {
+        showError('Fout', 'Factuur niet gevonden');
+        return;
+      }
+
+      await incomingInvoiceService.archiveToGoogleDrive(
+        invoiceId,
+        user.uid,
+        selectedCompany.id,
+        invoice
+      );
+
+      success('Gearchiveerd', 'Factuur is gearchiveerd in Google Drive');
+      loadInvoices();
+    } catch (error) {
+      showError('Fout bij archiveren', error instanceof Error ? error.message : 'Kon factuur niet archiveren');
+    } finally {
+      setArchiving(null);
     }
   };
 
@@ -230,8 +261,34 @@ const IncomingInvoices: React.FC = () => {
               onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
             />
           </label>
+          <Button
+            variant="ghost"
+            icon={HardDrive}
+            onClick={() => setShowArchiveInfo(!showArchiveInfo)}
+          >
+            Google Drive
+          </Button>
         </div>
       </div>
+
+      {/* Archive Info Box */}
+      {showArchiveInfo && (
+        <Card className="bg-blue-50 border-blue-200">
+          <div className="p-4">
+            <div className="flex items-start space-x-3">
+              <HardDrive className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-900">Google Drive Archivering</h3>
+                <p className="mt-1 text-sm text-blue-800">
+                  Goedgekeurde facturen kunnen worden gearchiveerd in Google Drive. Dit slaat de originele bestanden op 
+                  en extraheert alle gegevens automatisch via OCR voor administratieve doeleinden. De bedragen worden 
+                  bewaard voor rapportage en financiële overzichten.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Upload Zone */}
       <div
@@ -334,6 +391,12 @@ const IncomingInvoices: React.FC = () => {
                               OCR
                             </span>
                           )}
+                          {invoice.archivedToDrive && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              <HardDrive className="h-3 w-3 mr-1" />
+                              Drive
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
                           <div className="flex items-center">
@@ -390,7 +453,28 @@ const IncomingInvoices: React.FC = () => {
                           </Button>
                         </>
                       )}
-                      {invoice.status === 'approved' && (
+                      {invoice.status === 'approved' && !invoice.archivedToDrive && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={Archive}
+                            onClick={() => handleArchiveToGoogleDrive(invoice.id!)}
+                            disabled={archiving === invoice.id}
+                          >
+                            {archiving === invoice.id ? 'Archiveren...' : 'Archiveren'}
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={CheckCircle}
+                            onClick={() => handleMarkAsPaid(invoice.id!)}
+                          >
+                            Betaald
+                          </Button>
+                        </>
+                      )}
+                      {invoice.status === 'approved' && invoice.archivedToDrive && (
                         <Button
                           variant="primary"
                           size="sm"
