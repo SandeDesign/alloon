@@ -65,7 +65,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
         { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'], color: 'text-amber-600' },
         { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-blue-600' },
         { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-rose-600' },
-        { name: 'Verzuim Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-red-600' },
+        { name: 'Ziekte Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-red-600' },
       ]
     },
     {
