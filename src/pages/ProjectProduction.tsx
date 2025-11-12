@@ -625,7 +625,7 @@ const ProjectProduction: React.FC = () => {
                           className="text-xs text-center"
                           placeholder="0"
                         />
-                      </td>
+                      </div>
                       <div className="flex items-end">
                         <button
                           onClick={() => removeEntry(index)}
