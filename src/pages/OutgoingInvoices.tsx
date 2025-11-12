@@ -9,7 +9,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import { outgoingInvoiceService, OutgoingInvoice, CompanyInfo } from '../services/outgoingInvoiceService';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/ttdixmxlu9n7rvbnxgfomilht2ihllc2';
@@ -40,9 +40,18 @@ interface ProductionEntry {
   locaties: string;
 }
 
+interface ProductionWeek {
+  id: string;
+  week: number;
+  year: number;
+  employeeId: string;
+  entries: ProductionEntry[];
+  totalHours: number;
+}
+
 const OutgoingInvoices: React.FC = () => {
   const { user } = useAuth();
-  const { selectedCompany } = useApp();
+  const { selectedCompany, employees } = useApp();
   const { success, error: showError } = useToast();
 
   const [invoices, setInvoices] = useState<OutgoingInvoice[]>([]);
@@ -61,11 +70,10 @@ const OutgoingInvoices: React.FC = () => {
 
   // 🔥 Production Import State
   const [showProductionImport, setShowProductionImport] = useState(false);
-  const [productionWeek, setProductionWeek] = useState<number>(0);
-  const [productionYear, setProductionYear] = useState<number>(new Date().getFullYear());
-  const [productionMonteur, setProductionMonteur] = useState('');
+  const [productionWeeks, setProductionWeeks] = useState<ProductionWeek[]>([]);
+  const [selectedProductionWeek, setSelectedProductionWeek] = useState<ProductionWeek | null>(null);
+  const [selectedProductionEmployeeId, setSelectedProductionEmployeeId] = useState('');
   const [loadingProduction, setLoadingProduction] = useState(false);
-  const [availableProductionItems, setAvailableProductionItems] = useState<ProductionEntry[]>([]);
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -126,69 +134,84 @@ const OutgoingInvoices: React.FC = () => {
     }
   }, [user, selectedCompany]);
 
-  // 🔥 Load production data from Firebase
-  const handleLoadProductionData = async () => {
-    if (!productionWeek || !productionMonteur || !user || !selectedCompany) {
-      showError('Fout', 'Vul week en monteur in');
+  // 🔥 Load production weeks from Firebase
+  const handleLoadProductionWeeks = async () => {
+    if (!selectedProductionEmployeeId || !user || !selectedCompany) {
+      showError('Fout', 'Selecteer een medewerker');
       return;
     }
 
     setLoadingProduction(true);
     try {
-      // Query Firebase for production weeks
       const q = query(
         collection(db, 'productionWeeks'),
         where('userId', '==', user.uid),
-        where('week', '==', productionWeek),
-        where('year', '==', productionYear),
-        where('companyId', '==', selectedCompany.id)
+        where('companyId', '==', selectedCompany.id),
+        where('employeeId', '==', selectedProductionEmployeeId),
+        orderBy('week', 'desc')
       );
 
       const snap = await getDocs(q);
-      let foundEntries: ProductionEntry[] = [];
+      const weeks: ProductionWeek[] = [];
 
       snap.docs.forEach(doc => {
         const data = doc.data();
-        if (data.entries && Array.isArray(data.entries)) {
-          // Filter entries for selected monteur
-          const monteurEntries = data.entries.filter(
-            (entry: any) => entry.monteur.toLowerCase() === productionMonteur.toLowerCase()
-          );
-          foundEntries = foundEntries.concat(monteurEntries);
-        }
+        weeks.push({
+          id: doc.id,
+          week: data.week,
+          year: data.year,
+          employeeId: data.employeeId,
+          entries: data.entries || [],
+          totalHours: data.totalHours || 0
+        });
       });
 
-      if (foundEntries.length === 0) {
-        showError('Geen data', `Geen production data gevonden voor Week ${productionWeek}, ${productionMonteur}`);
-        setLoadingProduction(false);
-        return;
+      setProductionWeeks(weeks);
+      if (weeks.length === 0) {
+        showError('Geen data', `Geen productie weken gevonden voor deze medewerker`);
       }
-
-      setAvailableProductionItems(foundEntries);
-      success('Geladen', `${foundEntries.length} production entries geladen`);
     } catch (error) {
-      console.error('Error loading production data:', error);
-      showError('Fout', 'Kon production data niet laden');
+      console.error('Error loading production weeks:', error);
+      showError('Fout', 'Kon productie weken niet laden');
     } finally {
       setLoadingProduction(false);
     }
   };
 
-  // 🔥 Add production item to invoice
+  // 🔥 Add production entry to invoice
   const addProductionItem = (entry: ProductionEntry) => {
     const newItem = {
-      title: 'Production',
+      title: 'Productie',
       description: `${entry.datum} - ${entry.monteur}\n${entry.uren}u @ ${entry.opdrachtgever}\nLocatie: ${entry.locaties}`,
-      quantity: 1,
+      quantity: entry.uren,
       rate: 0,
       amount: 0
     };
 
     setItems([...items, newItem]);
-    setAvailableProductionItems(
-      availableProductionItems.filter(item => item !== entry)
-    );
     success('Toegevoegd', 'Production regel toegevoegd');
+  };
+
+  // 🔥 Add all entries from selected week
+  const addAllProductionItems = () => {
+    if (!selectedProductionWeek || selectedProductionWeek.entries.length === 0) {
+      showError('Fout', 'Geen entries in geselecteerde week');
+      return;
+    }
+
+    const newItems = selectedProductionWeek.entries.map(entry => ({
+      title: 'Productie',
+      description: `${entry.datum} - ${entry.monteur}\n${entry.uren}u @ ${entry.opdrachtgever}\nLocatie: ${entry.locaties}`,
+      quantity: entry.uren,
+      rate: 0,
+      amount: 0
+    }));
+
+    setItems([...items, ...newItems]);
+    setSelectedProductionWeek(null);
+    setProductionWeeks([]);
+    setShowProductionImport(false);
+    success('Toegevoegd', `${newItems.length} production regels toegevoegd`);
   };
 
   const handleCreateNew = () => {
@@ -210,9 +233,9 @@ const OutgoingInvoices: React.FC = () => {
     });
     setItems([{ title: '', description: '', quantity: 1, rate: 0, amount: 0 }]);
     setShowProductionImport(false);
-    setAvailableProductionItems([]);
-    setProductionWeek(0);
-    setProductionMonteur('');
+    setProductionWeeks([]);
+    setSelectedProductionWeek(null);
+    setSelectedProductionEmployeeId('');
     loadRelations();
     generateNextInvoiceNumber();
     setView('create');
@@ -605,7 +628,7 @@ const OutgoingInvoices: React.FC = () => {
             </div>
           </Card>
 
-          {/* 🔥 Production Data - Firebase ONLY */}
+          {/* 🔥 Production Data - Firebase via Dropdowns */}
           <Card className="p-4 sm:p-5 bg-amber-50 border-amber-200">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -627,57 +650,85 @@ const OutgoingInvoices: React.FC = () => {
             </div>
             
             {showProductionImport && (
-              <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="mt-3 pt-3 border-t border-amber-200 space-y-3">
+                {/* Employee Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-amber-700 mb-1">Medewerker</label>
+                  <select
+                    value={selectedProductionEmployeeId}
+                    onChange={(e) => {
+                      setSelectedProductionEmployeeId(e.target.value);
+                      setProductionWeeks([]);
+                      setSelectedProductionWeek(null);
+                    }}
+                    className="w-full px-3 py-2 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
+                  >
+                    <option value="">Selecteer medewerker...</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.personalInfo.firstName} {emp.personalInfo.lastName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Load Button */}
+                <button
+                  type="button"
+                  onClick={handleLoadProductionWeeks}
+                  disabled={loadingProduction || !selectedProductionEmployeeId}
+                  className="w-full px-3 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 rounded transition-colors"
+                >
+                  {loadingProduction ? 'Laden...' : 'Laad weken'}
+                </button>
+
+                {/* Week Selector */}
+                {productionWeeks.length > 0 && (
                   <div>
-                    <label className="block text-xs font-medium text-amber-700 mb-1">Week</label>
-                    <input
-                      type="number"
-                      value={productionWeek}
-                      onChange={(e) => setProductionWeek(parseInt(e.target.value))}
-                      min="1"
-                      max="52"
-                      className="w-full px-2 py-1 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      placeholder="Week"
-                    />
+                    <label className="block text-xs font-medium text-amber-700 mb-1">Selecteer week</label>
+                    <select
+                      value={selectedProductionWeek?.id || ''}
+                      onChange={(e) => {
+                        const week = productionWeeks.find(w => w.id === e.target.value);
+                        setSelectedProductionWeek(week || null);
+                      }}
+                      className="w-full px-3 py-2 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
+                    >
+                      <option value="">Selecteer week...</option>
+                      {productionWeeks.map((week) => (
+                        <option key={week.id} value={week.id}>
+                          Week {week.week} {week.year} ({week.entries.length} entries, {week.totalHours}u)
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-amber-700 mb-1">Monteur</label>
-                    <input
-                      type="text"
-                      value={productionMonteur}
-                      onChange={(e) => setProductionMonteur(e.target.value)}
-                      className="w-full px-2 py-1 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      placeholder="Naam monteur"
-                    />
-                  </div>
-                  <div className="flex items-end">
+                )}
+
+                {/* Show entries of selected week */}
+                {selectedProductionWeek && selectedProductionWeek.entries.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="bg-white p-3 rounded border border-amber-200 space-y-2 max-h-48 overflow-y-auto">
+                      {selectedProductionWeek.entries.map((entry, idx) => (
+                        <div key={idx} className="text-xs bg-amber-50 p-2 rounded border border-amber-100">
+                          <p className="font-medium text-amber-900">
+                            {entry.datum} - {entry.monteur}
+                          </p>
+                          <p className="text-amber-700 text-xs mt-1">
+                            {entry.uren}u @ {entry.opdrachtgever}
+                          </p>
+                          {entry.locaties && (
+                            <p className="text-amber-600 text-xs mt-1">📍 {entry.locaties}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                     <button
                       type="button"
-                      onClick={handleLoadProductionData}
-                      disabled={loadingProduction || !productionWeek || !productionMonteur}
-                      className="w-full px-2 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 rounded transition-colors"
+                      onClick={addAllProductionItems}
+                      className="w-full px-3 py-2 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
                     >
-                      {loadingProduction ? '...' : 'Laad'}
+                      Voeg alle entries toe
                     </button>
-                  </div>
-                </div>
-                
-                {availableProductionItems.length > 0 && (
-                  <div className="bg-white p-2 rounded border border-amber-200 space-y-1 max-h-48 overflow-y-auto">
-                    {availableProductionItems.map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => addProductionItem(item)}
-                        className="w-full text-left px-2 py-1 text-xs bg-amber-50 hover:bg-amber-100 rounded transition-colors flex items-center justify-between group"
-                      >
-                        <span className="truncate text-amber-900 text-xs">
-                          {item.datum} - {item.uren}u - {item.opdrachtgever}
-                        </span>
-                        <span className="text-amber-600 ml-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">+</span>
-                      </button>
-                    ))}
                   </div>
                 )}
               </div>
