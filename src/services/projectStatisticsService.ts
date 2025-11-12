@@ -1,11 +1,13 @@
 import {
-  collection, query, where, getDocs, Timestamp,
+  collection, query, where, getDocs, Timestamp, getFirestore,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { getApp } from 'firebase/app';
 import type {
   ProjectStatistics, InvoiceMetrics, ProductionMetrics,
   EmployeeMetrics, MonthlyData
 } from '../types/statistics';
+
+const db = getFirestore(getApp());
 
 export const projectStatisticsService = {
   async getProjectStatistics(
