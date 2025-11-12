@@ -8,10 +8,10 @@ import {
   Users,
   Building2,
   Menu,
-  Send,
+  CheckCircle2,
   Calendar,
-  Briefcase,
-  BarChart3,
+  Factory,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
@@ -33,9 +33,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
     if (companyType === 'project') {
       return [
         { href: '/', icon: Home, label: 'Dashboard' },
-        { href: '/project-production', icon: Briefcase, label: 'Productie' },
-        { href: '/project-statistics', icon: BarChart3, label: 'Stats' },
-        { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
+        { href: '/project-production', icon: Factory, label: 'Productie' },
+        { href: '/project-statistics', icon: TrendingUp, label: 'Stats' },
+        { href: '/outgoing-invoices', icon: FileText, label: 'Facturen' },
       ];
     }
 
@@ -51,12 +51,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/employees', icon: Users, label: 'Team' },
         { href: '/timesheets', icon: Clock, label: 'Uren' },
-        { href: '/timesheet-approvals', icon: Calendar, label: 'Goedkeuren' },
+        { href: '/timesheet-approvals', icon: CheckCircle2, label: 'Goedkeuren' },
       ],
       admin: [
         { href: '/', icon: Home, label: 'Dashboard' },
-        { href: '/timesheet-approvals', icon: Clock, label: 'Uren' },
-        { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
+        { href: '/timesheet-approvals', icon: CheckCircle2, label: 'Uren' },
+        { href: '/outgoing-invoices', icon: FileText, label: 'Facturen' },
         { href: '/employees', icon: Users, label: 'Team' },
       ],
     };
