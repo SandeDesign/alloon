@@ -411,9 +411,23 @@ const IncomingInvoices: React.FC = () => {
                             <Calendar className="h-4 w-4 mr-1" />
                             {invoice.invoiceDate.toLocaleDateString('nl-NL')}
                           </div>
-                          <div className="flex items-center">
-                            <Euro className="h-4 w-4 mr-1" />
-                            €{invoice.totalAmount.toFixed(2)}
+                        </div>
+                        <div className="mt-2 grid grid-cols-4 gap-2 text-sm">
+                          <div className="bg-gray-50 p-2 rounded">
+                            <p className="text-xs text-gray-600">Excl. BTW</p>
+                            <p className="font-semibold text-gray-900">€{((invoice as any).subtotal || invoice.totalAmount / 1.21).toFixed(2)}</p>
+                          </div>
+                          <div className="bg-gray-50 p-2 rounded">
+                            <p className="text-xs text-gray-600">BTW (21%)</p>
+                            <p className="font-semibold text-gray-900">€{((invoice as any).vatAmount || (invoice.totalAmount / 1.21 * 0.21)).toFixed(2)}</p>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded">
+                            <p className="text-xs text-blue-600">Incl. BTW</p>
+                            <p className="font-semibold text-blue-900">€{invoice.totalAmount.toFixed(2)}</p>
+                          </div>
+                          <div className="bg-gray-50 p-2 rounded">
+                            <p className="text-xs text-gray-600">Vervaldatum</p>
+                            <p className="font-semibold text-gray-900">{(invoice as any).dueDate ? new Date((invoice as any).dueDate).toLocaleDateString('nl-NL') : 'N/A'}</p>
                           </div>
                         </div>
                         {invoice.status === 'rejected' && (invoice as any).rejectionReason && (
