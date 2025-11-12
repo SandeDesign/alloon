@@ -9,8 +9,7 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  CheckCircle,
-  Eye
+  User as UserIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
@@ -31,6 +30,7 @@ export interface ProductionEntry {
   week: number;
   year: number;
   companyId: string;
+  employeeId: string;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +41,7 @@ export interface ProductionWeek {
   week: number;
   year: number;
   companyId: string;
+  employeeId: string;
   userId: string;
   entries: ProductionEntry[];
   status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed';
@@ -52,7 +53,7 @@ export interface ProductionWeek {
 
 const ProjectProduction: React.FC = () => {
   const { user, adminUserId } = useAuth();
-  const { selectedCompany } = useApp();
+  const { selectedCompany, employees } = useApp();
   const { success, error: showError } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -60,8 +61,10 @@ const ProjectProduction: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<number>(getWeekNumber(new Date()));
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [productionData, setProductionData] = useState<ProductionWeek | null>(null);
   const [entries, setEntries] = useState<ProductionEntry[]>([]);
+  const [linkedEmployees, setLinkedEmployees] = useState<any[]>([]);
 
   const loadProductionData = useCallback(async () => {
     if (!user || !adminUserId || !selectedCompany) {
@@ -71,11 +74,26 @@ const ProjectProduction: React.FC = () => {
 
     try {
       setLoading(true);
+
+      // Get linked employees for this project company
+      const linked = employees.filter(emp =>
+        emp.workCompanies?.includes(selectedCompany.id) ||
+        emp.projectCompanies?.includes(selectedCompany.id)
+      );
+
+      setLinkedEmployees(linked);
+
+      // Auto-select first employee if available
+      if (linked.length > 0 && !selectedEmployeeId) {
+        setSelectedEmployeeId(linked[0].id);
+      }
+
       // Initialize empty production week
       const newWeek: ProductionWeek = {
         week: selectedWeek,
         year: selectedYear,
         companyId: selectedCompany.id,
+        employeeId: selectedEmployeeId || linked[0]?.id || '',
         userId: adminUserId,
         entries: [],
         status: 'draft',
@@ -93,11 +111,24 @@ const ProjectProduction: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, adminUserId, selectedCompany, selectedWeek, selectedYear, showError]);
+  }, [user, adminUserId, selectedCompany, selectedEmployeeId, employees, showError]);
 
   const handleImportFromMake = async () => {
     if (!selectedCompany) {
       showError('Fout', 'Selecteer eerst een bedrijf');
+      return;
+    }
+
+    if (!selectedEmployeeId) {
+      showError('Fout', 'Selecteer een medewerker');
+      return;
+    }
+
+    // Get selected employee
+    const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+
+    if (!selectedEmployee) {
+      showError('Fout', 'Medewerker niet gevonden');
       return;
     }
 
@@ -114,7 +145,15 @@ const ProjectProduction: React.FC = () => {
             action: 'get_production_data',
             week: selectedWeek,
             year: selectedYear,
-            companyId: selectedCompany.id
+            companyId: selectedCompany.id,
+            // 🔥 Specifieke medewerker
+            employee: {
+              id: selectedEmployee.id,
+              firstName: selectedEmployee.personalInfo.firstName,
+              lastName: selectedEmployee.personalInfo.lastName,
+              fullName: `${selectedEmployee.personalInfo.firstName} ${selectedEmployee.personalInfo.lastName}`
+            },
+            employeeName: `${selectedEmployee.personalInfo.firstName} ${selectedEmployee.personalInfo.lastName}`
           })
         }
       );
@@ -130,11 +169,10 @@ const ProjectProduction: React.FC = () => {
         Array.isArray(productionResponse) &&
         productionResponse.length > 0
       ) {
-        await processProductionData(productionResponse);
+        await processProductionData(productionResponse, selectedEmployeeId);
         success('Import geslaagd', `${productionResponse.length} productie entries geïmporteerd`);
-        await loadProductionData();
       } else {
-        showError('Geen data', 'Geen productie gegevens gevonden voor deze week');
+        showError('Geen data', 'Geen productie gegevens gevonden voor deze week/medewerker');
       }
     } catch (error) {
       console.error('Error importing production data:', error);
@@ -144,7 +182,7 @@ const ProjectProduction: React.FC = () => {
     }
   };
 
-  const processProductionData = async (rawData: any[]) => {
+  const processProductionData = async (rawData: any[], employeeId: string) => {
     const normalizedEntries: ProductionEntry[] = rawData.map((record) => {
       const data = record.data || record;
       return {
@@ -156,6 +194,7 @@ const ProjectProduction: React.FC = () => {
         week: selectedWeek,
         year: selectedYear,
         companyId: selectedCompany!.id,
+        employeeId: employeeId,
         userId: adminUserId!,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -168,6 +207,7 @@ const ProjectProduction: React.FC = () => {
       week: selectedWeek,
       year: selectedYear,
       companyId: selectedCompany!.id,
+      employeeId: employeeId,
       userId: adminUserId!,
       entries: normalizedEntries,
       status: 'draft',
@@ -213,6 +253,7 @@ const ProjectProduction: React.FC = () => {
       week: selectedWeek,
       year: selectedYear,
       companyId: selectedCompany!.id,
+      employeeId: selectedEmployeeId,
       userId: adminUserId!,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -316,6 +357,22 @@ const ProjectProduction: React.FC = () => {
     );
   }
 
+  if (linkedEmployees.length === 0) {
+    return (
+      <div className="space-y-6 px-4 sm:px-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productie Verwerking</h1>
+        <EmptyState
+          icon={UserIcon}
+          title="Geen medewerkers gekoppeld"
+          description="Koppel eerst medewerkers aan dit projectbedrijf om productie in te voeren."
+        />
+      </div>
+    );
+  }
+
+  // Get selected employee info
+  const selectedEmployee = employees.find(emp => emp.id === selectedEmployeeId);
+
   return (
     <div className="space-y-3 sm:space-y-6 px-4 sm:px-0 pb-24 sm:pb-6">
       {/* Header */}
@@ -327,8 +384,9 @@ const ProjectProduction: React.FC = () => {
           </p>
         </div>
 
-        {/* Week Navigation + Controls */}
+        {/* Week Navigation + Employee Selector + Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Week Selector */}
           <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
             <button
               onClick={() => changeWeek(-1)}
@@ -350,10 +408,26 @@ const ProjectProduction: React.FC = () => {
             </button>
           </div>
 
+          {/* Employee Selector */}
+          {linkedEmployees.length > 1 && (
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Selecteer medewerker...</option>
+              {linkedEmployees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.personalInfo.firstName} {emp.personalInfo.lastName}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Import Button */}
           <Button
             onClick={handleImportFromMake}
-            disabled={importing || saving}
+            disabled={importing || saving || !selectedEmployeeId}
             variant="secondary"
             size="sm"
             className="text-xs sm:text-sm"
@@ -372,6 +446,23 @@ const ProjectProduction: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Selected Employee Info */}
+      {selectedEmployee && (
+        <Card className="bg-blue-50 border-blue-200 p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 rounded-full p-2">
+              <UserIcon className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-blue-600 font-medium">Geselecteerde medewerker</p>
+              <p className="font-semibold text-gray-900">
+                {selectedEmployee.personalInfo.firstName} {selectedEmployee.personalInfo.lastName}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Summary Card */}
       {productionData && (
@@ -534,7 +625,7 @@ const ProjectProduction: React.FC = () => {
                           className="text-xs text-center"
                           placeholder="0"
                         />
-                      </div>
+                      </td>
                       <div className="flex items-end">
                         <button
                           onClick={() => removeEntry(index)}
