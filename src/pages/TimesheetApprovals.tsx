@@ -318,15 +318,14 @@ export default function TimesheetApprovals() {
                       </div>
                     </div>
 
-                    {/* Buttons Container - ALTIJD zichtbaar */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Buttons Container - ALTIJD zichtbaar en klikbaar */}
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           setDashboardEmployeeId(summary.employeeId);
                           setShowDashboardModal(true);
                         }}
-                        className="px-2 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold hover:bg-blue-200 flex items-center gap-1 whitespace-nowrap"
+                        className="px-2 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold hover:bg-blue-200 active:bg-blue-300 flex items-center gap-1 whitespace-nowrap transition-colors"
                         title="Dashboard met alle weken"
                       >
                         <BarChart3 className="h-3 w-3" />
