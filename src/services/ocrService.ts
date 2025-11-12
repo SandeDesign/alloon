@@ -237,11 +237,21 @@ export const extractInvoiceData = (ocrText: string) => {
   const invoiceDate = dates.length > 0 ? dates[0] : new Date();
   const dueDate = dates.length > 1 ? dates[1] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  // ===== AMOUNTS - Proper Dutch invoice parsing =====
+  // ===== AMOUNTS - NEDERLANDSE format ONLY =====
   const parseAmount = (str?: string): number => {
     if (!str) return 0;
-    // Remove dots (thousands separator) and replace comma with dot
-    return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    
+    let cleaned = str.trim().replace(/€/g, '').trim();
+    
+    // Nederlands format ALTIJD: 15.339,66 (dot=thousands separator, comma=decimal)
+    // Stap 1: Vervang ALLE punten door niks (thousands separators)
+    cleaned = cleaned.replace(/\./g, '');
+    
+    // Stap 2: Vervang komma door punt (decimal separator)
+    cleaned = cleaned.replace(',', '.');
+    
+    const result = parseFloat(cleaned) || 0;
+    return Math.round(result * 100) / 100; // Round to 2 decimals
   };
 
   // Subtotal excl VAT
