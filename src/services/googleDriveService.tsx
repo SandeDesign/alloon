@@ -10,7 +10,7 @@ let accessToken: string | null = null;
 /**
  * Request Google Drive access token via OAuth2
  */
-export const requestGoogleDriveToken = async (): Promise<string> => {
+export const requestGoogleDriveToken = async (userEmail?: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.append('client_id', CLIENT_ID);
@@ -18,6 +18,10 @@ export const requestGoogleDriveToken = async (): Promise<string> => {
     authUrl.searchParams.append('response_type', 'token');
     authUrl.searchParams.append('scope', SCOPES.join(' '));
     authUrl.searchParams.append('prompt', 'consent');
+    
+    if (userEmail) {
+      authUrl.searchParams.append('login_hint', userEmail);
+    }
 
     const width = 500;
     const height = 600;
@@ -65,6 +69,87 @@ export const requestGoogleDriveToken = async (): Promise<string> => {
       reject(new Error('Google auth timeout'));
     }, 600000);
   });
+};
+
+/**
+ * Silent refresh - automatic token refresh met minimale user interaction
+ */
+export const silentRefreshGoogleToken = async (userId: string, userEmail?: string): Promise<string | null> => {
+  try {
+    const token = await getGoogleDriveToken(userId);
+    
+    // Token still valid
+    if (token) {
+      return token;
+    }
+
+    // Token expired - refresh silently
+    console.log('Token expired, refreshing silently...');
+    
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.append('client_id', CLIENT_ID);
+    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    authUrl.searchParams.append('response_type', 'token');
+    authUrl.searchParams.append('scope', SCOPES.join(' '));
+    authUrl.searchParams.append('prompt', ''); // Empty prompt = silent refresh
+    
+    if (userEmail) {
+      authUrl.searchParams.append('login_hint', userEmail);
+    }
+
+    return new Promise((resolve) => {
+      const popup = window.open(
+        authUrl.toString(),
+        'google_silent_refresh',
+        'width=1,height=1,left=-9999,top=-9999'
+      );
+
+      if (!popup) {
+        console.warn('Silent refresh popup blocked');
+        resolve(null);
+        return;
+      }
+
+      const checkPopup = setInterval(() => {
+        try {
+          if (!popup.closed) {
+            const popupUrl = popup.location.href;
+            if (popupUrl.includes('access_token=')) {
+              const urlParams = new URLSearchParams(popupUrl.split('#')[1]);
+              const newToken = urlParams.get('access_token');
+              
+              if (newToken) {
+                accessToken = newToken;
+                clearInterval(checkPopup);
+                popup.close();
+                
+                // Save new token
+                saveGoogleDriveToken(userId, newToken).catch(err => {
+                  console.error('Error saving refreshed token:', err);
+                });
+                
+                resolve(newToken);
+              }
+            }
+          } else {
+            clearInterval(checkPopup);
+            resolve(null);
+          }
+        } catch (e) {
+          // Cross-origin, normal
+        }
+      }, 500);
+
+      setTimeout(() => {
+        clearInterval(checkPopup);
+        if (!popup.closed) popup.close();
+        resolve(null);
+      }, 30000); // 30 second timeout for silent refresh
+    });
+  } catch (error) {
+    console.error('Silent refresh error:', error);
+    return null;
+  }
 };
 
 /**
@@ -259,6 +344,7 @@ export const uploadInvoiceToDrive = async (
   companyId: string,
   companyName: string,
   userId: string,
+  userEmail?: string,
   metadata?: {
     supplierName?: string;
     invoiceNumber?: string;
@@ -270,7 +356,11 @@ export const uploadInvoiceToDrive = async (
   driveWebLink: string;
 }> => {
   try {
-    const token = await getGoogleDriveToken(userId);
+    console.log('Getting/refreshing Google Drive token...');
+    
+    // Try to get token, silently refresh if expired
+    let token = await silentRefreshGoogleToken(userId, userEmail);
+    
     if (!token) {
       throw new Error('Google Drive not connected. Please connect in Settings.');
     }
