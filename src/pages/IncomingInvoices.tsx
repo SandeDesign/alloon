@@ -1,308 +1,436 @@
-import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, query, where, Timestamp, updateDoc, doc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Upload,
+  Download,
+  Search,
+  Calendar,
+  Euro,
+  Building2,
+  User,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  FileText,
+  Scan,
+  Trash2,
+  HardDrive
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { useToast } from '../hooks/useToast';
+import { EmptyState } from '../components/ui/EmptyState';
+import { incomingInvoiceService, IncomingInvoice } from '../services/incomingInvoiceService';
+import { uploadInvoiceToDrive, requestGoogleDriveAccess } from '../services/googleDriveService';
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID || '896567545879-rr9ggafhleoid5vcokd1mb2vquuk9jdd.apps.googleusercontent.com';
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
-let tokenClient: any = null;
-let accessToken: string | null = null;
+const IncomingInvoices: React.FC = () => {
+  const { user } = useAuth();
+  const { selectedCompany } = useApp();
+  const { success, error: showError } = useToast();
+  const [invoices, setInvoices] = useState<IncomingInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isDragOver, setIsDragOver] = useState(false);
 
-/**
- * Initialize Google Drive API
- */
-export const initGoogleDrive = async () => {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      // @ts-ignore
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES.join(' '),
-        callback: (response: any) => {
-          if (response.access_token) {
-            accessToken = response.access_token;
-            resolve(true);
-          } else {
-            reject(new Error('Failed to get access token'));
-          }
-        },
+  const loadInvoices = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const invoicesData = await incomingInvoiceService.getInvoices(
+        user.uid, 
+        selectedCompany?.id
+      );
+      setInvoices(invoicesData);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      showError('Fout bij laden', 'Kon facturen niet laden');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, selectedCompany, showError]);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  // Initialize Google Drive access on mount
+  useEffect(() => {
+    if (user) {
+      requestGoogleDriveAccess().catch(err => {
+        console.warn('Google Drive not initialized yet:', err);
       });
-      resolve(true);
-    };
-    script.onerror = () => reject(new Error('Failed to load Google API'));
-    document.body.appendChild(script);
-  });
-};
+    }
+  }, [user]);
 
-/**
- * Request access token from user
- */
-export const requestGoogleDriveAccess = async () => {
-  if (!tokenClient) {
-    await initGoogleDrive();
-  }
-  
-  if (accessToken) {
-    return accessToken;
-  }
+  const handleFileUpload = async (files: FileList) => {
+    if (!files.length || !selectedCompany || !user) return;
 
-  return new Promise((resolve, reject) => {
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-    
-    // Wait for token callback
-    const checkToken = setInterval(() => {
-      if (accessToken) {
-        clearInterval(checkToken);
-        resolve(accessToken);
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
+          showError('Ongeldig bestandstype', 'Alleen PDF en afbeeldingen zijn toegestaan');
+          continue;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          showError('Bestand te groot', 'Maximaal 10MB per bestand');
+          continue;
+        }
+
+        // Upload to Google Drive
+        await uploadInvoiceToDrive(
+          file,
+          selectedCompany.id,
+          selectedCompany.name,
+          user.uid
+        );
       }
-    }, 100);
-
-    setTimeout(() => {
-      clearInterval(checkToken);
-      reject(new Error('Token request timeout'));
-    }, 30000);
-  });
-};
-
-/**
- * Create or get folder in Google Drive
- */
-export const createOrGetFolder = async (folderName: string, parentFolderId?: string): Promise<string> => {
-  const token = await requestGoogleDriveAccess();
-
-  // Search for existing folder
-  const query_str = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${
-    parentFolderId ? ` and '${parentFolderId}' in parents` : ''
-  }`;
-
-  const searchResponse = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query_str)}&spaces=drive&pageSize=10&fields=files(id,name)`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      
+      success('Bestanden geüpload', 'Facturen zijn naar Google Drive geüpload');
+      loadInvoices();
+    } catch (error) {
+      console.error('Upload error:', error);
+      showError('Fout bij uploaden', error instanceof Error ? error.message : 'Kon bestanden niet uploaden');
+    } finally {
+      setUploading(false);
     }
-  );
-
-  const searchData = await searchResponse.json();
-
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id;
-  }
-
-  // Create new folder if not found
-  const metadata = {
-    name: folderName,
-    mimeType: 'application/vnd.google-apps.folder',
-    ...(parentFolderId && { parents: [parentFolderId] }),
   };
 
-  const createResponse = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(metadata),
-  });
-
-  const createData = await createResponse.json();
-
-  if (!createData.id) {
-    throw new Error('Failed to create folder');
-  }
-
-  return createData.id;
-};
-
-/**
- * Upload file to Google Drive
- */
-export const uploadFileToDrive = async (
-  file: File,
-  folderId: string,
-  fileName?: string
-): Promise<{
-  fileId: string;
-  webViewLink: string;
-  downloadLink: string;
-  name: string;
-}> => {
-  const token = await requestGoogleDriveAccess();
-
-  const formData = new FormData();
-
-  const metadata = {
-    name: fileName || file.name,
-    parents: [folderId],
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFileUpload(e.dataTransfer.files);
   };
 
-  formData.append(
-    'metadata',
-    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-  );
-  formData.append('file', file);
-
-  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Upload failed: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  return {
-    fileId: data.id,
-    webViewLink: data.webViewLink,
-    downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
-    name: data.name,
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
   };
-};
 
-/**
- * Save invoice metadata to Firestore with Drive reference
- */
-export const saveInvoiceWithDriveFile = async (
-  invoiceData: any,
-  driveFileId: string,
-  driveWebLink: string,
-  userId: string,
-  companyId: string
-): Promise<string> => {
-  try {
-    const now = new Date();
-    const docData = {
-      ...invoiceData,
-      userId,
-      companyId,
-      driveFileId,
-      driveWebLink,
-      fileUrl: driveWebLink, // For compatibility
-      status: 'pending',
-      invoiceDate: Timestamp.fromDate(invoiceData.invoiceDate || now),
-      dueDate: Timestamp.fromDate(invoiceData.dueDate || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)),
-      createdAt: Timestamp.fromDate(now),
-      updatedAt: Timestamp.fromDate(now),
-      ocrProcessed: false,
-    };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
-    const docRef = await addDoc(collection(db, 'incomingInvoices'), docData);
-    return docRef.id;
-  } catch (error) {
-    console.error('Error saving invoice:', error);
-    throw new Error('Kon factuur niet opslaan');
-  }
-};
-
-/**
- * Get Drive folder ID for company (create if not exists)
- */
-export const getOrCreateCompanyDriveFolder = async (
-  companyId: string,
-  companyName: string,
-  userId: string
-): Promise<string> => {
-  try {
-    // Check if folder ID is already stored in Firestore
-    const q = query(
-      collection(db, 'driveFolders'),
-      where('companyId', '==', companyId),
-      where('userId', '==', userId)
-    );
-
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.docs.length > 0) {
-      return querySnapshot.docs[0].data().folderId;
+  const handleApprove = async (invoiceId: string) => {
+    if (!user) return;
+    
+    try {
+      await incomingInvoiceService.approveInvoice(invoiceId, user.uid);
+      success('Factuur goedgekeurd', 'De factuur is goedgekeurd voor betaling');
+      loadInvoices();
+    } catch (error) {
+      showError('Fout bij goedkeuren', 'Kon factuur niet goedkeuren');
     }
+  };
 
-    // Create main company folder
-    const companyFolderId = await createOrGetFolder(`${companyName} - Documenten`);
+  const handleReject = async (invoiceId: string) => {
+    const reason = prompt('Reden voor afwijzing:');
+    if (!reason) return;
+    
+    try {
+      await incomingInvoiceService.rejectInvoice(invoiceId, reason);
+      success('Factuur afgewezen', 'De factuur is afgewezen');
+      loadInvoices();
+    } catch (error) {
+      showError('Fout bij afwijzen', 'Kon factuur niet afwijzen');
+    }
+  };
 
-    // Create subfolder for incoming invoices
-    const invoicesFolderId = await createOrGetFolder(
-      'Inkomende Facturen',
-      companyFolderId
-    );
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    try {
+      await incomingInvoiceService.markAsPaid(invoiceId);
+      success('Factuur betaald', 'De factuur is gemarkeerd als betaald');
+      loadInvoices();
+    } catch (error) {
+      showError('Fout bij bijwerken', 'Kon factuur niet als betaald markeren');
+    }
+  };
 
-    // Store folder reference in Firestore
-    await addDoc(collection(db, 'driveFolders'), {
-      companyId,
-      userId,
-      companyFolderId,
-      invoicesFolderId,
-      createdAt: Timestamp.fromDate(new Date()),
-    });
+  const handleDelete = async (invoiceId: string) => {
+    if (!confirm('Weet je zeker dat je deze factuur wilt verwijderen?')) return;
+    
+    try {
+      await incomingInvoiceService.deleteInvoice(invoiceId);
+      success('Factuur verwijderd', 'De factuur is succesvol verwijderd');
+      loadInvoices();
+    } catch (error) {
+      showError('Fout bij verwijderen', 'Kon factuur niet verwijderen');
+    }
+  };
 
-    return invoicesFolderId;
-  } catch (error) {
-    console.error('Error getting/creating company folder:', error);
-    throw new Error('Kon Drive map niet aanmaken');
+  const handleDownload = (invoice: IncomingInvoice) => {
+    window.open(invoice.fileUrl, '_blank');
+  };
+
+  const getStatusColor = (status: IncomingInvoice['status']) => {
+    switch (status) {
+      case 'pending': return 'text-orange-600 bg-orange-100';
+      case 'approved': return 'text-blue-600 bg-blue-100';
+      case 'paid': return 'text-green-600 bg-green-100';
+      case 'rejected': return 'text-red-600 bg-red-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getStatusIcon = (status: IncomingInvoice['status']) => {
+    switch (status) {
+      case 'pending': return Clock;
+      case 'approved': return CheckCircle;
+      case 'paid': return CheckCircle;
+      case 'rejected': return AlertCircle;
+      default: return Clock;
+    }
+  };
+
+  const getStatusText = (status: IncomingInvoice['status']) => {
+    switch (status) {
+      case 'pending': return 'In behandeling';
+      case 'approved': return 'Goedgekeurd';
+      case 'paid': return 'Betaald';
+      case 'rejected': return 'Afgewezen';
+      default: return status;
+    }
+  };
+
+  const filteredInvoices = invoices.filter(invoice => {
+    const matchesSearch = invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  if (loading) {
+    return <LoadingSpinner />;
   }
+
+  if (!selectedCompany) {
+    return (
+      <EmptyState
+        icon={Building2}
+        title="Geen bedrijf geselecteerd"
+        description="Selecteer een bedrijf om facturen te beheren"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Inkomende Facturen</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Beheer inkomende facturen voor {selectedCompany.name}
+          </p>
+        </div>
+        <div className="flex space-x-2 mt-4 sm:mt-0">
+          <label className="cursor-pointer">
+            <Button as="span" icon={Upload} disabled={uploading}>
+              {uploading ? 'Uploaden...' : 'Upload Factuur'}
+            </Button>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,image/*"
+              className="hidden"
+              onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Upload Zone */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragOver 
+            ? 'border-blue-400 bg-blue-50' 
+            : 'border-gray-300 hover:border-gray-400'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        <HardDrive className="mx-auto h-12 w-12 text-blue-400" />
+        <p className="mt-2 text-sm text-gray-600">
+          Sleep facturen hierheen of{' '}
+          <label className="font-medium text-blue-600 hover:text-blue-500 cursor-pointer">
+            selecteer bestanden
+            <input
+              type="file"
+              multiple
+              accept=".pdf,image/*"
+              className="hidden"
+              onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+            />
+          </label>
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          PDF, PNG, JPG tot 10MB per bestand - Geüpload naar Google Drive
+        </p>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Zoek op leverancier of factuurnummer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="sm:w-48">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">Alle statussen</option>
+                <option value="pending">In behandeling</option>
+                <option value="approved">Goedgekeurd</option>
+                <option value="paid">Betaald</option>
+                <option value="rejected">Afgewezen</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Invoices List */}
+      {filteredInvoices.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Geen facturen gevonden"
+          description={searchTerm || statusFilter !== 'all' 
+            ? "Geen facturen gevonden die voldoen aan de filters" 
+            : "Upload je eerste factuur"}
+        />
+      ) : (
+        <div className="grid gap-4">
+          {filteredInvoices.map((invoice) => {
+            const StatusIcon = getStatusIcon(invoice.status);
+            return (
+              <Card key={invoice.id}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                          <FileText className="h-6 w-6 text-orange-600" />
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {invoice.invoiceNumber}
+                          </h3>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {getStatusText(invoice.status)}
+                          </span>
+                          {invoice.ocrProcessed && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                              <Scan className="h-3 w-3 mr-1" />
+                              OCR
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-1" />
+                            {invoice.supplierName}
+                          </div>
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            {invoice.invoiceDate.toLocaleDateString('nl-NL')}
+                          </div>
+                          <div className="flex items-center">
+                            <Euro className="h-4 w-4 mr-1" />
+                            €{invoice.totalAmount.toFixed(2)}
+                          </div>
+                        </div>
+                        {invoice.status === 'rejected' && invoice.rejectionReason && (
+                          <div className="mt-2 text-sm text-red-600">
+                            Afgewezen: {invoice.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Download}
+                        onClick={() => handleDownload(invoice)}
+                      >
+                        Download
+                      </Button>
+                      {invoice.status === 'pending' && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={CheckCircle}
+                            onClick={() => handleApprove(invoice.id!)}
+                          >
+                            Goedkeuren
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon={AlertCircle}
+                            onClick={() => handleReject(invoice.id!)}
+                          >
+                            Afwijzen
+                          </Button>
+                        </>
+                      )}
+                      {invoice.status === 'approved' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={CheckCircle}
+                          onClick={() => handleMarkAsPaid(invoice.id!)}
+                        >
+                          Betaald
+                        </Button>
+                      )}
+                      {(invoice.status === 'rejected' || invoice.status === 'pending') && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => handleDelete(invoice.id!)}
+                        >
+                          Verwijderen
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 };
 
-/**
- * Upload invoice directly to Drive
- */
-export const uploadInvoiceToDrive = async (
-  file: File,
-  companyId: string,
-  companyName: string,
-  userId: string,
-  metadata?: {
-    supplierName?: string;
-    invoiceNumber?: string;
-    amount?: number;
-  }
-): Promise<{
-  invoiceId: string;
-  driveFileId: string;
-  driveWebLink: string;
-}> => {
-  try {
-    // Get or create company Drive folder
-    const invoicesFolderId = await getOrCreateCompanyDriveFolder(
-      companyId,
-      companyName,
-      userId
-    );
-
-    // Upload file to Drive
-    const uploadResult = await uploadFileToDrive(
-      file,
-      invoicesFolderId,
-      `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.pdf`
-    );
-
-    // Save invoice record to Firestore with Drive reference
-    const invoiceId = await saveInvoiceWithDriveFile(
-      {
-        supplierName: metadata?.supplierName || 'Onbekend',
-        invoiceNumber: metadata?.invoiceNumber || `INV-${Date.now()}`,
-        amount: metadata?.amount || 0,
-        fileName: file.name,
-      },
-      uploadResult.fileId,
-      uploadResult.webViewLink,
-      userId,
-      companyId
-    );
-
-    return {
-      invoiceId,
-      driveFileId: uploadResult.fileId,
-      driveWebLink: uploadResult.webViewLink,
-    };
-  } catch (error) {
-    console.error('Error uploading invoice to Drive:', error);
-    throw error;
-  }
-};
+export default IncomingInvoices;
