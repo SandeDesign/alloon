@@ -513,9 +513,20 @@ export default function TimesheetApprovals() {
                               <span className={`font-bold text-sm ${percentage < 85 ? 'text-red-600' : 'text-green-600'}`}>
                                 {timesheet.totalRegularHours}u
                               </span>
+                              {timesheet.status === 'approved' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-green-200 text-green-700 font-semibold flex items-center gap-1">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Goedgekeurd
+                                </span>
+                              )}
                               {isPending && (
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-200 text-orange-700 font-semibold">
                                   Wachten
+                                </span>
+                              )}
+                              {timesheet.status === 'rejected' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-200 text-red-700 font-semibold">
+                                  Afgekeurd
                                 </span>
                               )}
                             </div>
@@ -532,6 +543,9 @@ export default function TimesheetApprovals() {
                           </div>
                           {timesheet.lowHoursExplanation && (
                             <p className="text-xs text-red-600 mt-1 italic">⚠️ {timesheet.lowHoursExplanation}</p>
+                          )}
+                          {timesheet.approvedAt && (
+                            <p className="text-xs text-green-600 mt-1 font-semibold">✓ Goedgekeurd op {timesheet.approvedAt.toLocaleDateString('nl-NL')}</p>
                           )}
                         </div>
                       );
