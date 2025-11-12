@@ -13,7 +13,6 @@ import {
   Clock,
   FileText,
   Scan,
-  RefreshCw,
   Trash2,
   Archive,
   HardDrive
@@ -26,6 +25,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
 import { EmptyState } from '../components/ui/EmptyState';
 import { incomingInvoiceService, IncomingInvoice } from '../services/incomingInvoiceService';
+import { firebaseStorageHelper } from '../utils/firebase-storage-helper';
 
 const IncomingInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -35,6 +35,7 @@ const IncomingInvoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [archiving, setArchiving] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -76,7 +77,7 @@ const IncomingInvoices: React.FC = () => {
           continue;
         }
 
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        if (file.size > 10 * 1024 * 1024) {
           showError('Bestand te groot', 'Maximaal 10MB per bestand');
           continue;
         }
@@ -117,6 +118,34 @@ const IncomingInvoices: React.FC = () => {
       showError('Fout bij archiveren', error instanceof Error ? error.message : 'Kon factuur niet archiveren');
     } finally {
       setArchiving(null);
+    }
+  };
+
+  const handleDownloadFile = async (invoice: IncomingInvoice) => {
+    if (!selectedCompany) return;
+    
+    setDownloading(invoice.id!);
+    try {
+      const storagePath = `incoming-invoices/${selectedCompany.id}/${Date.now()}-${invoice.fileName}`;
+      await firebaseStorageHelper.downloadFile(storagePath, invoice.fileName);
+      success('Download gestart', `${invoice.fileName} wordt gedownload`);
+    } catch (error) {
+      console.error('Download error:', error);
+      showError('Download fout', 'Kon bestand niet downloaden');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleViewFile = async (invoice: IncomingInvoice) => {
+    if (!selectedCompany) return;
+    
+    try {
+      const storagePath = `incoming-invoices/${selectedCompany.id}/${Date.now()}-${invoice.fileName}`;
+      await firebaseStorageHelper.viewFile(storagePath);
+    } catch (error) {
+      console.error('View error:', error);
+      showError('View fout', 'Kon bestand niet openen');
     }
   };
 
@@ -181,10 +210,6 @@ const IncomingInvoices: React.FC = () => {
     } catch (error) {
       showError('Fout bij verwijderen', 'Kon factuur niet verwijderen');
     }
-  };
-
-  const handleDownload = (invoice: IncomingInvoice) => {
-    window.open(invoice.fileUrl, '_blank');
   };
 
   const getStatusColor = (status: IncomingInvoice['status']) => {
@@ -366,6 +391,9 @@ const IncomingInvoices: React.FC = () => {
         <div className="grid gap-4">
           {filteredInvoices.map((invoice) => {
             const StatusIcon = getStatusIcon(invoice.status);
+            const isDownloading = downloading === invoice.id;
+            const isArchiving = archiving === invoice.id;
+
             return (
               <Card key={invoice.id}>
                 <div className="p-6">
@@ -428,10 +456,22 @@ const IncomingInvoices: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        icon={Download}
-                        onClick={() => handleDownload(invoice)}
+                        icon={Eye}
+                        onClick={() => handleViewFile(invoice)}
+                        disabled={isDownloading}
+                        title="Open PDF in nieuw venster"
                       >
-                        Download
+                        Bekijken
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Download}
+                        onClick={() => handleDownloadFile(invoice)}
+                        disabled={isDownloading}
+                        className={isDownloading ? 'opacity-50' : ''}
+                      >
+                        {isDownloading ? 'Download...' : 'Download'}
                       </Button>
                       {invoice.status === 'pending' && (
                         <>
@@ -460,9 +500,10 @@ const IncomingInvoices: React.FC = () => {
                             size="sm"
                             icon={Archive}
                             onClick={() => handleArchiveToGoogleDrive(invoice.id!)}
-                            disabled={archiving === invoice.id}
+                            disabled={isArchiving}
+                            className={isArchiving ? 'opacity-50' : ''}
                           >
-                            {archiving === invoice.id ? 'Archiveren...' : 'Archiveren'}
+                            {isArchiving ? 'Archiveren...' : 'Archiveren'}
                           </Button>
                           <Button
                             variant="primary"
