@@ -2,67 +2,73 @@ import { db } from '../lib/firebase';
 import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 
 const CLIENT_ID = '896567545879-t7ps2toen24v8nrjn5ulf59esnjg1hok.apps.googleusercontent.com';
+const REDIRECT_URI = window.location.origin;
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
-let gapiLoaded = false;
 let accessToken: string | null = null;
 
 /**
- * Load and initialize Google API
+ * Request Google Drive access token via OAuth2
  */
-export const loadGoogleApi = async (): Promise<void> => {
-  if (gapiLoaded) return;
-
+export const requestGoogleDriveToken = async (): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.async = true;
-    script.onload = () => {
-      // @ts-ignore
-      gapi.load('client:auth2', () => {
-        // @ts-ignore
-        gapi.client
-          .init({
-            clientId: CLIENT_ID,
-            scope: SCOPES.join(' '),
-          })
-          .then(() => {
-            gapiLoaded = true;
-            resolve();
-          })
-          .catch((err: any) => {
-            console.error('Failed to init gapi:', err);
-            reject(err);
-          });
-      });
-    };
-    script.onerror = () => reject(new Error('Failed to load Google API'));
-    document.body.appendChild(script);
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.append('client_id', CLIENT_ID);
+    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    authUrl.searchParams.append('response_type', 'token');
+    authUrl.searchParams.append('scope', SCOPES.join(' '));
+    authUrl.searchParams.append('prompt', 'consent');
+
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      authUrl.toString(),
+      'google_auth',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (!popup) {
+      reject(new Error('Popup blocked'));
+      return;
+    }
+
+    const checkPopup = setInterval(() => {
+      try {
+        if (!popup.closed) {
+          const popupUrl = popup.location.href;
+          if (popupUrl.includes('access_token=')) {
+            const urlParams = new URLSearchParams(popupUrl.split('#')[1]);
+            const token = urlParams.get('access_token');
+            
+            if (token) {
+              accessToken = token;
+              clearInterval(checkPopup);
+              popup.close();
+              resolve(token);
+            }
+          }
+        } else {
+          clearInterval(checkPopup);
+          reject(new Error('Popup closed by user'));
+        }
+      } catch (e) {
+        // Cross-origin error, popup is on different domain (normal)
+      }
+    }, 500);
+
+    setTimeout(() => {
+      clearInterval(checkPopup);
+      if (!popup.closed) popup.close();
+      reject(new Error('Google auth timeout'));
+    }, 600000);
   });
 };
 
 /**
- * Sign in to Google Drive
- */
-export const signInToGoogleDrive = async (): Promise<string> => {
-  try {
-    await loadGoogleApi();
-
-    // @ts-ignore
-    const auth2 = gapi.auth2.getAuthInstance();
-    const user = await auth2.signIn();
-    const authResponse = user.getAuthResponse();
-    
-    accessToken = authResponse.id_token;
-    return authResponse.id_token;
-  } catch (error) {
-    console.error('Google sign in error:', error);
-    throw new Error('Kon niet inloggen met Google');
-  }
-};
-
-/**
- * Save Google Drive token to Firestore
+ * Save token to Firestore
  */
 export const saveGoogleDriveToken = async (userId: string, token: string) => {
   try {
@@ -78,7 +84,7 @@ export const saveGoogleDriveToken = async (userId: string, token: string) => {
 };
 
 /**
- * Get Google Drive token from Firestore
+ * Get token from Firestore
  */
 export const getGoogleDriveToken = async (userId: string): Promise<string | null> => {
   try {
@@ -90,7 +96,7 @@ export const getGoogleDriveToken = async (userId: string): Promise<string | null
     const expiresAt = data.expiresAt.toDate();
 
     if (new Date() > expiresAt) {
-      return null; // Token expired
+      return null;
     }
 
     return data.token;
@@ -101,7 +107,7 @@ export const getGoogleDriveToken = async (userId: string): Promise<string | null
 };
 
 /**
- * Create or get folder in Google Drive
+ * Create or get folder
  */
 export const createOrGetFolder = async (folderName: string, token: string, parentFolderId?: string): Promise<string> => {
   const query_str = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${
@@ -148,7 +154,7 @@ export const createOrGetFolder = async (folderName: string, token: string, paren
 };
 
 /**
- * Upload file to Google Drive
+ * Upload file to Drive
  */
 export const uploadFileToDrive = async (
   file: File,
@@ -233,7 +239,7 @@ export const getOrCreateCompanyDriveFolder = async (
 };
 
 /**
- * Get existing company folder structure
+ * Get company folder structure
  */
 export const getCompanyDriveFolders = async (companyId: string) => {
   try {
