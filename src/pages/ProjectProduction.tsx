@@ -18,6 +18,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../hooks/useToast';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export interface ProductionEntry {
   id?: string;
@@ -112,6 +114,7 @@ const ProjectProduction: React.FC = () => {
     }
   }, [user, adminUserId, selectedCompany, selectedEmployeeId, employees, showError]);
 
+  // 🔥 WEBHOOK: Import production data
   const handleImportFromMake = async () => {
     if (!selectedCompany) {
       showError('Fout', 'Selecteer eerst een bedrijf');
@@ -218,7 +221,6 @@ const ProjectProduction: React.FC = () => {
   };
 
   const processProductionData = async (rawData: any[], employeeId: string) => {
-    // 🔥 Zelfde pattern als Timesheets.tsx
     console.log('🔍 Raw data received:', rawData);
     console.log('🔍 Raw data length:', rawData.length);
     
@@ -227,8 +229,6 @@ const ProjectProduction: React.FC = () => {
       console.log(`Entry ${idx} raw:`, record);
       console.log(`Entry ${idx} extracted data:`, data);
       
-      // Extract data - Make.com returns with numeric keys (0, 1, 2, 3, 4, 5)
-      // 0: Monteur, 1: Datum, 2: Uren, 3: Opdrachtgever, 4: Locaties, 5: Week
       let monteur = '';
       let datum = '';
       let uren = 0;
@@ -239,10 +239,10 @@ const ProjectProduction: React.FC = () => {
       if (data['0'] !== undefined) {
         console.log(`Entry ${idx} using numeric indices`);
         monteur = data['0'] || '';
-        datum = data['1'] ? data['1'].replace(/['"]/g, '') : ''; // Remove quotes
+        datum = data['1'] ? data['1'].replace(/['"]/g, '') : '';
         uren = parseFloat(data['2']) || 0;
         opdrachtgever = data['3'] || '';
-        locaties = data['4'] ? data['4'].replace(/\n/g, ' ').trim() : ''; // Remove newlines
+        locaties = data['4'] ? data['4'].replace(/\n/g, ' ').trim() : '';
       } else {
         // Fallback to named properties
         console.log(`Entry ${idx} using named properties`);
@@ -368,15 +368,59 @@ const ProjectProduction: React.FC = () => {
     }
   };
 
+  // 🔥 FIREBASE: Opslaan naar database
   const handleSave = async () => {
-    if (!productionData || !user || !adminUserId) return;
+    if (!productionData || !user || !adminUserId || entries.length === 0) {
+      showError('Fout', 'Voeg minstens 1 entry toe voordat je opslaat');
+      return;
+    }
 
     setSaving(true);
     try {
-      success('Gegevens opgeslagen', 'Productie gegevens succesvol opgeslagen');
+      // Convert dates to Timestamps for Firestore
+      const dataToSave = {
+        week: productionData.week,
+        year: productionData.year,
+        companyId: productionData.companyId,
+        employeeId: productionData.employeeId,
+        userId: adminUserId,
+        entries: entries.map(entry => ({
+          monteur: entry.monteur,
+          datum: entry.datum,
+          uren: entry.uren,
+          opdrachtgever: entry.opdrachtgever,
+          locaties: entry.locaties,
+          week: entry.week,
+          year: entry.year,
+          companyId: entry.companyId,
+          employeeId: entry.employeeId,
+          userId: entry.userId,
+          createdAt: Timestamp.fromDate(entry.createdAt),
+          updatedAt: Timestamp.fromDate(entry.updatedAt)
+        })),
+        status: 'draft',
+        totalHours: productionData.totalHours,
+        totalEntries: productionData.totalEntries,
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
+      };
+
+      // 🔥 SAVE TO FIRESTORE
+      const docRef = await addDoc(collection(db, 'productionWeeks'), dataToSave);
+      
+      setProductionData({
+        ...productionData,
+        id: docRef.id
+      });
+
+      success('Opgeslagen', `Week ${selectedWeek} productie opgeslagen met ${entries.length} entries`);
+      
+      // Reset form
+      setEntries([]);
+      setProductionData(null);
     } catch (error) {
       console.error('Error saving production data:', error);
-      showError('Fout bij opslaan', 'Kon productie gegevens niet opslaan');
+      showError('Fout bij opslaan', `Kon productie niet opslaan: ${error instanceof Error ? error.message : 'Onbekende fout'}`);
     } finally {
       setSaving(false);
     }
@@ -757,11 +801,11 @@ const ProjectProduction: React.FC = () => {
         <Button
           onClick={handleSave}
           disabled={saving || entries.length === 0}
-          variant="secondary"
+          loading={saving}
           className="flex-1 sm:flex-none"
         >
           <Save className="h-4 w-4 mr-2" />
-          Opslaan
+          {saving ? 'Opslaan...' : 'Opslaan'}
         </Button>
       </div>
     </div>
