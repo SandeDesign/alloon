@@ -9,7 +9,6 @@ import { EmptyState } from '../components/ui/EmptyState';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import { outgoingInvoiceService, OutgoingInvoice, CompanyInfo } from '../services/outgoingInvoiceService';
-import { ITKnechtFactuurService } from '../services/itknechtFactuurService';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -31,6 +30,14 @@ interface InvoiceRelation {
   address?: { street: string; city: string; zipCode: string; country: string };
   kvk?: string;
   taxNumber?: string;
+}
+
+interface ProductionEntry {
+  monteur: string;
+  datum: string;
+  uren: number;
+  opdrachtgever: string;
+  locaties: string;
 }
 
 const OutgoingInvoices: React.FC = () => {
@@ -56,8 +63,9 @@ const OutgoingInvoices: React.FC = () => {
   const [showProductionImport, setShowProductionImport] = useState(false);
   const [productionWeek, setProductionWeek] = useState<number>(0);
   const [productionYear, setProductionYear] = useState<number>(new Date().getFullYear());
-  const [importingProduction, setImportingProduction] = useState(false);
-  const [availableProductionItems, setAvailableProductionItems] = useState<any[]>([]);
+  const [productionMonteur, setProductionMonteur] = useState('');
+  const [loadingProduction, setLoadingProduction] = useState(false);
+  const [availableProductionItems, setAvailableProductionItems] = useState<ProductionEntry[]>([]);
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -118,52 +126,67 @@ const OutgoingInvoices: React.FC = () => {
     }
   }, [user, selectedCompany]);
 
-  // 🔥 Load production items from webhook
-  const handleImportProductionItems = async () => {
-    if (!productionWeek || !selectedCompany) {
-      showError('Fout', 'Selecteer week en bedrijf');
+  // 🔥 Load production data from Firebase
+  const handleLoadProductionData = async () => {
+    if (!productionWeek || !productionMonteur || !user || !selectedCompany) {
+      showError('Fout', 'Vul week en monteur in');
       return;
     }
 
-    setImportingProduction(true);
+    setLoadingProduction(true);
     try {
-      const weekDataList = await ITKnechtFactuurService.fetchFactuurData(
-        productionWeek,
-        productionYear,
-        selectedCompany.id
+      // Query Firebase for production weeks
+      const q = query(
+        collection(db, 'productionWeeks'),
+        where('userId', '==', user.uid),
+        where('week', '==', productionWeek),
+        where('year', '==', productionYear),
+        where('companyId', '==', selectedCompany.id)
       );
 
-      const newItems = ITKnechtFactuurService.transformToInvoiceItems(weekDataList);
-      
-      if (newItems.length === 0) {
-        showError('Geen data', 'Geen productie regels gevonden voor deze week');
-        setImportingProduction(false);
+      const snap = await getDocs(q);
+      let foundEntries: ProductionEntry[] = [];
+
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.entries && Array.isArray(data.entries)) {
+          // Filter entries for selected monteur
+          const monteurEntries = data.entries.filter(
+            (entry: any) => entry.monteur.toLowerCase() === productionMonteur.toLowerCase()
+          );
+          foundEntries = foundEntries.concat(monteurEntries);
+        }
+      });
+
+      if (foundEntries.length === 0) {
+        showError('Geen data', `Geen production data gevonden voor Week ${productionWeek}, ${productionMonteur}`);
+        setLoadingProduction(false);
         return;
       }
 
-      setAvailableProductionItems(newItems);
-      success('Geladen', `${newItems.length} productie regels beschikbaar`);
+      setAvailableProductionItems(foundEntries);
+      success('Geladen', `${foundEntries.length} production entries geladen`);
     } catch (error) {
-      console.error('Error importing production items:', error);
-      showError('Fout', 'Kon production regels niet laden');
+      console.error('Error loading production data:', error);
+      showError('Fout', 'Kon production data niet laden');
     } finally {
-      setImportingProduction(false);
+      setLoadingProduction(false);
     }
   };
 
   // 🔥 Add production item to invoice
-  const addProductionItem = (productionItem: any) => {
+  const addProductionItem = (entry: ProductionEntry) => {
     const newItem = {
       title: 'Production',
-      description: productionItem.description,
-      quantity: productionItem.quantity || 1,
-      rate: productionItem.rate || 0,
-      amount: (productionItem.quantity || 1) * (productionItem.rate || 0)
+      description: `${entry.datum} - ${entry.monteur}\n${entry.uren}u @ ${entry.opdrachtgever}\nLocatie: ${entry.locaties}`,
+      quantity: 1,
+      rate: 0,
+      amount: 0
     };
 
     setItems([...items, newItem]);
     setAvailableProductionItems(
-      availableProductionItems.filter(item => item.description !== productionItem.description)
+      availableProductionItems.filter(item => item !== entry)
     );
     success('Toegevoegd', 'Production regel toegevoegd');
   };
@@ -188,6 +211,8 @@ const OutgoingInvoices: React.FC = () => {
     setItems([{ title: '', description: '', quantity: 1, rate: 0, amount: 0 }]);
     setShowProductionImport(false);
     setAvailableProductionItems([]);
+    setProductionWeek(0);
+    setProductionMonteur('');
     loadRelations();
     generateNextInvoiceNumber();
     setView('create');
@@ -580,7 +605,7 @@ const OutgoingInvoices: React.FC = () => {
             </div>
           </Card>
 
-          {/* 🔥 Production Items Import - SUBTIEL */}
+          {/* 🔥 Production Data - Firebase ONLY */}
           <Card className="p-4 sm:p-5 bg-amber-50 border-amber-200">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -588,8 +613,8 @@ const OutgoingInvoices: React.FC = () => {
                   <Factory className="h-3 w-3 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-amber-700">Production items</p>
-                  <p className="text-xs text-amber-600">Laad production regels</p>
+                  <p className="text-xs font-medium text-amber-700">Production data</p>
+                  <p className="text-xs text-amber-600">Uit database</p>
                 </div>
               </div>
               <button
@@ -617,29 +642,29 @@ const OutgoingInvoices: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-amber-700 mb-1">Jaar</label>
+                    <label className="block text-xs font-medium text-amber-700 mb-1">Monteur</label>
                     <input
-                      type="number"
-                      value={productionYear}
-                      onChange={(e) => setProductionYear(parseInt(e.target.value))}
+                      type="text"
+                      value={productionMonteur}
+                      onChange={(e) => setProductionMonteur(e.target.value)}
                       className="w-full px-2 py-1 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      placeholder="Jaar"
+                      placeholder="Naam monteur"
                     />
                   </div>
                   <div className="flex items-end">
                     <button
                       type="button"
-                      onClick={handleImportProductionItems}
-                      disabled={importingProduction || !productionWeek}
+                      onClick={handleLoadProductionData}
+                      disabled={loadingProduction || !productionWeek || !productionMonteur}
                       className="w-full px-2 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 rounded transition-colors"
                     >
-                      {importingProduction ? '...' : 'Laad'}
+                      {loadingProduction ? '...' : 'Laad'}
                     </button>
                   </div>
                 </div>
                 
                 {availableProductionItems.length > 0 && (
-                  <div className="bg-white p-2 rounded border border-amber-200 space-y-1 max-h-32 overflow-y-auto">
+                  <div className="bg-white p-2 rounded border border-amber-200 space-y-1 max-h-48 overflow-y-auto">
                     {availableProductionItems.map((item, idx) => (
                       <button
                         key={idx}
@@ -647,7 +672,9 @@ const OutgoingInvoices: React.FC = () => {
                         onClick={() => addProductionItem(item)}
                         className="w-full text-left px-2 py-1 text-xs bg-amber-50 hover:bg-amber-100 rounded transition-colors flex items-center justify-between group"
                       >
-                        <span className="truncate text-amber-900 text-xs">{item.description}</span>
+                        <span className="truncate text-amber-900 text-xs">
+                          {item.datum} - {item.uren}u - {item.opdrachtgever}
+                        </span>
                         <span className="text-amber-600 ml-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">+</span>
                       </button>
                     ))}
@@ -679,7 +706,6 @@ const OutgoingInvoices: React.FC = () => {
             <div className="space-y-3">
               {items.map((item, i) => (
                 <div key={i} className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
-                  {/* Title */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
                     <input
@@ -690,7 +716,6 @@ const OutgoingInvoices: React.FC = () => {
                     />
                   </div>
 
-                  {/* Description */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Beschrijving</label>
                     <textarea
@@ -702,7 +727,6 @@ const OutgoingInvoices: React.FC = () => {
                     />
                   </div>
 
-                  {/* Quantity, Rate, Amount - Grid for better mobile */}
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Hoeveelheid</label>
@@ -734,7 +758,6 @@ const OutgoingInvoices: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Delete Button */}
                   <button
                     type="button"
                     onClick={() => removeItem(i)}
@@ -890,7 +913,6 @@ const OutgoingInvoices: React.FC = () => {
                   className="w-full"
                 >
                   <div className="p-4 sm:p-5 flex items-center gap-3 sm:gap-4 hover:bg-gray-50 transition-colors">
-                    {/* Icon */}
                     <div className={`p-3 rounded-lg flex-shrink-0 ${
                       invoice.status === 'paid'
                         ? 'bg-green-100'
@@ -911,7 +933,6 @@ const OutgoingInvoices: React.FC = () => {
                       }`} />
                     </div>
 
-                    {/* Details */}
                     <div className="flex-1 min-w-0 text-left">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-semibold text-gray-900 text-sm truncate">
@@ -930,7 +951,6 @@ const OutgoingInvoices: React.FC = () => {
                       <div className="text-xs sm:text-sm text-gray-600">{invoice.clientName}</div>
                     </div>
 
-                    {/* Amount & Date */}
                     <div className="text-right flex-shrink-0">
                       <div className="font-semibold text-gray-900 text-sm">€{invoice.totalAmount.toFixed(2)}</div>
                       <div className="text-xs text-gray-500 mt-1">
@@ -938,17 +958,14 @@ const OutgoingInvoices: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Chevron */}
                     <ChevronDown
                       className={`h-5 w-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                   </div>
                 </button>
 
-                {/* Expanded Content */}
                 {isExpanded && (
                   <div className="border-t-2 border-gray-200 bg-gray-50 px-4 sm:px-5 py-4 space-y-4">
-                    {/* Invoice Items */}
                     {invoice.items.length > 0 && (
                       <div className="bg-white rounded-lg p-4 space-y-2">
                         <h4 className="font-semibold text-sm text-gray-900 mb-3">Factuurregels</h4>
@@ -976,7 +993,6 @@ const OutgoingInvoices: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Action Buttons */}
                     <div className="flex gap-2 flex-wrap">
                       <Button
                         onClick={() => handleEdit(invoice)}
@@ -1040,7 +1056,6 @@ const OutgoingInvoices: React.FC = () => {
           })}
           </div>
 
-          {/* Stats Bar */}
           <div className="bg-white border-2 border-gray-200 rounded-lg px-4 sm:px-6 py-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
               <div>
