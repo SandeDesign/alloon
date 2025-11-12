@@ -373,7 +373,15 @@ export default function TimesheetApprovals() {
                                 </p>
                                 {timesheet.submittedAt && (
                                   <p className="text-xs text-gray-500 mt-1">
-                                    Ingediend: {timesheet.submittedAt.toLocaleDateString('nl-NL')}
+                                    Ingediend: {
+                                      typeof timesheet.submittedAt === 'string'
+                                        ? new Date(timesheet.submittedAt).toLocaleDateString('nl-NL')
+                                        : (timesheet.submittedAt instanceof Date)
+                                          ? timesheet.submittedAt.toLocaleDateString('nl-NL')
+                                          : typeof timesheet.submittedAt.toDate === 'function'
+                                            ? timesheet.submittedAt.toDate().toLocaleDateString('nl-NL')
+                                            : 'onbekende datum'
+                                    }
                                   </p>
                                 )}
                               </div>
@@ -545,7 +553,17 @@ export default function TimesheetApprovals() {
                             <p className="text-xs text-red-600 mt-1 italic">⚠️ {timesheet.lowHoursExplanation}</p>
                           )}
                           {timesheet.approvedAt && (
-                            <p className="text-xs text-green-600 mt-1 font-semibold">✓ Goedgekeurd op {timesheet.approvedAt.toLocaleDateString('nl-NL')}</p>
+                            <p className="text-xs text-green-600 mt-1 font-semibold">
+                              ✓ Goedgekeurd op {
+                                typeof timesheet.approvedAt === 'string' 
+                                  ? new Date(timesheet.approvedAt).toLocaleDateString('nl-NL')
+                                  : (timesheet.approvedAt instanceof Date)
+                                    ? timesheet.approvedAt.toLocaleDateString('nl-NL')
+                                    : typeof timesheet.approvedAt.toDate === 'function'
+                                      ? timesheet.approvedAt.toDate().toLocaleDateString('nl-NL')
+                                      : 'onbekende datum'
+                              }
+                            </p>
                           )}
                         </div>
                       );
@@ -631,7 +649,15 @@ export default function TimesheetApprovals() {
                   <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex justify-between items-baseline mb-2">
                       <span className="font-medium text-sm text-gray-900">
-                        {entry.date.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' })}
+                        {
+                          typeof entry.date === 'string'
+                            ? new Date(entry.date).toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' })
+                            : (entry.date instanceof Date)
+                              ? entry.date.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' })
+                              : typeof entry.date.toDate === 'function'
+                                ? entry.date.toDate().toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: 'short' })
+                                : 'onbekende datum'
+                        }
                       </span>
                       <span className="text-lg font-bold text-gray-900">{entry.regularHours}u</span>
                     </div>
