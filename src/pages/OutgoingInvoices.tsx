@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Send, Search, Calendar, Euro, Building2, User, CheckCircle, AlertCircle, Clock, Edit, Trash2, ChevronDown, X, ArrowLeft, TrendingUp, Eye } from 'lucide-react';
+import { Plus, Send, Search, Calendar, Euro, Building2, User, CheckCircle, AlertCircle, Clock, Edit, Trash2, ChevronDown, X, ArrowLeft, TrendingUp, Eye, Factory } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import Button from '../components/ui/Button';
@@ -9,6 +9,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import { outgoingInvoiceService, OutgoingInvoice, CompanyInfo } from '../services/outgoingInvoiceService';
+import { ITKnechtFactuurService } from '../services/itknechtFactuurService';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -50,6 +51,13 @@ const OutgoingInvoices: React.FC = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+
+  // 🔥 Production Import State
+  const [showProductionImport, setShowProductionImport] = useState(false);
+  const [productionWeek, setProductionWeek] = useState<number>(0);
+  const [productionYear, setProductionYear] = useState<number>(new Date().getFullYear());
+  const [importingProduction, setImportingProduction] = useState(false);
+  const [availableProductionItems, setAvailableProductionItems] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -110,6 +118,56 @@ const OutgoingInvoices: React.FC = () => {
     }
   }, [user, selectedCompany]);
 
+  // 🔥 Load production items from webhook
+  const handleImportProductionItems = async () => {
+    if (!productionWeek || !selectedCompany) {
+      showError('Fout', 'Selecteer week en bedrijf');
+      return;
+    }
+
+    setImportingProduction(true);
+    try {
+      const weekDataList = await ITKnechtFactuurService.fetchFactuurData(
+        productionWeek,
+        productionYear,
+        selectedCompany.id
+      );
+
+      const newItems = ITKnechtFactuurService.transformToInvoiceItems(weekDataList);
+      
+      if (newItems.length === 0) {
+        showError('Geen data', 'Geen productie regels gevonden voor deze week');
+        setImportingProduction(false);
+        return;
+      }
+
+      setAvailableProductionItems(newItems);
+      success('Geladen', `${newItems.length} productie regels beschikbaar`);
+    } catch (error) {
+      console.error('Error importing production items:', error);
+      showError('Fout', 'Kon production regels niet laden');
+    } finally {
+      setImportingProduction(false);
+    }
+  };
+
+  // 🔥 Add production item to invoice
+  const addProductionItem = (productionItem: any) => {
+    const newItem = {
+      title: 'Production',
+      description: productionItem.description,
+      quantity: productionItem.quantity || 1,
+      rate: productionItem.rate || 0,
+      amount: (productionItem.quantity || 1) * (productionItem.rate || 0)
+    };
+
+    setItems([...items, newItem]);
+    setAvailableProductionItems(
+      availableProductionItems.filter(item => item.description !== productionItem.description)
+    );
+    success('Toegevoegd', 'Production regel toegevoegd');
+  };
+
   const handleCreateNew = () => {
     setEditingInvoice(null);
     setFormData({
@@ -128,6 +186,8 @@ const OutgoingInvoices: React.FC = () => {
       projectCode: ''
     });
     setItems([{ title: '', description: '', quantity: 1, rate: 0, amount: 0 }]);
+    setShowProductionImport(false);
+    setAvailableProductionItems([]);
     loadRelations();
     generateNextInvoiceNumber();
     setView('create');
@@ -518,6 +578,83 @@ const OutgoingInvoices: React.FC = () => {
                 />
               </div>
             </div>
+          </Card>
+
+          {/* 🔥 Production Items Import - SUBTIEL */}
+          <Card className="p-4 sm:p-5 bg-amber-50 border-amber-200">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 rounded">
+                  <Factory className="h-3 w-3 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-amber-700">Production items</p>
+                  <p className="text-xs text-amber-600">Laad production regels</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProductionImport(!showProductionImport)}
+                className="px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition-colors whitespace-nowrap"
+              >
+                {showProductionImport ? '−' : '+'}
+              </button>
+            </div>
+            
+            {showProductionImport && (
+              <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-amber-700 mb-1">Week</label>
+                    <input
+                      type="number"
+                      value={productionWeek}
+                      onChange={(e) => setProductionWeek(parseInt(e.target.value))}
+                      min="1"
+                      max="52"
+                      className="w-full px-2 py-1 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      placeholder="Week"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-amber-700 mb-1">Jaar</label>
+                    <input
+                      type="number"
+                      value={productionYear}
+                      onChange={(e) => setProductionYear(parseInt(e.target.value))}
+                      className="w-full px-2 py-1 border border-amber-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      placeholder="Jaar"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={handleImportProductionItems}
+                      disabled={importingProduction || !productionWeek}
+                      className="w-full px-2 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 rounded transition-colors"
+                    >
+                      {importingProduction ? '...' : 'Laad'}
+                    </button>
+                  </div>
+                </div>
+                
+                {availableProductionItems.length > 0 && (
+                  <div className="bg-white p-2 rounded border border-amber-200 space-y-1 max-h-32 overflow-y-auto">
+                    {availableProductionItems.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => addProductionItem(item)}
+                        className="w-full text-left px-2 py-1 text-xs bg-amber-50 hover:bg-amber-100 rounded transition-colors flex items-center justify-between group"
+                      >
+                        <span className="truncate text-amber-900 text-xs">{item.description}</span>
+                        <span className="text-amber-600 ml-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">+</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
 
           {/* Invoice Items */}
