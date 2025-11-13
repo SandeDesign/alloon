@@ -212,7 +212,8 @@ const IncomingInvoicesStats: React.FC = () => {
       const updateData: any = {
         supplierName: editFormData.supplierName,
         invoiceNumber: editFormData.invoiceNumber,
-        amount: editFormData.amount,
+        subtotal: editFormData.subtotal || editFormData.amount,
+        amount: editFormData.subtotal || editFormData.amount,
         vatAmount: editFormData.vatAmount,
         totalAmount: editFormData.totalAmount,
         description: editFormData.description,
@@ -515,7 +516,7 @@ const IncomingInvoicesStats: React.FC = () => {
                               <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-600">
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Excl. BTW</p>
                                 <p className="font-bold text-gray-900 dark:text-white">
-                                  {formatCurrency(invoice.amount)}
+                                  {formatCurrency((invoice as any).subtotal || invoice.amount || 0)}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-600">
@@ -604,8 +605,11 @@ const IncomingInvoicesStats: React.FC = () => {
                   <input
                     type="number"
                     step="0.01"
-                    value={editFormData.amount ?? ''}
-                    onChange={e => setEditFormData({ ...editFormData, amount: parseFloat(e.target.value) || 0 })}
+                    value={(editFormData as any).subtotal ?? editFormData.amount ?? ''}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setEditFormData({ ...editFormData, subtotal: val, amount: val } as IncomingInvoice);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -699,7 +703,7 @@ const IncomingInvoicesStats: React.FC = () => {
                   <div className="bg-white dark:bg-gray-700 p-3 rounded">
                     <p className="text-xs text-gray-600 dark:text-gray-400">Excl. BTW</p>
                     <p className="font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(editFormData.amount || 0)}
+                      {formatCurrency((editFormData as any).subtotal || editFormData.amount || 0)}
                     </p>
                   </div>
                   <div className="bg-white dark:bg-gray-700 p-3 rounded">
