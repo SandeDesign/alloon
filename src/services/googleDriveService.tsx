@@ -239,7 +239,7 @@ export const createOrGetFolder = async (folderName: string, token: string, paren
 };
 
 /**
- * Upload file to Drive
+ * Upload file to Drive - FIXED VERSION
  */
 export const uploadFileToDrive = async (
   file: File,
@@ -252,39 +252,74 @@ export const uploadFileToDrive = async (
   downloadLink: string;
   name: string;
 }> => {
-  const formData = new FormData();
+  try {
+    console.log(`[uploadFileToDrive] Starting upload: ${fileName || file.name} to folder: ${folderId}`);
+    
+    const formData = new FormData();
 
-  const metadata = {
-    name: fileName || file.name,
-    parents: [folderId],
-  };
+    const metadata = {
+      name: fileName || file.name,
+      parents: [folderId],
+    };
 
-  formData.append(
-    'metadata',
-    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-  );
-  formData.append('file', file);
+    // Append metadata as JSON blob
+    formData.append(
+      'metadata',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+    );
+    
+    // Append file
+    formData.append('file', file);
 
-  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
+    console.log(`[uploadFileToDrive] FormData prepared, file size: ${file.size} bytes`);
 
-  if (!response.ok) {
-    throw new Error(`Upload failed: ${response.statusText}`);
+    const response = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // NOTE: Do NOT set Content-Type for FormData - browser will set it with boundary
+        },
+        body: formData,
+      }
+    );
+
+    console.log(`[uploadFileToDrive] Response status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      // Try to get error details from response
+      const errorText = await response.text();
+      console.error(`[uploadFileToDrive] Upload failed. Status: ${response.status}`);
+      console.error(`[uploadFileToDrive] Error response:`, errorText);
+      
+      // Try to parse JSON error if available
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(`Upload failed (${response.status}): ${errorJson.error?.message || response.statusText}`);
+      } catch (e) {
+        throw new Error(`Upload failed (${response.status}): ${response.statusText} - ${errorText.substring(0, 200)}`);
+      }
+    }
+
+    const data = await response.json();
+    
+    console.log(`[uploadFileToDrive] Upload successful. FileId: ${data.id}`);
+
+    if (!data.id) {
+      throw new Error('No file ID returned from Google Drive API');
+    }
+
+    return {
+      fileId: data.id,
+      webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
+      downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
+      name: data.name,
+    };
+  } catch (error) {
+    console.error('[uploadFileToDrive] Error:', error);
+    throw error;
   }
-
-  const data = await response.json();
-
-  return {
-    fileId: data.id,
-    webViewLink: data.webViewLink,
-    downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
-    name: data.name,
-  };
 };
 
 /**
@@ -337,28 +372,44 @@ export const getOrCreateCompanyDriveFolder = async (
   incomingInvoicesFolderId: string;
   outgoingInvoicesFolderId: string;
 }> => {
-  const rootFolderId = await createOrGetFolder('Alloon', token);
-  const companyFolderId = await createOrGetFolder(companyName, token, rootFolderId);
-  const incomingInvoicesFolderId = await createOrGetFolder('Inkomende Facturen', token, companyFolderId);
-  const outgoingInvoicesFolderId = await createOrGetFolder('Uitgaande Facturen', token, companyFolderId);
-  await createOrGetFolder('Exports', token, companyFolderId);
+  try {
+    console.log(`[getOrCreateCompanyDriveFolder] Creating folder structure for: ${companyName}`);
+    
+    const rootFolderId = await createOrGetFolder('Alloon', token);
+    console.log(`[getOrCreateCompanyDriveFolder] Root folder: ${rootFolderId}`);
+    
+    const companyFolderId = await createOrGetFolder(companyName, token, rootFolderId);
+    console.log(`[getOrCreateCompanyDriveFolder] Company folder: ${companyFolderId}`);
+    
+    const incomingInvoicesFolderId = await createOrGetFolder('Inkomende Facturen', token, companyFolderId);
+    console.log(`[getOrCreateCompanyDriveFolder] Incoming invoices folder: ${incomingInvoicesFolderId}`);
+    
+    const outgoingInvoicesFolderId = await createOrGetFolder('Uitgaande Facturen', token, companyFolderId);
+    const exportsFolderId = await createOrGetFolder('Exports', token, companyFolderId);
 
-  await setDoc(doc(db, 'driveFolderStructure', companyId), {
-    companyId,
-    companyName,
-    rootFolderId,
-    companyFolderId,
-    incomingInvoicesFolderId,
-    outgoingInvoicesFolderId,
-    createdAt: Timestamp.fromDate(new Date()),
-    updatedAt: Timestamp.fromDate(new Date()),
-  });
+    await setDoc(doc(db, 'driveFolderStructure', companyId), {
+      companyId,
+      companyName,
+      rootFolderId,
+      companyFolderId,
+      incomingInvoicesFolderId,
+      outgoingInvoicesFolderId,
+      exportsFolderId,
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date()),
+    });
 
-  return {
-    rootFolderId,
-    incomingInvoicesFolderId,
-    outgoingInvoicesFolderId,
-  };
+    console.log(`[getOrCreateCompanyDriveFolder] Folder structure saved to Firestore`);
+
+    return {
+      rootFolderId,
+      incomingInvoicesFolderId,
+      outgoingInvoicesFolderId,
+    };
+  } catch (error) {
+    console.error('[getOrCreateCompanyDriveFolder] Error:', error);
+    throw error;
+  }
 };
 
 /**
@@ -375,7 +426,7 @@ export const getCompanyDriveFolders = async (companyId: string) => {
 };
 
 /**
- * Upload invoice to Drive with OCR data
+ * Upload invoice to Drive with OCR data - FIXED VERSION
  */
 export const uploadInvoiceToDrive = async (
   file: File,
@@ -395,7 +446,8 @@ export const uploadInvoiceToDrive = async (
   driveWebLink: string;
 }> => {
   try {
-    console.log('Getting/refreshing Google Drive token...');
+    console.log('[uploadInvoiceToDrive] Starting invoice upload process');
+    console.log(`[uploadInvoiceToDrive] Company: ${companyName}, File: ${file.name}`);
     
     // Try to get token, silently refresh if expired
     let token = await silentRefreshGoogleToken(userId, userEmail);
@@ -404,18 +456,19 @@ export const uploadInvoiceToDrive = async (
       throw new Error('Google Drive not connected. Please connect in Settings.');
     }
 
-    console.log('Checking/creating folder structure for company:', companyName);
+    console.log('[uploadInvoiceToDrive] Token obtained, checking folder structure');
 
     // Check if folders exist, if not create them
     let folders = await getCompanyDriveFolders(companyId);
     if (!folders) {
-      console.log('Folder structure not found, creating...');
+      console.log('[uploadInvoiceToDrive] Folder structure not found, creating...');
       folders = await getOrCreateCompanyDriveFolder(companyId, companyName, token);
-      console.log('Folder structure created:', folders);
+      console.log('[uploadInvoiceToDrive] Folder structure created:', folders);
     } else {
-      console.log('Using existing folder structure:', folders);
+      console.log('[uploadInvoiceToDrive] Using existing folder structure');
     }
 
+    console.log('[uploadInvoiceToDrive] Starting file upload to Drive');
     const uploadResult = await uploadFileToDrive(
       file,
       folders.incomingInvoicesFolderId,
@@ -423,7 +476,7 @@ export const uploadInvoiceToDrive = async (
       `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.pdf`
     );
 
-    console.log('File uploaded to:', uploadResult.webViewLink);
+    console.log(`[uploadInvoiceToDrive] File uploaded successfully: ${uploadResult.webViewLink}`);
 
     // Save invoice with OCR data
     const invoiceId = await saveInvoiceWithDriveFile(
@@ -440,13 +493,15 @@ export const uploadInvoiceToDrive = async (
       ocrData
     );
 
+    console.log(`[uploadInvoiceToDrive] Invoice saved with ID: ${invoiceId}`);
+
     return {
       invoiceId,
       driveFileId: uploadResult.fileId,
       driveWebLink: uploadResult.webViewLink,
     };
   } catch (error) {
-    console.error('Error uploading invoice to Drive:', error);
+    console.error('[uploadInvoiceToDrive] Error uploading invoice to Drive:', error);
     throw error;
   }
 };
