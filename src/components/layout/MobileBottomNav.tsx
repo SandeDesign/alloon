@@ -34,8 +34,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
       return [
         { href: '/', icon: Home, label: 'Dashboard', gradient: 'from-blue-500 to-blue-600' },
         { href: '/project-production', icon: Cpu, label: 'Productie', gradient: 'from-purple-500 to-purple-600' },
-        { href: '/outgoing-invoices', icon: Send, label: 'Uitgaand', gradient: 'from-green-500 to-green-600' },
-        { href: '/incoming-invoices', icon: Download, label: 'Inkomend', gradient: 'from-orange-500 to-orange-600' },
+        { href: '/outgoing-invoices', icon: Send, label: 'Facturen', gradient: 'from-green-500 to-green-600' },
+        { href: '/incoming-invoices', icon: Download, label: 'Uploaden', gradient: 'from-orange-500 to-orange-600' },
       ];
     }
 
