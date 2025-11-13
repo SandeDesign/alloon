@@ -155,10 +155,12 @@ function parseNederlandsNumber(str: string): number {
 }
 
 /**
- * Extract bedrag uit string
+ * Extract bedrag uit string - CORRECT voor Nederlands formaat
+ * "€ 15.339,66" → 15339.66
  */
 function extractAmount(text: string): number {
-  const match = text.match(/€?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/);
+  // Match: optional €, optional spaces, digits/punten/komma
+  const match = text.match(/€?\s*([\d\.]+,\d{2})/);
   if (match) {
     return parseNederlandsNumber(match[1]);
   }
