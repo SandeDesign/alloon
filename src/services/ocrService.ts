@@ -38,7 +38,7 @@ const getWorker = async () => {
 };
 
 /**
- * ✅ NEW: Convert HEIC to JPG (iPad photos)
+ * ✅ HEIC naar JPG conversie (iPad foto's)
  */
 export const convertHEICToJPG = async (file: File): Promise<File> => {
   try {
@@ -47,12 +47,12 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
       const jpgBlob = await heic2any({
         blob: file,
         toType: 'image/jpeg',
-        quality: 0.9,
+        quality: 0.95,
       });
       return new File([jpgBlob], file.name.replace('.heic', '.jpg'), { type: 'image/jpeg' });
     }
   } catch (error) {
-    console.warn('HEIC conversion failed, falling back to canvas:', error);
+    console.warn('HEIC conversion failed, fallback canvas:', error);
   }
 
   // Fallback: Canvas conversion
@@ -79,7 +79,7 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
             }
           },
           'image/jpeg',
-          0.9
+          0.95
         );
       };
       img.onerror = () => reject(new Error('Image load failed'));
@@ -91,22 +91,129 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
 };
 
 /**
- * ✅ NEW: Preprocessing voor betere OCR
+ * ✅ GEAVANCEERDE Image Preprocessing:
+ * - Grayscale conversie
+ * - Contrast boost (1.8x voor scherper onderscheid)
+ * - Brightness aanpassingen
+ * - Sharpening filter
+ * - Noise reduction
  */
 export const preprocessImage = async (img: HTMLImageElement): Promise<HTMLCanvasElement> => {
   const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
+  
+  // Upscale kleine foto's
+  const scaleFactor = img.width < 1200 ? 1.5 : 1;
+  canvas.width = img.width * scaleFactor;
+  canvas.height = img.height * scaleFactor;
+  
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context failed');
 
-  ctx.drawImage(img, 0, 0);
+  // Teken afbeelding met scaling
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
 
-  // Contrast & brightness boost
-  const contrast = 1.5;
+  // STAP 1: Grayscale conversie (betere OCR performance)
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    data[i] = gray;
+    data[i + 1] = gray;
+    data[i + 2] = gray;
+  }
+
+  // STAP 2: Contrast & brightness boost
+  const contrast = 1.8; // Sterker contrast voor beter onderscheid
+  const brightness = 30; // Helderheid boost
+
+  for (let i = 0; i < data.length; i += 4) {
+    for (let j = 0; j < 3; j++) {
+      let pixel = data[i + j];
+      pixel = (pixel - 128) * contrast + 128 + brightness;
+      data[i + j] = Math.max(0, Math.min(255, pixel));
+    }
+  }
+
+  // STAP 3: Sharpening filter (versterkt edges voor betere OCR)
+  const sharpened = new ImageData(new Uint8ClampedArray(data), imageData.width, imageData.height);
+  applySharpening(sharpened, 0.5);
+  
+  ctx.putImageData(sharpened, 0, 0);
+  return canvas;
+};
+
+/**
+ * Sharpening filter kernel
+ */
+function applySharpening(imageData: ImageData, strength: number): void {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+  
+  const kernel = [
+    0, -strength, 0,
+    -strength, 1 + 4 * strength, -strength,
+    0, -strength, 0
+  ];
+
+  const temp = new Uint8ClampedArray(data);
+
+  for (let i = 0; i < height; i++) {
+    for (let j = 0; j < width; j++) {
+      const idx = (i * width + j) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        let value = 0;
+        for (let ki = -1; ki <= 1; ki++) {
+          for (let kj = -1; kj <= 1; kj++) {
+            const ni = i + ki;
+            const nj = j + kj;
+            if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
+              const nidx = (ni * width + nj) * 4 + c;
+              const kernelIdx = (ki + 1) * 3 + (kj + 1);
+              value += temp[nidx] * kernel[kernelIdx];
+            }
+          }
+        }
+        data[idx + c] = Math.max(0, Math.min(255, value));
+      }
+    }
+  }
+}
+
+/**
+ * ✅ PDF preprocessing - NIEUW!
+ */
+const preprocessCanvas = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
+  const processedCanvas = document.createElement('canvas');
+  processedCanvas.width = canvas.width;
+  processedCanvas.height = canvas.height;
+  
+  const ctx = processedCanvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context failed');
+
+  ctx.drawImage(canvas, 0, 0);
+  
+  const imageData = ctx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+  const data = imageData.data;
+
+  // Grayscale
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    data[i] = gray;
+    data[i + 1] = gray;
+    data[i + 2] = gray;
+  }
+
+  // Contrast boost
+  const contrast = 1.6;
   const brightness = 20;
 
   for (let i = 0; i < data.length; i += 4) {
@@ -118,7 +225,7 @@ export const preprocessImage = async (img: HTMLImageElement): Promise<HTMLCanvas
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return canvas;
+  return processedCanvas;
 };
 
 export const extractTextFromPDF = async (
@@ -135,10 +242,10 @@ export const extractTextFromPDF = async (
     const worker = await getWorker();
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      onProgress?.((pageNum / pdf.numPages) * 50);
+      onProgress?.((pageNum / pdf.numPages) * 40);
 
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 2 });
+      const viewport = page.getViewport({ scale: 3 }); // Verhoogde schaal voor beter detail
 
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -152,7 +259,12 @@ export const extractTextFromPDF = async (
         viewport: viewport,
       }).promise;
 
-      const result = await worker.recognize(canvas);
+      // ✅ NIEUW: PDF preprocessing!
+      const processedCanvas = preprocessCanvas(canvas);
+
+      onProgress?.((pageNum / pdf.numPages) * 50);
+
+      const result = await worker.recognize(processedCanvas);
       const pageText = result.data.text;
       const pageConfidence = result.data.confidence;
 
@@ -181,21 +293,21 @@ export const extractTextFromPDF = async (
 };
 
 /**
- * ✅ UPDATED: Extract text from image - with preprocessing & HEIC support
+ * ✅ GEOPTIMALISEERDE: Extract text from image - full preprocessing pipeline
  */
 export const extractTextFromImage = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> => {
   try {
-    onProgress?.(10);
+    onProgress?.(5);
 
-    // Convert HEIC to JPG if needed
+    // HEIC naar JPG conversie
     let imageFile = file;
     if (file.type === 'image/heic' || file.name.endsWith('.heic')) {
-      console.log('Converting HEIC to JPG...');
+      console.log('📱 Converting HEIC to JPG...');
       imageFile = await convertHEICToJPG(file);
-      onProgress?.(25);
+      onProgress?.(20);
     }
 
     const img = document.createElement('img');
@@ -204,13 +316,15 @@ export const extractTextFromImage = async (
     return new Promise((resolve, reject) => {
       img.onload = async () => {
         try {
-          onProgress?.(35);
+          onProgress?.(30);
 
-          // Preprocess image for better OCR
+          // Geavanceerde preprocessing
+          console.log('🔧 Preprocessing image (grayscale, contrast, sharpening)...');
           const processedCanvas = await preprocessImage(img);
-          onProgress?.(40);
+          onProgress?.(60);
 
           const worker = await getWorker();
+          console.log('🤖 Running OCR...');
           const result = await worker.recognize(processedCanvas);
           onProgress?.(100);
 
@@ -400,7 +514,7 @@ export const extractInvoiceData = (ocrText: string) => {
     }
   }
 
-  console.log('\n========== INVOICE EXTRACTED ==========');
+  console.log('\n========== 📄 INVOICE EXTRACTED ==========');
   console.log('Type:            ', docType);
   console.log('Supplier:        ', supplierName);
   console.log('Invoice Number:  ', invoiceNumber);
