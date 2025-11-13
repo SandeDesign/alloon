@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { doc, setDoc, getDoc, Timestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 
 const CLIENT_ID = '896567545879-t7ps2toen24v8nrjn5ulf59esnjg1hok.apps.googleusercontent.com';
 const REDIRECT_URI = window.location.origin;
@@ -7,9 +7,6 @@ const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 let accessToken: string | null = null;
 
-/**
- * Request Google Drive access token via OAuth2
- */
 export const requestGoogleDriveToken = async (userEmail?: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -59,7 +56,7 @@ export const requestGoogleDriveToken = async (userEmail?: string): Promise<strin
           reject(new Error('Popup closed by user'));
         }
       } catch (e) {
-        // Cross-origin error, popup is on different domain (normal)
+        // Cross-origin error, normal
       }
     }, 500);
 
@@ -71,27 +68,22 @@ export const requestGoogleDriveToken = async (userEmail?: string): Promise<strin
   });
 };
 
-/**
- * Silent refresh - automatic token refresh met minimale user interaction
- */
 export const silentRefreshGoogleToken = async (userId: string, userEmail?: string): Promise<string | null> => {
   try {
     const token = await getGoogleDriveToken(userId);
     
-    // Token still valid
     if (token) {
       return token;
     }
 
-    // Token expired - refresh silently
-    console.log('Token expired, refreshing silently...');
+    console.log('Token expired, refreshing...');
     
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.append('client_id', CLIENT_ID);
     authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
     authUrl.searchParams.append('response_type', 'token');
     authUrl.searchParams.append('scope', SCOPES.join(' '));
-    authUrl.searchParams.append('prompt', ''); // Empty prompt = silent refresh
+    authUrl.searchParams.append('prompt', '');
     
     if (userEmail) {
       authUrl.searchParams.append('login_hint', userEmail);
@@ -105,7 +97,6 @@ export const silentRefreshGoogleToken = async (userId: string, userEmail?: strin
       );
 
       if (!popup) {
-        console.warn('Silent refresh popup blocked');
         resolve(null);
         return;
       }
@@ -122,12 +113,7 @@ export const silentRefreshGoogleToken = async (userId: string, userEmail?: strin
                 accessToken = newToken;
                 clearInterval(checkPopup);
                 popup.close();
-                
-                // Save new token
-                saveGoogleDriveToken(userId, newToken).catch(err => {
-                  console.error('Error saving refreshed token:', err);
-                });
-                
+                saveGoogleDriveToken(userId, newToken).catch(() => {});
                 resolve(newToken);
               }
             }
@@ -144,7 +130,7 @@ export const silentRefreshGoogleToken = async (userId: string, userEmail?: strin
         clearInterval(checkPopup);
         if (!popup.closed) popup.close();
         resolve(null);
-      }, 30000); // 30 second timeout for silent refresh
+      }, 30000);
     });
   } catch (error) {
     console.error('Silent refresh error:', error);
@@ -152,15 +138,12 @@ export const silentRefreshGoogleToken = async (userId: string, userEmail?: strin
   }
 };
 
-/**
- * Save token to Firestore
- */
 export const saveGoogleDriveToken = async (userId: string, token: string) => {
   try {
     await setDoc(doc(db, 'userGoogleDriveTokens', userId), {
       token,
       createdAt: Timestamp.fromDate(new Date()),
-      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3600000)), // 1 hour
+      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3600000)),
     });
   } catch (error) {
     console.error('Error saving token:', error);
@@ -168,9 +151,6 @@ export const saveGoogleDriveToken = async (userId: string, token: string) => {
   }
 };
 
-/**
- * Get token from Firestore
- */
 export const getGoogleDriveToken = async (userId: string): Promise<string | null> => {
   try {
     const docSnap = await getDoc(doc(db, 'userGoogleDriveTokens', userId));
@@ -191,10 +171,11 @@ export const getGoogleDriveToken = async (userId: string): Promise<string | null
   }
 };
 
-/**
- * Create or get folder
- */
-export const createOrGetFolder = async (folderName: string, token: string, parentFolderId?: string): Promise<string> => {
+export const findOrCreateFolder = async (
+  folderName: string,
+  token: string,
+  parentFolderId?: string
+): Promise<string> => {
   const query_str = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${
     parentFolderId ? ` and '${parentFolderId}' in parents` : ''
   }`;
@@ -211,8 +192,11 @@ export const createOrGetFolder = async (folderName: string, token: string, paren
   const searchData = await searchResponse.json();
 
   if (searchData.files && searchData.files.length > 0) {
+    console.log(`✓ Folder found: ${folderName} (${searchData.files[0].id})`);
     return searchData.files[0].id;
   }
+
+  console.log(`→ Creating folder: ${folderName}`);
 
   const metadata = {
     name: folderName,
@@ -235,12 +219,10 @@ export const createOrGetFolder = async (folderName: string, token: string, paren
     throw new Error('Failed to create folder');
   }
 
+  console.log(`✓ Folder created: ${folderName} (${createData.id})`);
   return createData.id;
 };
 
-/**
- * Upload file to Drive - FIXED VERSION
- */
 export const uploadFileToDrive = async (
   file: File,
   folderId: string,
@@ -252,182 +234,50 @@ export const uploadFileToDrive = async (
   downloadLink: string;
   name: string;
 }> => {
-  try {
-    console.log(`[uploadFileToDrive] Starting upload: ${fileName || file.name} to folder: ${folderId}`);
-    
-    const formData = new FormData();
+  const formData = new FormData();
 
-    const metadata = {
-      name: fileName || file.name,
-      parents: [folderId],
-    };
+  const metadata = {
+    name: fileName || file.name,
+    parents: [folderId],
+  };
 
-    // Append metadata as JSON blob
-    formData.append(
-      'metadata',
-      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-    );
-    
-    // Append file
-    formData.append('file', file);
+  formData.append(
+    'metadata',
+    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+  );
+  formData.append('file', file);
 
-    console.log(`[uploadFileToDrive] FormData prepared, file size: ${file.size} bytes`);
-
-    const response = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // NOTE: Do NOT set Content-Type for FormData - browser will set it with boundary
-        },
-        body: formData,
-      }
-    );
-
-    console.log(`[uploadFileToDrive] Response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      // Try to get error details from response
-      const errorText = await response.text();
-      console.error(`[uploadFileToDrive] Upload failed. Status: ${response.status}`);
-      console.error(`[uploadFileToDrive] Error response:`, errorText);
-      
-      // Try to parse JSON error if available
-      try {
-        const errorJson = JSON.parse(errorText);
-        throw new Error(`Upload failed (${response.status}): ${errorJson.error?.message || response.statusText}`);
-      } catch (e) {
-        throw new Error(`Upload failed (${response.status}): ${response.statusText} - ${errorText.substring(0, 200)}`);
-      }
+  const response = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
     }
+  );
 
-    const data = await response.json();
-    
-    console.log(`[uploadFileToDrive] Upload successful. FileId: ${data.id}`);
-
-    if (!data.id) {
-      throw new Error('No file ID returned from Google Drive API');
+  if (!response.ok) {
+    const errorText = await response.text();
+    try {
+      const errorJson = JSON.parse(errorText);
+      throw new Error(errorJson.error?.message || 'Upload failed');
+    } catch (e) {
+      throw new Error(`Upload failed: ${response.statusText}`);
     }
-
-    return {
-      fileId: data.id,
-      webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
-      downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
-      name: data.name,
-    };
-  } catch (error) {
-    console.error('[uploadFileToDrive] Error:', error);
-    throw error;
   }
+
+  const data = await response.json();
+
+  return {
+    fileId: data.id,
+    webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
+    downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
+    name: data.name,
+  };
 };
 
-/**
- * Save invoice metadata to Firestore with Drive reference and OCR data
- */
-export const saveInvoiceWithDriveFile = async (
-  invoiceData: any,
-  driveFileId: string,
-  driveWebLink: string,
-  userId: string,
-  companyId: string,
-  ocrData?: any
-): Promise<string> => {
-  try {
-    const now = new Date();
-    const docData = {
-      ...invoiceData,
-      userId,
-      companyId,
-      driveFileId,
-      driveWebLink,
-      fileUrl: driveWebLink,
-      status: 'pending',
-      invoiceDate: Timestamp.fromDate(invoiceData.invoiceDate || now),
-      dueDate: Timestamp.fromDate(invoiceData.dueDate || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)),
-      createdAt: Timestamp.fromDate(now),
-      updatedAt: Timestamp.fromDate(now),
-      ocrProcessed: !!ocrData,
-      ocrData: ocrData || null,
-      ocrConfidence: ocrData?.confidence || 0,
-    };
-
-    const docRef = await addDoc(collection(db, 'incomingInvoices'), docData);
-    return docRef.id;
-  } catch (error) {
-    console.error('Error saving invoice:', error);
-    throw new Error('Kon factuur niet opslaan');
-  }
-};
-
-/**
- * Get or create company folder structure
- */
-export const getOrCreateCompanyDriveFolder = async (
-  companyId: string,
-  companyName: string,
-  token: string
-): Promise<{
-  rootFolderId: string;
-  incomingInvoicesFolderId: string;
-  outgoingInvoicesFolderId: string;
-}> => {
-  try {
-    console.log(`[getOrCreateCompanyDriveFolder] Creating folder structure for: ${companyName}`);
-    
-    const rootFolderId = await createOrGetFolder('Alloon', token);
-    console.log(`[getOrCreateCompanyDriveFolder] Root folder: ${rootFolderId}`);
-    
-    const companyFolderId = await createOrGetFolder(companyName, token, rootFolderId);
-    console.log(`[getOrCreateCompanyDriveFolder] Company folder: ${companyFolderId}`);
-    
-    const incomingInvoicesFolderId = await createOrGetFolder('Inkomende Facturen', token, companyFolderId);
-    console.log(`[getOrCreateCompanyDriveFolder] Incoming invoices folder: ${incomingInvoicesFolderId}`);
-    
-    const outgoingInvoicesFolderId = await createOrGetFolder('Uitgaande Facturen', token, companyFolderId);
-    const exportsFolderId = await createOrGetFolder('Exports', token, companyFolderId);
-
-    await setDoc(doc(db, 'driveFolderStructure', companyId), {
-      companyId,
-      companyName,
-      rootFolderId,
-      companyFolderId,
-      incomingInvoicesFolderId,
-      outgoingInvoicesFolderId,
-      exportsFolderId,
-      createdAt: Timestamp.fromDate(new Date()),
-      updatedAt: Timestamp.fromDate(new Date()),
-    });
-
-    console.log(`[getOrCreateCompanyDriveFolder] Folder structure saved to Firestore`);
-
-    return {
-      rootFolderId,
-      incomingInvoicesFolderId,
-      outgoingInvoicesFolderId,
-    };
-  } catch (error) {
-    console.error('[getOrCreateCompanyDriveFolder] Error:', error);
-    throw error;
-  }
-};
-
-/**
- * Get company folder structure
- */
-export const getCompanyDriveFolders = async (companyId: string) => {
-  try {
-    const docSnap = await getDoc(doc(db, 'driveFolderStructure', companyId));
-    return docSnap.exists() ? docSnap.data() : null;
-  } catch (error) {
-    console.error('Error getting folder structure:', error);
-    return null;
-  }
-};
-
-/**
- * Upload invoice to Drive with OCR data - FIXED VERSION
- */
 export const uploadInvoiceToDrive = async (
   file: File,
   companyId: string,
@@ -446,62 +296,48 @@ export const uploadInvoiceToDrive = async (
   driveWebLink: string;
 }> => {
   try {
-    console.log('[uploadInvoiceToDrive] Starting invoice upload process');
-    console.log(`[uploadInvoiceToDrive] Company: ${companyName}, File: ${file.name}`);
+    console.log(`Uploading: ${file.name} for ${companyName}`);
     
-    // Try to get token, silently refresh if expired
     let token = await silentRefreshGoogleToken(userId, userEmail);
     
     if (!token) {
       throw new Error('Google Drive not connected. Please connect in Settings.');
     }
 
-    console.log('[uploadInvoiceToDrive] Token obtained, checking folder structure');
+    // Create folder structure in Drive
+    console.log('Creating folder structure...');
+    
+    const alloonFolderId = await findOrCreateFolder('Alloon', token);
+    const companyFolderId = await findOrCreateFolder(companyName, token, alloonFolderId);
+    const incomingFolderId = await findOrCreateFolder('Inkomende Facturen', token, companyFolderId);
+    const yearFolderId = await findOrCreateFolder(
+      new Date().getFullYear().toString(),
+      token,
+      incomingFolderId
+    );
+    const monthName = new Date().toLocaleString('nl-NL', { month: 'long' });
+    const monthFolderId = await findOrCreateFolder(monthName, token, yearFolderId);
 
-    // Check if folders exist, if not create them
-    let folders = await getCompanyDriveFolders(companyId);
-    if (!folders) {
-      console.log('[uploadInvoiceToDrive] Folder structure not found, creating...');
-      folders = await getOrCreateCompanyDriveFolder(companyId, companyName, token);
-      console.log('[uploadInvoiceToDrive] Folder structure created:', folders);
-    } else {
-      console.log('[uploadInvoiceToDrive] Using existing folder structure');
-    }
+    console.log('Uploading file...');
 
-    console.log('[uploadInvoiceToDrive] Starting file upload to Drive');
+    // Upload file
     const uploadResult = await uploadFileToDrive(
       file,
-      folders.incomingInvoicesFolderId,
+      monthFolderId,
       token,
-      `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.pdf`
+      `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.${file.name.split('.').pop()}`
     );
 
-    console.log(`[uploadInvoiceToDrive] File uploaded successfully: ${uploadResult.webViewLink}`);
+    console.log(`✓ Upload complete: ${uploadResult.webViewLink}`);
 
-    // Save invoice with OCR data
-    const invoiceId = await saveInvoiceWithDriveFile(
-      {
-        supplierName: metadata?.supplierName || 'Onbekend',
-        invoiceNumber: metadata?.invoiceNumber || `INV-${Date.now()}`,
-        totalAmount: metadata?.amount || 0,
-        fileName: file.name,
-      },
-      uploadResult.fileId,
-      uploadResult.webViewLink,
-      userId,
-      companyId,
-      ocrData
-    );
-
-    console.log(`[uploadInvoiceToDrive] Invoice saved with ID: ${invoiceId}`);
-
+    // Return invoice data (no Firestore save, just Drive data)
     return {
-      invoiceId,
+      invoiceId: uploadResult.fileId,
       driveFileId: uploadResult.fileId,
       driveWebLink: uploadResult.webViewLink,
     };
   } catch (error) {
-    console.error('[uploadInvoiceToDrive] Error uploading invoice to Drive:', error);
+    console.error('Error uploading invoice to Drive:', error);
     throw error;
   }
 };
