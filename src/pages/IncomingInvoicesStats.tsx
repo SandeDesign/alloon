@@ -307,10 +307,10 @@ const IncomingInvoicesStats: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Inkomende Facturen
+          Inkoop Bonnen
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Beheer en volg al je inkomende facturen
+          Controleer alle inkoop bonnen.
         </p>
       </div>
 
