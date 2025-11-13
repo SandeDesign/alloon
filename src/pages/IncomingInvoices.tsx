@@ -122,7 +122,7 @@ const IncomingInvoices: React.FC = () => {
             companyId: selectedCompany.id,
             supplierName: ocrResult.invoiceData.supplierName,
             invoiceNumber: ocrResult.invoiceData.invoiceNumber,
-            amount: ocrResult.invoiceData.subtotalExclVat || 0,
+            amount: ocrResult.invoiceData.subtotal || 0,
             vatAmount: ocrResult.invoiceData.vatAmount || 0,
             totalAmount: ocrResult.invoiceData.totalInclVat || 0,
             description: `Factuur van ${ocrResult.invoiceData.supplierName}`,
@@ -230,9 +230,9 @@ const IncomingInvoices: React.FC = () => {
   const openEditModal = (invoice: IncomingInvoice) => {
     setEditingInvoice(invoice);
     setEditFormData({
-      supplierName: invoice.supplierName,
-      invoiceNumber: invoice.invoiceNumber,
-      subtotal: invoice.amount,
+      supplierName: invoice.supplierName || '',
+      invoiceNumber: invoice.invoiceNumber || '',
+      subtotal: invoice.amount || 0,
     });
   };
 
