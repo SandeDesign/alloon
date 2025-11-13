@@ -235,11 +235,10 @@ const IncomingInvoices: React.FC = () => {
 
   const openEditModal = (invoice: IncomingInvoice) => {
     setEditingInvoice(invoice);
-    // ✅ FIXED: Zorg dat we het correct ingevoerde bedrag gebruiken (niet totalAmount)
     setEditFormData({
       supplierName: invoice.supplierName || '',
       invoiceNumber: invoice.invoiceNumber || '',
-      subtotal: invoice.amount || 0, // Hier gebruiken we 'amount' (excl. BTW)
+      subtotal: invoice.amount || 0,
     });
   };
 
@@ -634,13 +633,19 @@ const IncomingInvoices: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-50 p-3 rounded text-sm space-y-2">
-                  <div>
-                    <p className="text-gray-600 text-xs">BTW 21%</p>
-                    <p className="font-semibold text-gray-900">€{(editFormData.subtotal * 0.21).toFixed(2)}</p>
-                  </div>
-                  <div className="border-t border-gray-200 pt-2">
-                    <p className="text-blue-600 text-xs font-medium">Totaal Incl. BTW</p>
-                    <p className="font-bold text-blue-900 text-lg">€{(editFormData.subtotal * 1.21).toFixed(2)}</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded border border-gray-200">
+                      <p className="text-gray-600">Excl. BTW</p>
+                      <p className="font-semibold text-gray-900">€{(editFormData.subtotal || 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white p-2 rounded border border-gray-200">
+                      <p className="text-gray-600">BTW</p>
+                      <p className="font-semibold text-gray-900">€{(Math.round(editFormData.subtotal * 0.21 * 100) / 100).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                      <p className="text-blue-600">Incl. BTW</p>
+                      <p className="font-semibold text-blue-900">€{(editFormData.subtotal + Math.round(editFormData.subtotal * 0.21 * 100) / 100).toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
