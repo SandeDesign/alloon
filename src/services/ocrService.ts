@@ -166,10 +166,11 @@ function extractAmount(text: string): number {
 }
 
 /**
- * Proper invoice extraction - fokus op STRUCTUUR
+ * Extract invoice data - Werk van ACHTEREN naar VOREN
+ * Facturen eindigen altijd met: Subtotaal, BTW, Totaal te voldoen
  */
 export const extractInvoiceData = (ocrText: string) => {
-  const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l);
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
   let supplierName = 'Onbekend';
   let invoiceNumber = `INV-${Date.now()}`;
@@ -178,29 +179,27 @@ export const extractInvoiceData = (ocrText: string) => {
   let vatAmount = 0;
   let totalInclVat = 0;
 
-  // ===== SUPPLIER: Zoek bedrijfsnaam (eerste grote tekst) =====
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  // ===== SUPPLIER: Zoek BEDRIJF (niet "--- PAGE 1 ---") =====
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
     const line = lines[i];
-    // Criteria: minstens 4 woorden OF bedrijfswoorden
-    if (line.length > 5 && !line.match(/^\d/) && line !== line.toLowerCase()) {
-      if (line.includes(' ') || line.match(/B\.?V\.?|Ltd|Inc|BV/i)) {
-        supplierName = line;
-        break;
-      }
+    // Skip template/page markers
+    if (line.includes('PAGE') || line.includes('---') || line.length < 3) continue;
+    // Zoek BV, Ltd, of mixed case bedrijfsnaam
+    if (line.match(/[A-Z][a-z]+.*(?:BV|Ltd|Inc|b\.v|B\.V)/i) || 
+        (line.length > 5 && !line.match(/^\d/) && line !== line.toLowerCase() && line.match(/[A-Z]/))) {
+      supplierName = line;
+      break;
     }
   }
 
   // ===== INVOICE NUMBER =====
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].toLowerCase();
-    if (line.includes('factuurnummer') || line.includes('invoice') || line.includes('nummer')) {
-      // Kijk op dezelfde lijn eerst
-      let num = lines[i].match(/:\s*([A-Z0-9\-]+)/)?.[1];
-      // Of op volgende lijn
-      if (!num && i + 1 < lines.length) {
-        num = lines[i + 1].match(/^([A-Z0-9\-]+)/)?.[1];
-      }
-      if (num && num.length > 2) {
+    const line = lines[i];
+    const lower = line.toLowerCase();
+    if (lower.includes('factuurnummer')) {
+      // Format: "Factuurnummer: 2025-0015"
+      const num = line.match(/:\s*([A-Z0-9\-\.]+)/)?.[1] || lines[i + 1]?.match(/^([A-Z0-9\-\.]+)/)?.[1];
+      if (num) {
         invoiceNumber = num;
         break;
       }
@@ -215,51 +214,60 @@ export const extractInvoiceData = (ocrText: string) => {
       const day = parseInt(match[1]);
       const month = parseInt(match[2]);
       const year = parseInt(match[3]);
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 2020 && year <= 2030) {
         invoiceDate = new Date(year, month - 1, day);
         break;
       }
     }
   }
 
-  // ===== BEDRAGEN: Zoek naar specifieke LABELS =====
-  for (let i = 0; i < lines.length; i++) {
+  // ===== BEDRAGEN: Werk VAN ACHTEREN =====
+  // De factuur eindigt ALTIJD met: Subtotaal, 21% btw, Totaal te voldoen
+  // Dus zoeken we van achteren naar voren
+  for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
-    const nextLine = (i + 1 < lines.length) ? lines[i + 1] : '';
     const lower = line.toLowerCase();
 
-    // SUBTOTAAL
-    if ((lower.includes('subtotaal') || lower.includes('subtotal')) && !lower.includes('incl')) {
-      subtotalExclVat = extractAmount(nextLine) || extractAmount(line);
+    // TOTAAL TE VOLDOEN (laatste bedrag)
+    if (totalInclVat === 0 && lower.includes('totaal') && lower.includes('voldoen')) {
+      totalInclVat = extractAmount(line);
+      continue;
     }
 
     // 21% BTW
-    if ((lower.includes('21%') || lower.includes('btw')) && lower.includes('%')) {
-      vatAmount = extractAmount(nextLine) || extractAmount(line);
+    if (vatAmount === 0 && lower.includes('21%') && lower.includes('btw')) {
+      vatAmount = extractAmount(line);
+      continue;
     }
 
-    // TOTAAL
-    if (lower.includes('totaal') && (lower.includes('voldoen') || lower.includes('incl') || lower.includes('total'))) {
-      totalInclVat = extractAmount(nextLine) || extractAmount(line);
+    // SUBTOTAAL
+    if (subtotalExclVat === 0 && lower.includes('subtotaal')) {
+      subtotalExclVat = extractAmount(line);
+      continue;
     }
   }
 
-  // ===== Fallback: Bereken uit elkaar =====
-  // Als we subtotal en vat hebben, bereken totaal
+  // ===== Validatie & Fallback =====
+  // Check: bedragen moeten realistisch zijn
   if (subtotalExclVat > 0 && vatAmount === 0) {
     vatAmount = Math.round((subtotalExclVat * 0.21) * 100) / 100;
   }
   if (subtotalExclVat > 0 && totalInclVat === 0) {
     totalInclVat = subtotalExclVat + vatAmount;
   }
-  // Als we totaal hebben maar geen subtotal
   if (totalInclVat > 0 && subtotalExclVat === 0) {
     if (vatAmount > 0) {
       subtotalExclVat = totalInclVat - vatAmount;
     } else {
+      // Assume 21% VAT
       subtotalExclVat = Math.round((totalInclVat / 1.21) * 100) / 100;
       vatAmount = totalInclVat - subtotalExclVat;
     }
+  }
+
+  // Safety check: als bedragen nul zijn, heeft OCR gefaald
+  if (totalInclVat === 0) {
+    console.warn('⚠️  Warning: Bedragen niet gevonden in OCR. Mogelijk OCR probleem.');
   }
 
   console.log('\n========== INVOICE EXTRACTED ==========');
