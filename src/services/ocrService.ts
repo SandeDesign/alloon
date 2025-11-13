@@ -24,6 +24,7 @@ export interface OCRResult {
     text: string;
     confidence: number;
   }[];
+  engine: 'tesseract-psm4' | 'tesseract-psm11' | 'ocr-space';
 }
 
 let workerInstance: any = null;
@@ -31,14 +32,48 @@ let workerInstance: any = null;
 const getWorker = async () => {
   if (!workerInstance) {
     workerInstance = await createWorker('eng', 1, {
-      logger: () => {}, // Silent
+      logger: () => {},
     });
   }
   return workerInstance;
 };
 
 /**
- * ✅ HEIC naar JPG conversie (iPad foto's)
+ * ✅ GRATIS FALLBACK: OCR.space API (geen auth nodig!)
+ */
+export const recognizeWithOCRSpace = async (
+  imageFile: File
+): Promise<{ text: string; confidence: number }> => {
+  try {
+    const formData = new FormData();
+    formData.append('filename', imageFile.name);
+    formData.append('file', imageFile);
+    formData.append('apikey', 'K87899142591'); // Free tier
+    formData.append('language', 'eng');
+
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = (await response.json()) as any;
+
+    if (!data.IsErroredOnProcessing && data.ParsedText) {
+      return {
+        text: data.ParsedText,
+        confidence: 0.85, // Estimate
+      };
+    }
+
+    return { text: '', confidence: 0 };
+  } catch (error) {
+    console.error('OCR.space error:', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ HEIC → JPG
  */
 export const convertHEICToJPG = async (file: File): Promise<File> => {
   try {
@@ -49,13 +84,14 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
         toType: 'image/jpeg',
         quality: 0.95,
       });
-      return new File([jpgBlob], file.name.replace('.heic', '.jpg'), { type: 'image/jpeg' });
+      return new File([jpgBlob], file.name.replace('.heic', '.jpg'), {
+        type: 'image/jpeg',
+      });
     }
   } catch (error) {
     console.warn('HEIC conversion failed, fallback canvas:', error);
   }
 
-  // Fallback: Canvas conversion
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -73,7 +109,11 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              resolve(new File([blob], file.name.replace('.heic', '.jpg'), { type: 'image/jpeg' }));
+              resolve(
+                new File([blob], file.name.replace('.heic', '.jpg'), {
+                  type: 'image/jpeg',
+                })
+              );
             } else {
               reject(new Error('Canvas conversion failed'));
             }
@@ -91,114 +131,22 @@ export const convertHEICToJPG = async (file: File): Promise<File> => {
 };
 
 /**
- * ✅ GEAVANCEERDE Image Preprocessing:
- * - Grayscale conversie
- * - Contrast boost (1.8x voor scherper onderscheid)
- * - Brightness aanpassingen
- * - Sharpening filter
- * - Noise reduction
+ * ✅ AGGRESSIVE PREPROCESSING - voor Tesseract
  */
 export const preprocessImage = async (img: HTMLImageElement): Promise<HTMLCanvasElement> => {
   const canvas = document.createElement('canvas');
-  
-  // Upscale kleine foto's
+
+  // Upscale
   const scaleFactor = img.width < 1200 ? 1.5 : 1;
   canvas.width = img.width * scaleFactor;
   canvas.height = img.height * scaleFactor;
-  
+
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context failed');
 
-  // Teken afbeelding met scaling
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  
+
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // STAP 1: Grayscale conversie (betere OCR performance)
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-    data[i] = gray;
-    data[i + 1] = gray;
-    data[i + 2] = gray;
-  }
-
-  // STAP 2: Contrast & brightness boost
-  const contrast = 1.8; // Sterker contrast voor beter onderscheid
-  const brightness = 30; // Helderheid boost
-
-  for (let i = 0; i < data.length; i += 4) {
-    for (let j = 0; j < 3; j++) {
-      let pixel = data[i + j];
-      pixel = (pixel - 128) * contrast + 128 + brightness;
-      data[i + j] = Math.max(0, Math.min(255, pixel));
-    }
-  }
-
-  // STAP 3: Sharpening filter (versterkt edges voor betere OCR)
-  const sharpened = new ImageData(new Uint8ClampedArray(data), imageData.width, imageData.height);
-  applySharpening(sharpened, 0.5);
-  
-  ctx.putImageData(sharpened, 0, 0);
-  return canvas;
-};
-
-/**
- * Sharpening filter kernel
- */
-function applySharpening(imageData: ImageData, strength: number): void {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  
-  const kernel = [
-    0, -strength, 0,
-    -strength, 1 + 4 * strength, -strength,
-    0, -strength, 0
-  ];
-
-  const temp = new Uint8ClampedArray(data);
-
-  for (let i = 0; i < height; i++) {
-    for (let j = 0; j < width; j++) {
-      const idx = (i * width + j) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        let value = 0;
-        for (let ki = -1; ki <= 1; ki++) {
-          for (let kj = -1; kj <= 1; kj++) {
-            const ni = i + ki;
-            const nj = j + kj;
-            if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
-              const nidx = (ni * width + nj) * 4 + c;
-              const kernelIdx = (ki + 1) * 3 + (kj + 1);
-              value += temp[nidx] * kernel[kernelIdx];
-            }
-          }
-        }
-        data[idx + c] = Math.max(0, Math.min(255, value));
-      }
-    }
-  }
-}
-
-/**
- * ✅ PDF preprocessing - NIEUW!
- */
-const preprocessCanvas = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
-  const processedCanvas = document.createElement('canvas');
-  processedCanvas.width = canvas.width;
-  processedCanvas.height = canvas.height;
-  
-  const ctx = processedCanvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas context failed');
-
-  ctx.drawImage(canvas, 0, 0);
-  
-  const imageData = ctx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
   const data = imageData.data;
 
   // Grayscale
@@ -212,9 +160,9 @@ const preprocessCanvas = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
     data[i + 2] = gray;
   }
 
-  // Contrast boost
-  const contrast = 1.6;
-  const brightness = 20;
+  // Contrast + brightness AGGRESSIVE
+  const contrast = 2.2;
+  const brightness = 50;
 
   for (let i = 0; i < data.length; i += 4) {
     for (let j = 0; j < 3; j++) {
@@ -225,84 +173,21 @@ const preprocessCanvas = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return processedCanvas;
-};
-
-export const extractTextFromPDF = async (
-  file: File,
-  onProgress?: (progress: number) => void
-): Promise<OCRResult> => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-    const pages = [];
-    let totalConfidence = 0;
-    let allText = '';
-    const worker = await getWorker();
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      onProgress?.((pageNum / pdf.numPages) * 40);
-
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 3 }); // Verhoogde schaal voor beter detail
-
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      if (!context) throw new Error('Canvas context failed');
-
-      await page.render({
-        canvasContext: context,
-        viewport: viewport,
-      }).promise;
-
-      // ✅ NIEUW: PDF preprocessing!
-      const processedCanvas = preprocessCanvas(canvas);
-
-      onProgress?.((pageNum / pdf.numPages) * 50);
-
-      const result = await worker.recognize(processedCanvas);
-      const pageText = result.data.text;
-      const pageConfidence = result.data.confidence;
-
-      pages.push({
-        pageNumber: pageNum,
-        text: pageText,
-        confidence: pageConfidence,
-      });
-
-      allText += `\n--- PAGE ${pageNum} ---\n${pageText}`;
-      totalConfidence += pageConfidence;
-
-      onProgress?.(50 + (pageNum / pdf.numPages) * 50);
-    }
-
-    const averageConfidence = pages.length > 0 ? totalConfidence / pages.length : 0;
-    return {
-      text: allText.trim(),
-      confidence: averageConfidence,
-      pages,
-    };
-  } catch (error) {
-    console.error('PDF OCR error:', error);
-    throw error;
-  }
+  return canvas;
 };
 
 /**
- * ✅ GEOPTIMALISEERDE: Extract text from image - full preprocessing pipeline
+ * ✅ TESSERACT MET PSM 4 - RECEIPTS/INVOICES
+ * PSM 4 = Assume a single column of text of variable sizes
  */
-export const extractTextFromImage = async (
+export const extractTextFromImagePSM4 = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> => {
   try {
-    onProgress?.(5);
+    onProgress?.(10);
 
-    // HEIC naar JPG conversie
+    // HEIC → JPG
     let imageFile = file;
     if (file.type === 'image/heic' || file.name.endsWith('.heic')) {
       console.log('📱 Converting HEIC to JPG...');
@@ -318,27 +203,35 @@ export const extractTextFromImage = async (
         try {
           onProgress?.(30);
 
-          // Geavanceerde preprocessing
-          console.log('🔧 Preprocessing image (grayscale, contrast, sharpening)...');
           const processedCanvas = await preprocessImage(img);
-          onProgress?.(60);
+          onProgress?.(50);
 
           const worker = await getWorker();
-          console.log('🤖 Running OCR...');
+
+          // ✅ INSTELLE PSM 4 VOOR RECEIPTS
+          console.log('🤖 Running OCR with PSM 4 (receipts/invoices)...');
+          await worker.setParameters({
+            tessedit_pageseg_mode: 4,
+          });
+
           const result = await worker.recognize(processedCanvas);
+          const confidence = result.data.confidence;
+
           onProgress?.(100);
 
           resolve({
             text: result.data.text,
-            confidence: result.data.confidence,
+            confidence,
             pages: [
               {
                 pageNumber: 1,
                 text: result.data.text,
-                confidence: result.data.confidence,
+                confidence,
               },
             ],
+            engine: 'tesseract-psm4',
           });
+
           URL.revokeObjectURL(url);
         } catch (error) {
           URL.revokeObjectURL(url);
@@ -354,14 +247,224 @@ export const extractTextFromImage = async (
       img.src = url;
     });
   } catch (error) {
-    console.error('Image OCR error:', error);
+    console.error('Image OCR error (PSM4):', error);
     throw error;
   }
 };
 
 /**
- * Parse Nederlands getal: 15.339,66 → 15339.66
+ * ✅ TESSERACT MET PSM 11 - SLECHTE FOTO'S/SPARSE TEXT
+ * PSM 11 = Sparse text. Find as much text as possible in no particular order.
  */
+export const extractTextFromImagePSM11 = async (
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<OCRResult> => {
+  try {
+    onProgress?.(10);
+
+    // HEIC → JPG
+    let imageFile = file;
+    if (file.type === 'image/heic' || file.name.endsWith('.heic')) {
+      console.log('📱 Converting HEIC to JPG...');
+      imageFile = await convertHEICToJPG(file);
+      onProgress?.(20);
+    }
+
+    const img = document.createElement('img');
+    const url = URL.createObjectURL(imageFile);
+
+    return new Promise((resolve, reject) => {
+      img.onload = async () => {
+        try {
+          onProgress?.(30);
+
+          const processedCanvas = await preprocessImage(img);
+          onProgress?.(50);
+
+          const worker = await getWorker();
+
+          // ✅ INSTELLE PSM 11 VOOR SLECHTE FOTO'S
+          console.log('🤖 Running OCR with PSM 11 (sparse text/bad photos)...');
+          await worker.setParameters({
+            tessedit_pageseg_mode: 11,
+          });
+
+          const result = await worker.recognize(processedCanvas);
+          const confidence = result.data.confidence;
+
+          onProgress?.(100);
+
+          resolve({
+            text: result.data.text,
+            confidence,
+            pages: [
+              {
+                pageNumber: 1,
+                text: result.data.text,
+                confidence,
+              },
+            ],
+            engine: 'tesseract-psm11',
+          });
+
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          URL.revokeObjectURL(url);
+          reject(error);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Image load failed'));
+      };
+
+      img.src = url;
+    });
+  } catch (error) {
+    console.error('Image OCR error (PSM11):', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ SMART ROUTING:
+ * 1. Probeer PSM 4 (voor facturen/receipts)
+ * 2. Confidence laag? → PSM 11 (sparse text)
+ * 3. Nog steeds slecht? → OCR.space (GRATIS fallback)
+ */
+export const extractTextFromImageSmart = async (
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<OCRResult> => {
+  try {
+    onProgress?.(10);
+
+    // STAP 1: PSM 4 proberen
+    console.log('📄 Attempting PSM 4 (receipt/invoice mode)...');
+    const result_psm4 = await extractTextFromImagePSM4(file, onProgress);
+
+    console.log(`PSM 4 confidence: ${result_psm4.confidence.toFixed(1)}%`);
+
+    if (result_psm4.confidence >= 70) {
+      console.log('✅ PSM 4 good enough!');
+      return result_psm4;
+    }
+
+    // STAP 2: PSM 11 proberen (sparse text)
+    console.log('⚠️  PSM 4 confidence low, trying PSM 11 (sparse text)...');
+    const result_psm11 = await extractTextFromImagePSM11(file, onProgress);
+
+    console.log(`PSM 11 confidence: ${result_psm11.confidence.toFixed(1)}%`);
+
+    if (result_psm11.confidence >= 65) {
+      console.log('✅ PSM 11 good enough!');
+      return result_psm11;
+    }
+
+    // STAP 3: OCR.space fallback (GRATIS!)
+    console.log('🆘 Both PSM modes failed, trying OCR.space...');
+    const result_space = await recognizeWithOCRSpace(file);
+
+    if (result_space.text && result_space.text.length > 10) {
+      console.log('✅ OCR.space saved the day!');
+      onProgress?.(100);
+      return {
+        text: result_space.text,
+        confidence: result_space.confidence,
+        pages: [
+          {
+            pageNumber: 1,
+            text: result_space.text,
+            confidence: result_space.confidence,
+          },
+        ],
+        engine: 'ocr-space',
+      };
+    }
+
+    // Fallback: return best result
+    console.log('⚠️  All methods attempted, returning best result');
+    return result_psm11.confidence > result_psm4.confidence
+      ? result_psm11
+      : result_psm4;
+  } catch (error) {
+    console.error('Smart OCR error:', error);
+    throw error;
+  }
+};
+
+/**
+ * PDF extraction
+ */
+export const extractTextFromPDF = async (
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<OCRResult> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    const pages = [];
+    let totalConfidence = 0;
+    let allText = '';
+    const worker = await getWorker();
+
+    // Use PSM 4 for PDFs (receipts/invoices)
+    await worker.setParameters({
+      tessedit_pageseg_mode: 4,
+    });
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      onProgress?.((pageNum / pdf.numPages) * 50);
+
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 3 });
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      if (!context) throw new Error('Canvas context failed');
+
+      await page.render({
+        canvasContext: context,
+        viewport: viewport,
+      }).promise;
+
+      const result = await worker.recognize(canvas);
+      const pageText = result.data.text;
+      const pageConfidence = result.data.confidence;
+
+      pages.push({
+        pageNumber: pageNum,
+        text: pageText,
+        confidence: pageConfidence,
+      });
+
+      allText += `\n--- PAGE ${pageNum} ---\n${pageText}`;
+      totalConfidence += pageConfidence;
+
+      onProgress?.(50 + (pageNum / pdf.numPages) * 50);
+    }
+
+    const averageConfidence =
+      pages.length > 0 ? totalConfidence / pages.length : 0;
+    return {
+      text: allText.trim(),
+      confidence: averageConfidence,
+      pages,
+      engine: 'tesseract-psm4',
+    };
+  } catch (error) {
+    console.error('PDF OCR error:', error);
+    throw error;
+  }
+};
+
+// ... (rest van het bestand: parseNederlandsNumber, extractInvoiceData, etc.)
 function parseNederlandsNumber(str: string): number {
   if (!str) return 0;
   let cleaned = str.replace(/€/g, '').replace(/\s/g, '').trim();
@@ -370,9 +473,6 @@ function parseNederlandsNumber(str: string): number {
   return parseFloat(cleaned) || 0;
 }
 
-/**
- * Extract bedrag - ondersteunt 1-2 decimalen
- */
 function extractAmount(text: string): number {
   const match = text.match(/€?\s*([\d\.]+,\d{1,2})/);
   if (match) {
@@ -381,42 +481,31 @@ function extractAmount(text: string): number {
   return 0;
 }
 
-/**
- * Find all amounts in text
- */
-function findAllAmounts(text: string): number[] {
-  const regex = /€?\s*([\d\.]+,\d{1,2})/g;
-  const matches = Array.from(text.matchAll(regex));
-  return matches
-    .map(m => parseNederlandsNumber(m[1]))
-    .filter(n => n > 0)
-    .sort((a, b) => b - a);
-}
-
-/**
- * Detect document type
- */
 function detectDocumentType(ocrText: string): 'invoice' | 'receipt' {
   const lower = ocrText.toLowerCase();
-  
+
   if (lower.includes('totaal') && (lower.includes('prijs') || lower.includes('pomp'))) {
     return 'receipt';
   }
-  
-  if (lower.includes('factuurnummer') || lower.includes('subtotaal') || lower.includes('factuur')) {
+
+  if (
+    lower.includes('factuurnummer') ||
+    lower.includes('subtotaal') ||
+    lower.includes('factuur')
+  ) {
     return 'invoice';
   }
-  
+
   return 'receipt';
 }
 
-/**
- * Extract invoice data - DYNAMISCH
- */
 export const extractInvoiceData = (ocrText: string) => {
-  const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const lines = ocrText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   const docType = detectDocumentType(ocrText);
-  
+
   let supplierName = 'Onbekend';
   let invoiceNumber = `INV-${Date.now()}`;
   let invoiceDate = new Date();
@@ -424,23 +513,29 @@ export const extractInvoiceData = (ocrText: string) => {
   let vatAmount = 0;
   let totalInclVat = 0;
 
-  // Supplier
   for (let i = 0; i < Math.min(15, lines.length); i++) {
     const line = lines[i];
-    if (line.includes('PAGE') || line.includes('---') || line.length < 3) continue;
-    if (line.match(/[A-Z][a-z]+.*(?:BV|Ltd|Inc|b\.v|B\.V|GROUP|EXPRESS|bv)/i) || 
-        (line.length > 5 && !line.match(/^\d/) && line !== line.toLowerCase() && line.match(/[A-Z]/))) {
+    if (line.includes('PAGE') || line.includes('---') || line.length < 3)
+      continue;
+    if (
+      line.match(/[A-Z][a-z]+.*(?:BV|Ltd|Inc|b\.v|B\.V|GROUP|EXPRESS|bv)/i) ||
+      (line.length > 5 &&
+        !line.match(/^\d/) &&
+        line !== line.toLowerCase() &&
+        line.match(/[A-Z]/))
+    ) {
       supplierName = line;
       break;
     }
   }
 
-  // Invoice number
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lower = line.toLowerCase();
     if (lower.includes('factuurnummer') || lower.includes('ticketnumber')) {
-      const num = line.match(/:\s*([A-Z0-9\-\.]+)/)?.[1] || lines[i + 1]?.match(/^([A-Z0-9\-\.]+)/)?.[1];
+      const num =
+        line.match(/:\s*([A-Z0-9\-\.]+)/)?.[1] ||
+        lines[i + 1]?.match(/^([A-Z0-9\-\.]+)/)?.[1];
       if (num) {
         invoiceNumber = num;
         break;
@@ -448,7 +543,6 @@ export const extractInvoiceData = (ocrText: string) => {
     }
   }
 
-  // Date
   const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
   for (const line of lines) {
     const match = line.match(datePattern);
@@ -456,14 +550,20 @@ export const extractInvoiceData = (ocrText: string) => {
       const day = parseInt(match[1]);
       const month = parseInt(match[2]);
       const year = parseInt(match[3]);
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 2020 && year <= 2030) {
+      if (
+        month >= 1 &&
+        month <= 12 &&
+        day >= 1 &&
+        day <= 31 &&
+        year >= 2020 &&
+        year <= 2030
+      ) {
         invoiceDate = new Date(year, month - 1, day);
         break;
       }
     }
   }
 
-  // Amounts
   if (docType === 'receipt') {
     for (let i = lines.length - 1; i >= 0; i--) {
       const line = lines[i];
@@ -499,7 +599,6 @@ export const extractInvoiceData = (ocrText: string) => {
     }
   }
 
-  // Fallbacks
   if (subtotalExclVat > 0 && vatAmount === 0) {
     vatAmount = Math.round((subtotalExclVat * 0.21) * 100) / 100;
   }
@@ -546,8 +645,12 @@ export const processInvoiceFile = async (
 
     if (file.type === 'application/pdf') {
       ocrResult = await extractTextFromPDF(file, onProgress);
-    } else if (file.type.startsWith('image/') || file.type === 'image/heic' || file.name.endsWith('.heic')) {
-      ocrResult = await extractTextFromImage(file, onProgress);
+    } else if (
+      file.type.startsWith('image/') ||
+      file.type === 'image/heic' ||
+      file.name.endsWith('.heic')
+    ) {
+      ocrResult = await extractTextFromImageSmart(file, onProgress);
     } else {
       throw new Error(`Unsupported file type: ${file.type}`);
     }
