@@ -482,7 +482,7 @@ const IncomingInvoices: React.FC = () => {
                     </div>
                     <div className="bg-white p-2 rounded border border-gray-200">
                       <p className="text-gray-600">BTW</p>
-                      <p className="font-semibold text-gray-900">€{(invoice.amount * 0.21).toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">€{(invoice.vatAmount || 0).toFixed(2)}</p>
                     </div>
                     <div className="bg-blue-50 p-2 rounded border border-blue-200">
                       <p className="text-blue-600">Incl. BTW</p>
@@ -639,30 +639,6 @@ const IncomingInvoices: React.FC = () => {
               </div>
 
               <div className="flex gap-2 mt-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => setEditingInvoice(null)}
-                  className="flex-1"
-                >
-                  Annuleren
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleSaveEdit}
-                  className="flex-1"
-                >
-                  Opslaan
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default IncomingInvoices;t-4">
                 <Button
                   variant="ghost"
                   onClick={() => setEditingInvoice(null)}
