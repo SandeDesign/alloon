@@ -1,5 +1,6 @@
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 if (typeof window !== 'undefined' && !window.WebSocket) {
   (window as any).WebSocket = class FakeWebSocket {
@@ -35,6 +36,74 @@ const getWorker = async () => {
     });
   }
   return workerInstance;
+};
+
+/**
+ * ✅ NEW: Convert image to PDF for better OCR
+ * Images direct OCR'en werkt slecht - via PDF veel beter
+ */
+export const convertImageToPDF = async (file: File): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const img = document.createElement('img');
+        const imageData = e.target?.result as string;
+        
+        img.onload = async () => {
+          try {
+            const pdfDoc = await PDFDocument.create();
+            
+            // Get image dimensions
+            const width = img.width;
+            const height = img.height;
+            
+            // Add page with image aspect ratio
+            const aspectRatio = width / height;
+            let pageWidth = 595; // A4 width
+            let pageHeight = pageWidth / aspectRatio;
+            
+            // Limit max height
+            if (pageHeight > 842) {
+              pageHeight = 842;
+              pageWidth = pageHeight * aspectRatio;
+            }
+            
+            const page = pdfDoc.addPage([pageWidth, pageHeight]);
+            
+            // Embed image
+            const imageBytes = await fetch(imageData).then(res => res.arrayBuffer());
+            const embeddedImage = await pdfDoc.embedPng(imageData).catch(async () => {
+              // Fallback to jpg if png fails
+              return await pdfDoc.embedJpg(imageData);
+            });
+            
+            // Draw image to fill page
+            page.drawImage(embeddedImage, {
+              x: 0,
+              y: 0,
+              width: pageWidth,
+              height: pageHeight,
+            });
+            
+            const pdfBytes = await pdfDoc.save();
+            resolve(pdfBytes);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = imageData;
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
 };
 
 export const extractTextFromPDF = async (
@@ -96,47 +165,30 @@ export const extractTextFromPDF = async (
   }
 };
 
+/**
+ * ✅ UPDATED: Extract text from image by converting to PDF first
+ */
 export const extractTextFromImage = async (
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> => {
   try {
-    const img = document.createElement('img');
-    const url = URL.createObjectURL(file);
-
-    return new Promise((resolve, reject) => {
-      img.onload = async () => {
-        try {
-          onProgress?.(25);
-          const worker = await getWorker();
-          const result = await worker.recognize(img);
-          onProgress?.(100);
-
-          resolve({
-            text: result.data.text,
-            confidence: result.data.confidence,
-            pages: [
-              {
-                pageNumber: 1,
-                text: result.data.text,
-                confidence: result.data.confidence,
-              },
-            ],
-          });
-          URL.revokeObjectURL(url);
-        } catch (error) {
-          URL.revokeObjectURL(url);
-          reject(error);
-        }
-      };
-
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Image load failed'));
-      };
-
-      img.src = url;
+    onProgress?.(10);
+    
+    // Convert image to PDF
+    const pdfBuffer = await convertImageToPDF(file);
+    onProgress?.(40);
+    
+    // Create a temporary File object from the PDF buffer
+    const pdfFile = new File([pdfBuffer], 'converted.pdf', { type: 'application/pdf' });
+    
+    // Process as PDF
+    const result = await extractTextFromPDF(pdfFile, (progress) => {
+      // Map 40-100 to 40% already done
+      onProgress?.(40 + (progress / 100) * 60);
     });
+    
+    return result;
   } catch (error) {
     console.error('Image OCR error:', error);
     throw error;
