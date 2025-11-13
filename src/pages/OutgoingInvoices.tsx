@@ -1185,4 +1185,4 @@ const OutgoingInvoices: React.FC = () => {
   );
 };
 
-export default OutgoingInvoice;
+export default OutgoingInvoices;
