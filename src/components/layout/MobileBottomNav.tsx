@@ -3,15 +3,14 @@ import { NavLink } from 'react-router-dom';
 import { 
   Home, 
   Clock, 
-  FileText, 
   Settings,
   Users,
-  Building2,
   Menu,
   CheckCircle2,
-  Calendar,
   Factory,
   TrendingUp,
+  Send,
+  ArrowDownLeft,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
@@ -29,22 +28,22 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
   const companyType = selectedCompany?.companyType as 'employer' | 'project' | undefined;
 
   const getCoreNavItems = () => {
-    // ✅ PROJECT COMPANY - Different nav
+    // ✅ PROJECT COMPANY
     if (companyType === 'project') {
       return [
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/project-production', icon: Factory, label: 'Productie' },
-        { href: '/project-statistics', icon: TrendingUp, label: 'Stats' },
-        { href: '/outgoing-invoices', icon: FileText, label: 'Facturen' },
+        { href: '/outgoing-invoices', icon: Send, label: 'Uitgaand' },
+        { href: '/incoming-invoices', icon: ArrowDownLeft, label: 'Inkomend' },
       ];
     }
 
-    // ✅ EMPLOYER COMPANY - Default nav by role
+    // ✅ EMPLOYER COMPANY
     const navItems: Record<string, Array<{ href: string; icon: any; label: string }>> = {
       employee: [
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/timesheets', icon: Clock, label: 'Uren' },
-        { href: '/payslips', icon: FileText, label: 'Loonstrook' },
+        { href: '/payslips', icon: CheckCircle2, label: 'Loonstrook' },
         { href: '/settings', icon: Settings, label: 'Profiel' },
       ],
       manager: [
@@ -56,7 +55,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
       admin: [
         { href: '/', icon: Home, label: 'Dashboard' },
         { href: '/timesheet-approvals', icon: CheckCircle2, label: 'Uren' },
-        { href: '/outgoing-invoices', icon: FileText, label: 'Facturen' },
+        { href: '/outgoing-invoices', icon: Send, label: 'Facturen' },
         { href: '/employees', icon: Users, label: 'Team' },
       ],
     };
@@ -85,7 +84,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
                 <div className={`p-2 rounded-lg transition-all duration-200 ${
                   isActive ? 'bg-blue-50' : 'hover:bg-gray-50'
                 }`}>
-                  <Icon size={28} strokeWidth={1.5} className={isActive ? 'text-blue-600' : 'text-gray-500'} />
+                  <Icon size={24} strokeWidth={1.5} className={isActive ? 'text-blue-600' : 'text-gray-500'} />
                 </div>
                 {isActive && (
                   <div className="absolute bottom-0 w-8 h-0.5 bg-blue-600 rounded-full" />
@@ -101,7 +100,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMenuClick })
           className="flex flex-col items-center justify-center px-3 py-2 flex-1 text-gray-500 hover:text-gray-700 transition-all duration-200"
         >
           <div className="p-2 rounded-lg hover:bg-gray-50 transition-all duration-200">
-            <Menu size={28} strokeWidth={1.5} />
+            <Menu size={24} strokeWidth={1.5} />
           </div>
         </button>
       </div>
