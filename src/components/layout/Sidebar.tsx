@@ -54,9 +54,9 @@ export const navigation: NavigationItem[] = [
   
   // FACTURATIE SECTION (both)
   { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Inkomende Facturen Stats', href: '/incoming-invoices-stats', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'] },
+  { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'] },
+  { name: 'Facturen Uploaden', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'] },
+  { name: 'Inkoopbonnen', href: '/incoming-invoices-stats', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'] },
   
   // PROJECT COMPANY SPECIFIC
   { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin'], companyTypes: ['project'] },
