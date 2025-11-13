@@ -15,6 +15,7 @@ import {
   Trash2,
   HardDrive,
   Zap,
+  Edit2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
@@ -223,6 +224,50 @@ const IncomingInvoices: React.FC = () => {
       loadInvoices();
     } catch (error) {
       showError('Fout bij verwijderen', 'Kon factuur niet verwijderen');
+    }
+  };
+
+  const handleEdit = async (invoice: IncomingInvoice) => {
+    const supplierName = prompt('Leverancier:', invoice.supplierName);
+    if (!supplierName) return;
+
+    const invoiceNumber = prompt('Factuurnummer:', invoice.invoiceNumber);
+    if (!invoiceNumber) return;
+
+    const subtotal = prompt('Excl. BTW:', invoice.amount.toString());
+    if (!subtotal) return;
+
+    try {
+      const newSubtotal = parseFloat(subtotal);
+      const newVat = newSubtotal * 0.21;
+      const newTotal = newSubtotal + newVat;
+
+      await incomingInvoiceService.updateInvoice(invoice.id!, {
+        supplierName,
+        invoiceNumber,
+        amount: newSubtotal,
+        vatAmount: newVat,
+        totalAmount: newTotal,
+      });
+
+      // Update local state
+      const updated = invoices.map(inv =>
+        inv.id === invoice.id
+          ? {
+              ...inv,
+              supplierName,
+              invoiceNumber,
+              amount: newSubtotal,
+              vatAmount: newVat,
+              totalAmount: newTotal,
+            }
+          : inv
+      );
+      setInvoices(updated);
+
+      success('Factuur bijgewerkt', 'De gegevens zijn opgeslagen');
+    } catch (error) {
+      showError('Fout bij bijwerken', 'Kon factuur niet bijwerken');
     }
   };
 
@@ -473,6 +518,16 @@ const IncomingInvoices: React.FC = () => {
                       >
                         Download
                       </Button>
+                      {invoice.status === 'pending' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Edit2}
+                          onClick={() => handleEdit(invoice)}
+                        >
+                          Bewerken
+                        </Button>
+                      )}
                       {invoice.status === 'pending' && (
                         <>
                           <Button
