@@ -209,10 +209,11 @@ function parseNederlandsNumber(str: string): number {
 /**
  * Extract bedrag uit string - CORRECT voor Nederlands formaat
  * "€ 15.339,66" → 15339.66
+ * "€ 1.909,4" → 1909.4 (ook 1 decimaal)
  */
 function extractAmount(text: string): number {
-  // Match: optional €, optional spaces, digits/punten/komma
-  const match = text.match(/€?\s*([\d\.]+,\d{2})/);
+  // Match: optional €, optional spaces, digits/punten/komma met 1-2 decimalen
+  const match = text.match(/€?\s*([\d\.]+,\d{1,2})/);
   if (match) {
     return parseNederlandsNumber(match[1]);
   }
@@ -220,11 +221,43 @@ function extractAmount(text: string): number {
 }
 
 /**
- * Extract invoice data - Werk van ACHTEREN naar VOREN
- * Facturen eindigen altijd met: Subtotaal, BTW, Totaal te voldoen
+ * Find all amounts in text - returns sorted array
+ */
+function findAllAmounts(text: string): number[] {
+  const regex = /€?\s*([\d\.]+,\d{1,2})/g;
+  const matches = Array.from(text.matchAll(regex));
+  return matches
+    .map(m => parseNederlandsNumber(m[1]))
+    .filter(n => n > 0)
+    .sort((a, b) => b - a); // Grootste eerst
+}
+
+/**
+ * ✅ NEW: Detect if document is factuur or bonnetje
+ */
+function detectDocumentType(ocrText: string): 'invoice' | 'receipt' {
+  const lower = ocrText.toLowerCase();
+  
+  // Tankstation/receipt keywords
+  if (lower.includes('totaal') && (lower.includes('prijs') || lower.includes('pomp'))) {
+    return 'receipt';
+  }
+  
+  // Factuur keywords
+  if (lower.includes('factuurnummer') || lower.includes('subtotaal') || lower.includes('factuur')) {
+    return 'invoice';
+  }
+  
+  // Default to receipt (bonnetjes zijn makkelijker)
+  return 'receipt';
+}
+
+/**
+ * Extract invoice data - DYNAMISCH voor facturen EN bonnetjes
  */
 export const extractInvoiceData = (ocrText: string) => {
   const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const docType = detectDocumentType(ocrText);
   
   let supplierName = 'Onbekend';
   let invoiceNumber = `INV-${Date.now()}`;
@@ -233,13 +266,13 @@ export const extractInvoiceData = (ocrText: string) => {
   let vatAmount = 0;
   let totalInclVat = 0;
 
-  // ===== SUPPLIER: Zoek BEDRIJF (niet "--- PAGE 1 ---") =====
+  // ===== SUPPLIER: Zoek bedrijfsnaam =====
   for (let i = 0; i < Math.min(15, lines.length); i++) {
     const line = lines[i];
     // Skip template/page markers
     if (line.includes('PAGE') || line.includes('---') || line.length < 3) continue;
     // Zoek BV, Ltd, of mixed case bedrijfsnaam
-    if (line.match(/[A-Z][a-z]+.*(?:BV|Ltd|Inc|b\.v|B\.V)/i) || 
+    if (line.match(/[A-Z][a-z]+.*(?:BV|Ltd|Inc|b\.v|B\.V|GROUP|EXPRESS|bv)/i) || 
         (line.length > 5 && !line.match(/^\d/) && line !== line.toLowerCase() && line.match(/[A-Z]/))) {
       supplierName = line;
       break;
@@ -250,8 +283,7 @@ export const extractInvoiceData = (ocrText: string) => {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lower = line.toLowerCase();
-    if (lower.includes('factuurnummer')) {
-      // Format: "Factuurnummer: 2025-0015"
+    if (lower.includes('factuurnummer') || lower.includes('ticketnumber')) {
       const num = line.match(/:\s*([A-Z0-9\-\.]+)/)?.[1] || lines[i + 1]?.match(/^([A-Z0-9\-\.]+)/)?.[1];
       if (num) {
         invoiceNumber = num;
@@ -275,34 +307,46 @@ export const extractInvoiceData = (ocrText: string) => {
     }
   }
 
-  // ===== BEDRAGEN: Werk VAN ACHTEREN =====
-  // De factuur eindigt ALTIJD met: Subtotaal, 21% btw, Totaal te voldoen
-  // Dus zoeken we van achteren naar voren
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    const lower = line.toLowerCase();
+  // ===== BEDRAGEN: Type-specific extraction =====
+  if (docType === 'receipt') {
+    // RECEIPT/BONNETJE: Zoek naar TOTAAL of TOTAL
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      const lower = line.toLowerCase();
 
-    // TOTAAL TE VOLDOEN (laatste bedrag)
-    if (totalInclVat === 0 && lower.includes('totaal') && lower.includes('voldoen')) {
-      totalInclVat = extractAmount(line);
-      continue;
+      if (lower.includes('totaal') && !lower.includes('subtotaal')) {
+        totalInclVat = extractAmount(line);
+        if (totalInclVat > 0) break;
+      }
     }
 
-    // 21% BTW
-    if (vatAmount === 0 && lower.includes('21%') && lower.includes('btw')) {
-      vatAmount = extractAmount(line);
-      continue;
-    }
+    // Assume no VAT for receipts, of 0% handling
+    subtotalExclVat = totalInclVat;
+    vatAmount = 0;
+  } else {
+    // FACTUUR: Standaard logic van achteren naar voren
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      const lower = line.toLowerCase();
 
-    // SUBTOTAAL
-    if (subtotalExclVat === 0 && lower.includes('subtotaal')) {
-      subtotalExclVat = extractAmount(line);
-      continue;
+      if (totalInclVat === 0 && lower.includes('totaal') && lower.includes('voldoen')) {
+        totalInclVat = extractAmount(line);
+        continue;
+      }
+
+      if (vatAmount === 0 && lower.includes('btw') && lower.match(/\d+%/)) {
+        vatAmount = extractAmount(line);
+        continue;
+      }
+
+      if (subtotalExclVat === 0 && lower.includes('subtotaal')) {
+        subtotalExclVat = extractAmount(line);
+        continue;
+      }
     }
   }
 
   // ===== Validatie & Fallback =====
-  // Check: bedragen moeten realistisch zijn
   if (subtotalExclVat > 0 && vatAmount === 0) {
     vatAmount = Math.round((subtotalExclVat * 0.21) * 100) / 100;
   }
@@ -313,18 +357,12 @@ export const extractInvoiceData = (ocrText: string) => {
     if (vatAmount > 0) {
       subtotalExclVat = totalInclVat - vatAmount;
     } else {
-      // Assume 21% VAT
-      subtotalExclVat = Math.round((totalInclVat / 1.21) * 100) / 100;
-      vatAmount = totalInclVat - subtotalExclVat;
+      subtotalExclVat = totalInclVat;
     }
   }
 
-  // Safety check: als bedragen nul zijn, heeft OCR gefaald
-  if (totalInclVat === 0) {
-    console.warn('⚠️  Warning: Bedragen niet gevonden in OCR. Mogelijk OCR probleem.');
-  }
-
   console.log('\n========== INVOICE EXTRACTED ==========');
+  console.log('Type:            ', docType);
   console.log('Supplier:        ', supplierName);
   console.log('Invoice Number:  ', invoiceNumber);
   console.log('Date:            ', invoiceDate.toLocaleDateString('nl-NL'));
