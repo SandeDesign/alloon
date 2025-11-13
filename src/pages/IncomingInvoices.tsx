@@ -239,7 +239,7 @@ const IncomingInvoices: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editingInvoice) return;
     
-    const vat = editFormData.subtotal * 0.21;
+    const vat = Math.round(editFormData.subtotal * 0.21 * 100) / 100;
     const total = editFormData.subtotal + vat;
 
     try {
@@ -260,6 +260,7 @@ const IncomingInvoices: React.FC = () => {
               amount: editFormData.subtotal,
               vatAmount: vat,
               totalAmount: total,
+              updatedAt: new Date(),
             }
           : inv
       );
@@ -268,6 +269,7 @@ const IncomingInvoices: React.FC = () => {
 
       success('Factuur bijgewerkt', 'De gegevens zijn opgeslagen');
     } catch (error) {
+      console.error('Edit error:', error);
       showError('Fout bij bijwerken', 'Kon factuur niet bijwerken');
     }
   };
@@ -465,7 +467,7 @@ const IncomingInvoices: React.FC = () => {
                 </div>
                 <div className="text-right flex-shrink-0 ml-2">
                   <p className="font-semibold text-sm text-gray-900">
-                    €{invoice.totalAmount.toFixed(2)}
+                    €{(invoice.totalAmount || 0).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -476,15 +478,15 @@ const IncomingInvoices: React.FC = () => {
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="bg-white p-2 rounded border border-gray-200">
                       <p className="text-gray-600">Excl. BTW</p>
-                      <p className="font-semibold text-gray-900">€{invoice.amount.toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">€{(invoice.amount || 0).toFixed(2)}</p>
                     </div>
                     <div className="bg-white p-2 rounded border border-gray-200">
                       <p className="text-gray-600">BTW</p>
-                      <p className="font-semibold text-gray-900">€{invoice.vatAmount.toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">€{(invoice.vatAmount || 0).toFixed(2)}</p>
                     </div>
                     <div className="bg-blue-50 p-2 rounded border border-blue-200">
                       <p className="text-blue-600">Incl. BTW</p>
-                      <p className="font-semibold text-blue-900">€{invoice.totalAmount.toFixed(2)}</p>
+                      <p className="font-semibold text-blue-900">€{(invoice.totalAmount || 0).toFixed(2)}</p>
                     </div>
                   </div>
 
