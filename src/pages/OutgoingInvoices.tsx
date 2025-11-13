@@ -411,12 +411,13 @@ const OutgoingInvoices: React.FC = () => {
     }
     setSendingWebhook(invoiceId);
     try {
+      // ⭐ AANPASSING: bankAccount toegevoegd
       const info: CompanyInfo = {
         id: selectedCompany?.id || '',
         name: selectedCompany?.name || '',
         kvk: selectedCompany?.kvk || '',
         taxNumber: selectedCompany?.taxNumber || '',
-        bankAccount: selectedCompany?.bankAccount || '',
+        bankAccount: selectedCompany?.bankAccount || '',  // ← NIEUW
         contactInfo: { email: selectedCompany?.contactInfo?.email || '', phone: selectedCompany?.contactInfo?.phone || '' },
         address: { street: selectedCompany?.address?.street || '', city: selectedCompany?.address?.city || '', zipCode: selectedCompany?.address?.zipCode || '', country: selectedCompany?.address?.country || '' }
       };
