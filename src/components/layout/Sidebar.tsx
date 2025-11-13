@@ -57,8 +57,10 @@ export const navigation: NavigationItem[] = [
   { name: 'Uitgaande Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'] },
   { name: 'Inkomende Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'] },
   
-  // PROJECT COMPANY SPECIFIC ✅ UPDATED
+  // PROJECT COMPANY SPECIFIC
   { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin'], companyTypes: ['project'] },
+  
+  // STATISTIEKEN (both)
   { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'] },
   
   // DATA & EXPORTS SECTION (employer only)
