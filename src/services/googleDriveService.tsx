@@ -320,7 +320,7 @@ export const uploadInvoiceToDrive = async (
     // Upload file
     const uploadResult = await uploadFileToDrive(
       file,
-      productieFolderId,
+      inkoopFolderId,
       token,
       `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.${file.name.split('.').pop()}`
     );
