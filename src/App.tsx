@@ -33,6 +33,8 @@ import InvoiceRelations from './pages/InvoiceRelations';
 // ✅ FACTUREN IMPORTS
 import OutgoingInvoices from './pages/OutgoingInvoices';
 import IncomingInvoices from './pages/IncomingInvoices';
+// ✅ INCOMING INVOICES STATS - NIEUW!
+import IncomingInvoicesStats from './pages/IncomingInvoicesStats';
 import TimesheetExport from './pages/TimesheetExport';
 import DriveFiles from './pages/DriveFiles';
 import { AppProvider } from './contexts/AppContext';
@@ -93,10 +95,12 @@ function App() {
                           <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
                           <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
                           
-                          {/* ✅ FACTURATIE - MET RELATIES! */}
+                          {/* ✅ FACTURATIE - MET RELATIES EN STATISTIEKEN! */}
                           <Route path="invoice-relations" element={<InvoiceRelations />} />
                           <Route path="outgoing-invoices" element={<OutgoingInvoices />} />
                           <Route path="incoming-invoices" element={<IncomingInvoices />} />
+                          {/* ✅ NEW ROUTE - Incoming Invoices Stats Dashboard */}
+                          <Route path="incoming-invoices-stats" element={<IncomingInvoicesStats />} />
                           
                           {/* ✅ DATA & EXPORTS */}
                           <Route path="timesheet-export" element={<TimesheetExport />} />
