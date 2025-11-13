@@ -230,9 +230,9 @@ const IncomingInvoices: React.FC = () => {
   const openEditModal = (invoice: IncomingInvoice) => {
     setEditingInvoice(invoice);
     setEditFormData({
-      supplierName: invoice.supplierName,
-      invoiceNumber: invoice.invoiceNumber,
-      subtotal: invoice.amount,
+      supplierName: invoice.supplierName || '',
+      invoiceNumber: invoice.invoiceNumber || '',
+      subtotal: invoice.amount || 0,
     });
   };
 
@@ -617,9 +617,9 @@ const IncomingInvoices: React.FC = () => {
                   <input
                     type="number"
                     step="0.01"
-                    value={editFormData.subtotal || ''}
+                    value={editFormData.subtotal}
                     onChange={(e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : 0;
+                      const val = e.target.value !== '' ? parseFloat(e.target.value) : 0;
                       setEditFormData({...editFormData, subtotal: val});
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
