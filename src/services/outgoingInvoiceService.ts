@@ -53,11 +53,13 @@ export interface OutgoingInvoice {
   updatedAt: Date;
 }
 
+// ⭐ AANPASSING 1: bankAccount toegevoegd
 export interface CompanyInfo {
   id: string;
   name: string;
   kvk: string;
   taxNumber: string;
+  bankAccount: string;  // ← NIEUW
   contactInfo: {
     email: string;
     phone: string;
@@ -224,6 +226,11 @@ export const outgoingInvoiceService = {
 
   async generateInvoiceHTML(invoice: OutgoingInvoice, company: CompanyInfo): Promise<string> {
     try {
+      // ⭐ AANPASSING 2: Bereken betaaltermijn dagen
+      const invoiceDateObj = new Date(invoice.invoiceDate);
+      const dueDateObj = new Date(invoice.dueDate);
+      const daysUntilDue = Math.ceil((dueDateObj.getTime() - invoiceDateObj.getTime()) / (1000 * 60 * 60 * 24));
+
       const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -238,7 +245,7 @@ export const outgoingInvoiceService = {
     .company-info h1 { font-size: 18px; color: #2563eb; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.5px; }
     .company-info p { font-size: 11px; color: #6b7280; margin-bottom: 2px; line-height: 1.3; }
     .company-details { font-size: 11px; color: #6b7280; text-align: right; }
-    .company-details p { margin-bottom: 2px; line-height: 1.3; }
+    .company-details p { margin-bottom: 4px; line-height: 1.4; }
     .company-details strong { color: #374151; }
     
     /* Invoice Title Section */
@@ -283,6 +290,14 @@ export const outgoingInvoiceService = {
     .totals-value { font-weight: 600; color: #111827; }
     .totals-row.total .totals-value { color: #2563eb; }
     
+    /* ⭐ Payment Info Section - NIEUW */
+    .payment-section { margin-top: 30px; padding: 15px 14px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #0ea5e9; border-radius: 6px; }
+    .payment-section h4 { font-size: 11px; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.3px; }
+    .payment-info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px; }
+    .payment-info-item { }
+    .payment-info-label { color: #0369a1; font-weight: 600; margin-bottom: 2px; }
+    .payment-info-value { color: #164e63; font-weight: 600; word-break: break-all; }
+    
     /* Footer */
     .footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; text-align: center; line-height: 1.4; }
     
@@ -299,6 +314,7 @@ export const outgoingInvoiceService = {
       </div>
       <div class="company-details">
         <p><strong>KvK:</strong> <span>${company.kvk}</span></p>
+        <p><strong>Bankrekening:</strong> <span>${company.bankAccount}</span></p>
         <p><strong>BTW:</strong> <span>${company.taxNumber}</span></p>
         <p><strong>E-mail:</strong> <span>${company.contactInfo.email}</span></p>
         <p><strong>Tel:</strong> <span>${company.contactInfo.phone}</span></p>
@@ -370,6 +386,21 @@ export const outgoingInvoiceService = {
             <span class="totals-label">TOTAAL:</span>
             <span class="totals-value">€${invoice.totalAmount.toFixed(2)}</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⭐ Payment Information Section - NIEUW -->
+    <div class="payment-section">
+      <h4>Betaalgegevens</h4>
+      <div class="payment-info">
+        <div class="payment-info-item">
+          <div class="payment-info-label">Bankrekening:</div>
+          <div class="payment-info-value">${company.bankAccount}</div>
+        </div>
+        <div class="payment-info-item">
+          <div class="payment-info-label">Betalen voor:</div>
+          <div class="payment-info-value">${new Date(invoice.dueDate).toLocaleDateString('nl-NL')} (binnen ${daysUntilDue} dagen)</div>
         </div>
       </div>
     </div>
