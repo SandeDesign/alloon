@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, CreditCard as Edit, Trash2, User, Mail, Phone, Building2 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, User, Mail, Phone, Building2, LogIn, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { Employee } from '../types';
-import { getEmployees, deleteEmployee } from '../services/firebase';
+import { getEmployees, deleteEmployee, createEmployeeAuthAccount, updateEmployee } from '../services/firebase';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import EmployeeModal from '../components/employee/EmployeeModal';
 import { useToast } from '../hooks/useToast';
+
+const DEFAULT_PASSWORD = 'DeInstallatie1234!!';
 
 const EmployeesNew: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +21,7 @@ const EmployeesNew: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [creatingAccount, setCreatingAccount] = useState<string | null>(null);
 
   const loadEmployees = useCallback(async () => {
     if (!user) {
@@ -73,6 +76,49 @@ const EmployeesNew: React.FC = () => {
     }
   };
 
+  const handleCreateAccount = async (employee: Employee) => {
+    if (!user) return;
+
+    if (employee.hasAccount) {
+      showError('Account bestaat al', `${employee.personalInfo.firstName} heeft al een account`);
+      return;
+    }
+
+    const confirmMsg = `Weet je zeker dat je een account wilt aanmaken voor ${employee.personalInfo.firstName} ${employee.personalInfo.lastName}?\n\nInloggegevens:\nE-mail: ${employee.personalInfo.contactInfo.email}\nWachtwoord: ${DEFAULT_PASSWORD}`;
+    
+    if (window.confirm(confirmMsg)) {
+      try {
+        setCreatingAccount(employee.id);
+        
+        await createEmployeeAuthAccount(
+          employee.id,
+          user.uid,
+          employee.personalInfo.contactInfo.email,
+          DEFAULT_PASSWORD
+        );
+
+        success(
+          'Account aangemaakt! ✓',
+          `${employee.personalInfo.firstName} kan nu inloggen.`
+        );
+        await loadEmployees();
+      } catch (error: any) {
+        console.error('Error creating account:', error);
+        
+        let errorMessage = 'Kon account niet aanmaken';
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'Dit e-mailadres is al in gebruik';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'E-mailadres is ongeldig';
+        }
+        
+        showError('Fout bij account aanmaken', errorMessage);
+      } finally {
+        setCreatingAccount(null);
+      }
+    }
+  };
+
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedEmployee(null);
@@ -113,31 +159,34 @@ const EmployeesNew: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6 px-4 md:px-0">
+      {/* Header - Mobiel vriendelijk */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Werknemers</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Werknemers</h1>
+          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 md:mt-2">
             Beheer je werknemers en hun gegevens
           </p>
         </div>
         <Button
           onClick={handleAddEmployee}
           disabled={companies.length === 0}
+          className="w-full sm:w-auto"
         >
           <Plus className="h-4 w-4 mr-2" />
           Nieuwe Werknemer
         </Button>
       </div>
 
+      {/* No companies state */}
       {companies.length === 0 ? (
-        <Card className="p-8">
+        <Card className="p-6 md:p-8">
           <div className="text-center">
             <Building2 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               Geen bedrijven gevonden
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mb-4">
               Je moet eerst een bedrijf aanmaken voordat je werknemers kunt toevoegen.
             </p>
             <Button onClick={() => window.location.href = '/companies'}>
@@ -154,62 +203,104 @@ const EmployeesNew: React.FC = () => {
           onAction={handleAddEmployee}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        /* Employees Grid - Responsive */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {employees.map((employee) => (
-            <Card key={employee.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                    <User className="h-6 w-6 text-blue-600" />
+            <Card key={employee.id} className="p-4 md:p-6 hover:shadow-lg transition-shadow flex flex-col h-full">
+              {/* Header with name and status */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex-shrink-0">
+                    <User className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white truncate">
                       {employee.personalInfo.firstName} {employee.personalInfo.lastName}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">
                       {employee.contractInfo.position}
                     </p>
                   </div>
                 </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(employee.status)}`}>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 whitespace-nowrap ${getStatusColor(employee.status)}`}>
                   {getStatusText(employee.status)}
                 </span>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                  <Mail className="h-4 w-4" />
-                  <span>{employee.personalInfo.contactInfo.email}</span>
+              {/* Contact & Contract Info */}
+              <div className="space-y-2 mb-4 text-xs md:text-sm flex-1">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 truncate">
+                  <Mail className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate" title={employee.personalInfo.contactInfo.email}>
+                    {employee.personalInfo.contactInfo.email}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                  <Phone className="h-4 w-4" />
-                  <span>{employee.personalInfo.contactInfo.phone || 'Niet ingevuld'}</span>
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                
+                {employee.personalInfo.contactInfo.phone && (
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 truncate">
+                    <Phone className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{employee.personalInfo.contactInfo.phone}</span>
+                  </div>
+                )}
+                
+                <div className="text-gray-600 dark:text-gray-400">
                   <span className="font-medium">Contract:</span> {employee.contractInfo.type}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                
+                <div className="text-gray-600 dark:text-gray-400">
                   <span className="font-medium">Uren/week:</span> {employee.contractInfo.hoursPerWeek}
                 </div>
               </div>
 
-              <div className="flex space-x-2">
+              {/* Account Status Alert */}
+              {!employee.hasAccount && (
+                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2 text-xs md:text-sm">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-amber-700 dark:text-amber-300">Geen account</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleEditEmployee(employee)}
-                  className="flex-1"
+                  className="text-xs md:text-sm"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Bewerken
                 </Button>
+                
                 <Button
                   size="sm"
                   variant="danger"
                   onClick={() => handleDeleteEmployee(employee)}
+                  className="text-xs md:text-sm"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
+
+                {!employee.hasAccount && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCreateAccount(employee)}
+                    disabled={creatingAccount === employee.id}
+                    className="col-span-2 text-xs md:text-sm bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                  >
+                    <LogIn className="h-4 w-4 mr-1" />
+                    {creatingAccount === employee.id ? 'Aanmaken...' : 'Account aanmaken'}
+                  </Button>
+                )}
+
+                {employee.hasAccount && (
+                  <div className="col-span-2 text-xs text-green-600 dark:text-green-400 text-center py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    ✓ Account actief
+                  </div>
+                )}
               </div>
             </Card>
           ))}
