@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LeaveRequest, Employee } from '../types';
 import * as firebaseService from '../services/firebase';
+import { syncLeaveRequestToTimesheet } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { useToast } from '../hooks/useToast';
@@ -63,17 +64,31 @@ const AdminLeaveApprovals: React.FC = () => {
 
     setProcessingId(request.id);
     try {
+      // 1️⃣ Approve in Firebase
       await firebaseService.approveLeaveRequest(
         request.id,
         user.uid,
         user.displayName || user.email || 'Admin'
       );
 
-      success('Verlof goedgekeurd', `Verlofaanvraag van ${getEmployeeName(request.employeeId)} is goedgekeurd`);
+      // 2️⃣ ✅ AUTO-SYNC: Update timesheet entries
+      const approvedRequest: LeaveRequest = {
+        ...request,
+        status: 'approved',
+        approvedBy: user.uid,
+        approvedAt: new Date()
+      };
+      
+      await syncLeaveRequestToTimesheet(approvedRequest);
+
+      success(
+        'Verlof goedgekeurd en ingeplanned',
+        `Verlofaanvraag van ${getEmployeeName(request.employeeId)} is goedgekeurd`
+      );
       await loadPendingRequests();
     } catch (err) {
       console.error('Error approving request:', err);
-      showError('Fout bij goedkeuren', 'Kon verlofaanvraag niet goedkeuren');
+      showError('Fout bij goedkeuren', 'Kon verlofaanvraag niet goedkeuren of urenregistratie niet aanpassen');
     } finally {
       setProcessingId(null);
     }
