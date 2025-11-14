@@ -235,7 +235,7 @@ const OutgoingInvoices: React.FC = () => {
     
     const description = `${tableHeader}\n${tableRows}`;
     const totalUren = selectedProductionWeek.totalHours;
-    const rate = 44;
+    const rate = 41.31;
     const amount = totalUren * rate;
 
     const newItem: InvoiceItem = {
