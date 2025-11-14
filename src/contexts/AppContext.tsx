@@ -1,320 +1,241 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Edit, Trash2, User, Mail, Phone, Building2, LogIn, AlertCircle } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useApp } from '../contexts/AppContext';
-import { Employee } from '../types';
-import { getEmployees, deleteEmployee, createEmployeeAuthAccount, updateEmployee } from '../services/firebase';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { EmptyState } from '../components/ui/EmptyState';
-import EmployeeModal from '../components/employee/EmployeeModal';
-import { useToast } from '../hooks/useToast';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from './AuthContext';
+import { Company, Employee, Branch, DashboardStats } from '../types';
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings } from '../services/firebase';
+import { getPendingExpenses } from '../services/firebase';
+import { getPayrollCalculations } from '../services/payrollService';
+import { getPendingTimesheets } from '../services/timesheetService';
 
-const DEFAULT_PASSWORD = 'DeInstallatie1234!!';
+interface AppContextType {
+  companies: Company[];
+  employees: Employee[];
+  branches: Branch[];
+  selectedCompany: Company | null;
+  dashboardStats: DashboardStats;
+  loading: boolean;
+  currentEmployeeId: string | null;
+  setSelectedCompany: (company: Company | null) => void;
+  refreshDashboardStats: () => Promise<void>;
+}
 
-const EmployeesNew: React.FC = () => {
-  const { user } = useAuth();
-  const { companies, selectedCompany, refreshDashboardStats } = useApp();
-  const { success, error: showError } = useToast();
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, userRole, currentEmployeeId, adminUserId } = useAuth();
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [creatingAccount, setCreatingAccount] = useState<string | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    activeEmployees: 0,
+    totalGrossThisMonth: 0,
+    companiesCount: 0,
+    branchesCount: 0,
+    pendingApprovals: 0,
+  });
 
-  const loadEmployees = useCallback(async () => {
-    if (!user) {
+  // Use ref to track if data is being loaded to prevent duplicate calls
+  const isLoadingRef = useRef(false);
+
+  // Calculate dashboard stats - PURE FUNCTION, no setState in dependencies
+  const calculateDashboardStats = useCallback(async (
+    companiesData: Company[],
+    employeesData: Employee[],
+    branchesData: Branch[],
+    userId: string
+  ) => {
+    try {
+      const activeEmployees = employeesData.filter(emp => emp.status === 'active').length;
+      const companiesCount = companiesData.length;
+      const branchesCount = branchesData.length;
+
+      let totalPendingApprovals = 0;
+      let totalGrossThisMonth = 0;
+
+      if (companiesData.length > 0) {
+        try {
+          const pendingLeaveRequests = await Promise.all(
+            companiesData.map(company => getPendingLeaveApprovals(company.id, userId).catch(() => []))
+          );
+          totalPendingApprovals += pendingLeaveRequests.flat().length;
+        } catch (error) {
+          console.error('Error calculating pending leaves:', error);
+        }
+
+        try {
+          const pendingTimesheets = await Promise.all(
+            companiesData.map(company => getPendingTimesheets(userId, company.id).catch(() => []))
+          );
+          totalPendingApprovals += pendingTimesheets.flat().length;
+        } catch (error) {
+          console.error('Error calculating pending timesheets:', error);
+        }
+
+        try {
+          const pendingExpenses = await Promise.all(
+            companiesData.map(company => getPendingExpenses(company.id, userId).catch(() => []))
+          );
+          totalPendingApprovals += pendingExpenses.flat().length;
+        } catch (error) {
+          console.error('Error calculating pending expenses:', error);
+        }
+
+        try {
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const payrollCalculations = await getPayrollCalculations(userId).catch(() => []);
+          totalGrossThisMonth = payrollCalculations.reduce((sum, calc) => {
+            if (calc.periodStartDate.getMonth() === currentMonth && calc.periodStartDate.getFullYear() === currentYear) {
+              return sum + calc.grossPay;
+            }
+            return sum;
+          }, 0);
+        } catch (error) {
+          console.error('Error calculating payroll:', error);
+        }
+      }
+
+      setDashboardStats({
+        activeEmployees,
+        totalGrossThisMonth,
+        companiesCount,
+        branchesCount,
+        pendingApprovals: totalPendingApprovals,
+      });
+    } catch (error) {
+      console.error('Error in calculateDashboardStats:', error);
+    }
+  }, []);
+
+  // Main load function - loads all data AND sets default company
+  const loadData = useCallback(async () => {
+    if (!user || !adminUserId) {
+      console.log('Cannot load data - missing user or adminUserId:', { user: !!user, adminUserId });
       setLoading(false);
+      return;
+    }
+
+    if (isLoadingRef.current) {
+      console.log('Already loading data, skipping duplicate call');
       return;
     }
 
     try {
+      isLoadingRef.current = true;
       setLoading(true);
-      const employeesData = await getEmployees(user.uid);
+      console.log('Loading data for adminUserId:', adminUserId);
+      
+      const [companiesData, employeesData, branchesData] = await Promise.all([
+        getCompanies(adminUserId),
+        getEmployees(adminUserId),
+        getBranches(adminUserId),
+      ]);
 
-      const filteredEmployees = selectedCompany
-        ? employeesData.filter(emp => emp.companyId === selectedCompany.id)
-        : employeesData;
+      console.log('Loaded companies:', companiesData.length, companiesData);
+      console.log('Loaded employees:', employeesData.length, employeesData);
+      console.log('Loaded branches:', branchesData.length, branchesData);
 
-      setEmployees(filteredEmployees);
-      await refreshDashboardStats();
+      setCompanies(companiesData);
+      setEmployees(employeesData);
+      setBranches(branchesData);
+
+      // Load default company from database ONLY on initial load
+      let defaultCompanyId: string | null = null;
+
+      if (userRole === 'admin') {
+        try {
+          const userSettings = await getUserSettings(adminUserId);
+          defaultCompanyId = userSettings?.defaultCompanyId || null;
+        } catch (error) {
+          console.error('Error loading user settings:', error);
+        }
+      }
+
+      // Fallback: check localStorage
+      if (!defaultCompanyId) {
+        const storedDefault = localStorage.getItem(`defaultCompany_${adminUserId}`);
+        defaultCompanyId = storedDefault || null;
+      }
+
+      if (userRole === 'employee' && currentEmployeeId) {
+        const currentEmployee = employeesData.find(e => e.id === currentEmployeeId);
+        if (currentEmployee) {
+          const employeeCompany = companiesData.find(c => c.id === currentEmployee.companyId);
+          if (employeeCompany) {
+            setSelectedCompany(prev => {
+              if (prev?.id !== employeeCompany.id) {
+                return employeeCompany;
+              }
+              return prev;
+            });
+          }
+        }
+      } else if (companiesData.length > 0) {
+        const companyToSelect = defaultCompanyId 
+          ? companiesData.find(c => c.id === defaultCompanyId) 
+          : companiesData[0];
+        
+        setSelectedCompany(companyToSelect || companiesData[0]);
+        
+        // Save to localStorage as fallback
+        if (companyToSelect) {
+          localStorage.setItem(`defaultCompany_${adminUserId}`, companyToSelect.id);
+        }
+      }
+
+      if (userRole === 'admin') {
+        await calculateDashboardStats(companiesData, employeesData, branchesData, adminUserId);
+      }
     } catch (error) {
-      console.error('Error loading employees:', error);
-      showError('Fout bij laden', 'Kon werknemers niet laden');
+      console.error('Error loading app data:', error);
+      console.error('Error details:', error);
     } finally {
+      isLoadingRef.current = false;
       setLoading(false);
     }
-  }, [user, selectedCompany, showError, refreshDashboardStats]);
+  }, [user, adminUserId, userRole, currentEmployeeId, calculateDashboardStats]);
 
+  // Main useEffect - ONLY depends on auth values - runs ONCE on login
   useEffect(() => {
-    loadEmployees();
-  }, [loadEmployees]);
-
-  const handleAddEmployee = () => {
-    setSelectedEmployee(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditEmployee = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteEmployee = async (employee: Employee) => {
-    if (!user) return;
-
-    if (window.confirm(`Weet je zeker dat je ${employee.personalInfo.firstName} ${employee.personalInfo.lastName} wilt verwijderen?`)) {
-      try {
-        await deleteEmployee(employee.id, user.uid);
-        success('Werknemer verwijderd', `${employee.personalInfo.firstName} ${employee.personalInfo.lastName} is succesvol verwijderd`);
-        await loadEmployees();
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        showError('Fout bij verwijderen', 'Kon werknemer niet verwijderen');
-      }
+    if (user && adminUserId && (userRole === 'admin' || userRole === 'employee')) {
+      loadData();
+    } else {
+      setLoading(false);
     }
-  };
+  }, [user?.uid, adminUserId, userRole]); // ✅ FIXED: Only stable auth values
 
-  const handleCreateAccount = async (employee: Employee) => {
-    if (!user) return;
-
-    if (employee.hasAccount) {
-      showError('Account bestaat al', `${employee.personalInfo.firstName} heeft al een account`);
-      return;
+  // ✅ REFRESH ONLY recalculates dashboard stats WITHOUT reloading data or changing company
+  const refreshDashboardStats = useCallback(async () => {
+    if (userRole === 'admin' && companies.length > 0 && employees.length > 0 && branches.length > 0) {
+      console.log('Refreshing dashboard stats only - NOT reloading data');
+      await calculateDashboardStats(companies, employees, branches, adminUserId);
     }
-
-    const confirmMsg = `Weet je zeker dat je een account wilt aanmaken voor ${employee.personalInfo.firstName} ${employee.personalInfo.lastName}?\n\nInloggegevens:\nE-mail: ${employee.personalInfo.contactInfo.email}\nWachtwoord: ${DEFAULT_PASSWORD}`;
-    
-    if (window.confirm(confirmMsg)) {
-      try {
-        setCreatingAccount(employee.id);
-        
-        await createEmployeeAuthAccount(
-          employee.id,
-          user.uid,
-          employee.personalInfo.contactInfo.email,
-          DEFAULT_PASSWORD
-        );
-
-        success(
-          'Account aangemaakt! ✓',
-          `${employee.personalInfo.firstName} kan nu inloggen.`
-        );
-        await loadEmployees();
-      } catch (error: any) {
-        console.error('Error creating account:', error);
-        
-        let errorMessage = 'Kon account niet aanmaken';
-        if (error.code === 'auth/email-already-in-use') {
-          errorMessage = 'Dit e-mailadres is al in gebruik';
-        } else if (error.code === 'auth/invalid-email') {
-          errorMessage = 'E-mailadres is ongeldig';
-        }
-        
-        showError('Fout bij account aanmaken', errorMessage);
-      } finally {
-        setCreatingAccount(null);
-      }
-    }
-  };
-
-  const handleModalClose = () => {
-    setIsModalOpen(false);
-    setSelectedEmployee(null);
-  };
-
-  const handleModalSuccess = async () => {
-    await loadEmployees();
-    handleModalClose();
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-      case 'on_leave':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'sick':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      active: 'Actief',
-      inactive: 'Inactief',
-      on_leave: 'Met verlof',
-      sick: 'Ziek',
-    };
-    return statusMap[status] || status;
-  };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  }, [userRole, companies, employees, branches, adminUserId, calculateDashboardStats]);
 
   return (
-    <div className="space-y-4 md:space-y-6 px-4 md:px-0">
-      {/* Header - Mobiel vriendelijk */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Werknemers</h1>
-          <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 md:mt-2">
-            Beheer je werknemers en hun gegevens
-          </p>
-        </div>
-        <Button
-          onClick={handleAddEmployee}
-          disabled={companies.length === 0}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nieuwe Werknemer
-        </Button>
-      </div>
-
-      {/* No companies state */}
-      {companies.length === 0 ? (
-        <Card className="p-6 md:p-8">
-          <div className="text-center">
-            <Building2 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Geen bedrijven gevonden
-            </h3>
-            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mb-4">
-              Je moet eerst een bedrijf aanmaken voordat je werknemers kunt toevoegen.
-            </p>
-            <Button onClick={() => window.location.href = '/companies'}>
-              Bedrijf Toevoegen
-            </Button>
-          </div>
-        </Card>
-      ) : employees.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Geen werknemers gevonden"
-          description={`Voeg je eerste werknemer toe voor ${selectedCompany?.name || 'het geselecteerde bedrijf'}`}
-          actionLabel="Eerste Werknemer Toevoegen"
-          onAction={handleAddEmployee}
-        />
-      ) : (
-        /* Employees Grid - Responsive */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {employees.map((employee) => (
-            <Card key={employee.id} className="p-4 md:p-6 hover:shadow-lg transition-shadow flex flex-col h-full">
-              {/* Header with name and status */}
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex-shrink-0">
-                    <User className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {employee.personalInfo.firstName} {employee.personalInfo.lastName}
-                    </h3>
-                    <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">
-                      {employee.contractInfo.position}
-                    </p>
-                  </div>
-                </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full flex-shrink-0 whitespace-nowrap ${getStatusColor(employee.status)}`}>
-                  {getStatusText(employee.status)}
-                </span>
-              </div>
-
-              {/* Contact & Contract Info */}
-              <div className="space-y-2 mb-4 text-xs md:text-sm flex-1">
-                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 truncate">
-                  <Mail className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate" title={employee.personalInfo.contactInfo.email}>
-                    {employee.personalInfo.contactInfo.email}
-                  </span>
-                </div>
-                
-                {employee.personalInfo.contactInfo.phone && (
-                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 truncate">
-                    <Phone className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{employee.personalInfo.contactInfo.phone}</span>
-                  </div>
-                )}
-                
-                <div className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Contract:</span> {employee.contractInfo.type}
-                </div>
-                
-                <div className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Uren/week:</span> {employee.contractInfo.hoursPerWeek}
-                </div>
-              </div>
-
-              {/* Account Status Alert */}
-              {!employee.hasAccount && (
-                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-start gap-2 text-xs md:text-sm">
-                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-amber-700 dark:text-amber-300">Geen account</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleEditEmployee(employee)}
-                  className="text-xs md:text-sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Bewerken
-                </Button>
-                
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => handleDeleteEmployee(employee)}
-                  className="text-xs md:text-sm"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-
-                {!employee.hasAccount && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCreateAccount(employee)}
-                    disabled={creatingAccount === employee.id}
-                    className="col-span-2 text-xs md:text-sm bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                  >
-                    <LogIn className="h-4 w-4 mr-1" />
-                    {creatingAccount === employee.id ? 'Aanmaken...' : 'Account aanmaken'}
-                  </Button>
-                )}
-
-                {employee.hasAccount && (
-                  <div className="col-span-2 text-xs text-green-600 dark:text-green-400 text-center py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    ✓ Account actief
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      <EmployeeModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
-        employee={selectedEmployee}
-      />
-    </div>
+    <AppContext.Provider
+      value={{
+        companies,
+        employees,
+        branches,
+        selectedCompany,
+        dashboardStats,
+        loading,
+        currentEmployeeId,
+        setSelectedCompany,
+        refreshDashboardStats,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
 };
 
-export default EmployeesNew;
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
