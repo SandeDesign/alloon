@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, Employee, Branch, DashboardStats } from '../types';
-import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings } from '../services/firebase';
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings, getUserRole, getCompany } from '../services/firebase';
 import { getPendingExpenses } from '../services/firebase';
 import { getPayrollCalculations } from '../services/payrollService';
 import { getPendingTimesheets } from '../services/timesheetService';
@@ -124,23 +124,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       isLoadingRef.current = true;
       setLoading(true);
-      console.log('Loading data for adminUserId:', adminUserId);
+      console.log('Loading data for adminUserId:', adminUserId, 'userRole:', userRole);
       
-      const [companiesData, employeesData, branchesData] = await Promise.all([
-        getCompanies(adminUserId),
-        getEmployees(adminUserId),
-        getBranches(adminUserId),
-      ]);
+      let companiesData: Company[] = [];
+      let employeesData: Employee[] = [];
+      let branchesData: Branch[] = [];
 
-      console.log('Loaded companies:', companiesData.length, companiesData);
-      console.log('Loaded employees:', employeesData.length, employeesData);
-      console.log('Loaded branches:', branchesData.length, branchesData);
+      // ✅ MANAGER: Load only assigned company
+      if (userRole === 'manager') {
+        try {
+          const roleData = await getUserRole(user.uid);
+          console.log('Manager role data:', roleData);
+          
+          if (roleData?.assignedCompanyId) {
+            const company = await getCompany(roleData.assignedCompanyId, adminUserId);
+            if (company) {
+              companiesData = [company];
+              console.log('Loaded manager assigned company:', company);
+            }
+          } else {
+            console.warn('Manager has no assigned company!');
+            companiesData = [];
+          }
+        } catch (error) {
+          console.error('Error loading manager company:', error);
+          companiesData = [];
+        }
+
+        // Managers get employees from their assigned company
+        if (companiesData.length > 0) {
+          try {
+            employeesData = await getEmployees(adminUserId, companiesData[0].id);
+            branchesData = await getBranches(adminUserId, companiesData[0].id);
+          } catch (error) {
+            console.error('Error loading manager data:', error);
+          }
+        }
+      } else {
+        // ✅ ADMIN/EMPLOYEE: Load all companies
+        const [companies, employees, branches] = await Promise.all([
+          getCompanies(adminUserId),
+          getEmployees(adminUserId),
+          getBranches(adminUserId),
+        ]);
+
+        companiesData = companies;
+        employeesData = employees;
+        branchesData = branches;
+      }
+
+      console.log('Loaded companies:', companiesData.length);
+      console.log('Loaded employees:', employeesData.length);
+      console.log('Loaded branches:', branchesData.length);
 
       setCompanies(companiesData);
       setEmployees(employeesData);
       setBranches(branchesData);
 
-      // Load default company from database ONLY on initial load
+      // Set default company
       let defaultCompanyId: string | null = null;
 
       if (userRole === 'admin') {
@@ -198,13 +239,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Main useEffect - ONLY depends on auth values - runs ONCE on login
   useEffect(() => {
-    // ✅ NIEUW:
-if (user && adminUserId && (userRole === 'admin' || userRole === 'employee' || userRole === 'manager')) {
-  loadData();
-} else {
-  setLoading(false);
-}
-  }, [user?.uid, adminUserId, userRole]); // ✅ FIXED: Only stable auth values
+    if (user && adminUserId && (userRole === 'admin' || userRole === 'employee' || userRole === 'manager')) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [user?.uid, adminUserId, userRole]);
 
   // ✅ REFRESH ONLY recalculates dashboard stats WITHOUT reloading data or changing company
   const refreshDashboardStats = useCallback(async () => {
