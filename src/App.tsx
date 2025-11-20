@@ -127,7 +127,7 @@ function App() {
     element={
       <Layout>
         <Routes>
-          <Route index element={<ManagerDashboard />} />  // ✅ NIEUW: <ManagerDashboard />
+          <Route index element={<ManagerDashboard />} />
           <Route path="employees" element={<EmployeesNew />} />
           
           {/* Manager kan uren beheren */}
