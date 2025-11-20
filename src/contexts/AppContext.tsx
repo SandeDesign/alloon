@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, Employee, Branch, DashboardStats } from '../types';
-import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings, getUserRole, getCompany } from '../services/firebase';
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings, getUserRole, getCompanyById } from '../services/firebase';
 import { getPendingExpenses } from '../services/firebase';
 import { getPayrollCalculations } from '../services/payrollService';
 import { getPendingTimesheets } from '../services/timesheetService';
@@ -130,14 +130,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let employeesData: Employee[] = [];
       let branchesData: Branch[] = [];
 
-      // ✅ MANAGER: Load only assigned company
+      // ✅ MANAGER: Load only assigned company (without userId check)
       if (userRole === 'manager') {
         try {
           const roleData = await getUserRole(user.uid);
           console.log('Manager role data:', roleData);
           
           if (roleData?.assignedCompanyId) {
-            const company = await getCompany(roleData.assignedCompanyId, adminUserId);
+            // Use getCompanyById instead of getCompany for managers
+            // Managers access companies assigned to them, not owned by their userId
+            const company = await getCompanyById(roleData.assignedCompanyId);
             if (company) {
               companiesData = [company];
               console.log('Loaded manager assigned company:', company);
