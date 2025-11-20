@@ -1,54 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
-  Building2,
   Clock,
-  AlertTriangle,
-  TrendingUp,
-  FileText,
-  CheckCircle,
   Calendar,
-  ArrowRight,
-  HeartPulse,
+  CheckCircle,
+  AlertCircle,
   Bell,
+  ChevronRight,
   Zap,
+  HeartPulse,
+  Settings,
+  ArrowRight,
+  TrendingUp,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useApp } from '../contexts/AppContext';
 import Card from '../components/ui/Card';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { useToast } from '../hooks/useToast';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  limit,
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { getEmployees, getCompanies, getLeaveRequests } from '../services/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
+import { getEmployees } from '../services/firebase';
 import { getPendingTimesheets } from '../services/timesheetService';
-
-interface ManagerStats {
-  totalTeamMembers: number;
-  employeesWithAccount: number;
-  pendingLeaveRequests: number;
-  pendingTimesheets: number;
-}
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { selectedCompany, employees } = useApp();
-  const { error: showError } = useToast();
+  const { selectedCompany } = useApp();
+  const navigate = useNavigate();
 
-  const [stats, setStats] = useState<ManagerStats | null>(null);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
-  const [pendingTimesheetsList, setPendingTimesheetsList] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [pendingTimesheets, setPendingTimesheets] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalTeam: 0,
+    activeMembers: 0,
+    pendingHours: 0,
+    pendingLeave: 0,
+  });
 
-  const loadDashboardData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!user || !selectedCompany) {
       setLoading(false);
       return;
@@ -57,305 +45,279 @@ const ManagerDashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get employees for this company
-      const companyEmployees = await getEmployees(user.uid, selectedCompany.id);
-      const employeesWithAccount = companyEmployees.filter(e => e.hasAccount).length;
-
-      // Get pending leave requests
-      const leaveRequests = await getLeaveRequests(user.uid);
-      const pendingLeaves = leaveRequests.filter(r => r.status === 'pending' && r.companyId === selectedCompany.id);
+      // Get team members
+      const employees = await getEmployees(user.uid, selectedCompany.id);
+      setTeamMembers(employees.slice(0, 8));
 
       // Get pending timesheets
       const timesheets = await getPendingTimesheets(user.uid, selectedCompany.id);
+      setPendingTimesheets(timesheets.slice(0, 5));
 
-      // Get recent audit logs for activity
-      const auditQuery = query(
-        collection(db, 'auditLogs'),
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
-      const auditSnapshot = await getDocs(auditQuery);
-      const activities = auditSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
+      // Calculate stats
       setStats({
-        totalTeamMembers: companyEmployees.length,
-        employeesWithAccount,
-        pendingLeaveRequests: pendingLeaves.length,
-        pendingTimesheets: timesheets.length,
+        totalTeam: employees.length,
+        activeMembers: employees.filter(e => e.status === 'active').length,
+        pendingHours: timesheets.length,
+        pendingLeave: 0,
       });
-
-      setPendingLeaves(pendingLeaves.slice(0, 3));
-      setPendingTimesheetsList(timesheets.slice(0, 3));
-      setRecentActivities(activities);
     } catch (error) {
-      console.error('Error loading manager dashboard:', error);
-      showError('Fout', 'Kon dashboard data niet laden');
+      console.error('Error loading manager data:', error);
     } finally {
       setLoading(false);
     }
-  }, [user, selectedCompany, showError]);
+  }, [user, selectedCompany]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    loadData();
+  }, [loadData]);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex items-center justify-center h-96">
         <LoadingSpinner />
       </div>
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle className="mx-auto h-12 w-12 text-red-600" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">Fout bij laden</h3>
-      </div>
-    );
-  }
-
-  const totalPending = stats.pendingTimesheets + stats.pendingLeaveRequests;
-
   return (
-    <div className="space-y-4 pb-24 sm:pb-6">
-      {/* Header - Mobile Optimized */}
-      <div className="px-4 sm:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Manager Dashboard</h1>
-        <p className="text-sm text-gray-600 mt-1">Team Management - {selectedCompany?.name || 'Loonadministratie'}</p>
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-8 text-white shadow-lg">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Manager Dashboard</h1>
+            <p className="text-indigo-100 flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              {selectedCompany?.name || 'Team Management'}
+            </p>
+          </div>
+          <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center">
+            <Users className="h-8 w-8 text-white" />
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Team Grootte', value: stats.totalTeam, icon: Users },
+            { label: 'Actief', value: stats.activeMembers, icon: CheckCircle },
+            { label: 'Uren Wachting', value: stats.pendingHours, icon: Clock },
+            { label: 'Verlof Wachting', value: stats.pendingLeave, icon: Calendar },
+          ].map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <div key={index} className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="h-4 w-4 text-indigo-100" />
+                  <p className="text-xs text-indigo-100">{stat.label}</p>
+                </div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Alert Banner */}
-      {totalPending > 0 && (
-        <div className="px-4 sm:px-0">
-          <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg flex items-start gap-3">
-            <Bell className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+      {/* Pending Items Alert */}
+      {(pendingTimesheets.length > 0 || stats.pendingLeave > 0) && (
+        <div className="bg-orange-50 border-l-4 border-orange-500 p-6 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Bell className="h-6 w-6 text-orange-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-orange-900">{totalPending} items wachten op actie</h3>
-              <p className="text-xs text-orange-700 mt-1">
-                {stats.pendingTimesheets} uren • {stats.pendingLeaveRequests} verlof
+              <h3 className="text-lg font-semibold text-orange-900">
+                {pendingTimesheets.length + stats.pendingLeave} Items Wachten
+              </h3>
+              <p className="text-sm text-orange-800 mt-1">
+                {pendingTimesheets.length} uren ter goedkeuring • {stats.pendingLeave} verlofaanvragen
               </p>
+              <div className="flex gap-2 mt-3">
+                {pendingTimesheets.length > 0 && (
+                  <button
+                    onClick={() => navigate('/timesheet-approvals')}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    Uren Goedkeuren
+                  </button>
+                )}
+                {stats.pendingLeave > 0 && (
+                  <button
+                    onClick={() => navigate('/admin/leave-approvals')}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    Verlof Goedkeuren
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stats Grid - Mobile First */}
-      <div className="px-4 sm:px-0 space-y-3 sm:space-y-4">
-        {/* Row 1: Team Members */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Card className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-blue-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Team</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.totalTeamMembers}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stats.employeesWithAccount} met account
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-blue-600 rounded-lg">
-                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4 sm:p-6 bg-gradient-to-br from-green-50 to-green-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Bedrijf</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedCompany?.name.substring(0, 15)}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Selectie
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-green-600 rounded-lg">
-                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Row 2: Pending Items */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Card className="p-4 sm:p-6 bg-gradient-to-br from-orange-50 to-orange-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Uren Wachten</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.pendingTimesheets}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Te verwerken
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-orange-600 rounded-lg">
-                <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4 sm:p-6 bg-gradient-to-br from-purple-50 to-purple-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Verlof Aanvragen</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.pendingLeaveRequests}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Wachten op goedkeuring
-                </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-purple-600 rounded-lg">
-                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-            </div>
-          </Card>
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <Zap className="h-6 w-6 text-amber-500" />
+          Snelle Acties
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            {
+              title: 'Uren',
+              subtitle: 'Goedkeuren',
+              icon: Clock,
+              action: () => navigate('/timesheet-approvals'),
+              bgGradient: 'from-blue-500 to-blue-600',
+              iconBg: 'bg-blue-100',
+              iconColor: 'text-blue-600'
+            },
+            {
+              title: 'Verlof',
+              subtitle: 'Goedkeuren',
+              icon: Calendar,
+              action: () => navigate('/admin/leave-approvals'),
+              bgGradient: 'from-purple-500 to-purple-600',
+              iconBg: 'bg-purple-100',
+              iconColor: 'text-purple-600'
+            },
+            {
+              title: 'Verzuim',
+              subtitle: 'Beheren',
+              icon: HeartPulse,
+              action: () => navigate('/admin/absence-management'),
+              bgGradient: 'from-red-500 to-red-600',
+              iconBg: 'bg-red-100',
+              iconColor: 'text-red-600'
+            },
+            {
+              title: 'Team',
+              subtitle: 'Beheren',
+              icon: Users,
+              action: () => navigate('/employees'),
+              bgGradient: 'from-green-500 to-green-600',
+              iconBg: 'bg-green-100',
+              iconColor: 'text-green-600'
+            },
+          ].map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={index}
+                onClick={action.action}
+                className="group"
+              >
+                <div
+                  className={`relative overflow-hidden rounded-xl p-6 h-full bg-gradient-to-br ${action.bgGradient} text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 active:scale-95`}
+                >
+                  <div className="flex flex-col items-center text-center h-full justify-center">
+                    <div
+                      className={`inline-flex p-4 ${action.iconBg} rounded-xl mb-3 group-hover:scale-110 transition-transform duration-200`}
+                    >
+                      <Icon className={`h-6 w-6 ${action.iconColor}`} />
+                    </div>
+                    <h3 className="font-bold text-sm mb-1">{action.title}</h3>
+                    <p className="text-xs text-white/80">{action.subtitle}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Pending Timesheets - Mobile Card */}
-      {stats.pendingTimesheets > 0 && (
-        <div className="px-4 sm:px-0">
-          <Card className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm sm:text-base font-semibold text-gray-900">
-                Uren ter goedkeuring
-              </h2>
-              <button
-                onClick={() => window.location.href = '/timesheet-approvals'}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Alle →
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {pendingTimesheetsList.map((ts) => (
-                <div key={ts.id} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      Week {ts.weekNumber || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {ts.totalRegularHours || 0}u uren
-                    </p>
-                  </div>
-                  <div className="ml-2 flex-shrink-0">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                      Wachting
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Pending Leave - Mobile Card */}
-      {stats.pendingLeaveRequests > 0 && (
-        <div className="px-4 sm:px-0">
-          <Card className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm sm:text-base font-semibold text-gray-900">
-                Verlofaanvragen
-              </h2>
-              <button
-                onClick={() => window.location.href = '/admin/leave-approvals'}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Alle →
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {pendingLeaves.map((leave) => (
-                <div key={leave.id} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {leave.employeeName || 'Werknemer'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {leave.reason || 'Verlof'}
-                    </p>
-                  </div>
-                  <div className="ml-2 flex-shrink-0">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      In behandeling
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Quick Actions - Mobile Optimized */}
-      <div className="px-4 sm:px-0">
-        <Card className="p-4 sm:p-6">
-          <h2 className="text-sm sm:text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-amber-500" />
-            Snelle acties
-          </h2>
-
+      {/* Pending Timesheets */}
+      {pendingTimesheets.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="h-6 w-6 text-blue-600" />
+              Uren ter Goedkeuring ({pendingTimesheets.length})
+            </h2>
+            <button
+              onClick={() => navigate('/timesheet-approvals')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Alle Zien →
+            </button>
+          </div>
           <div className="space-y-2">
-            <button
-              onClick={() => window.location.href = '/employees'}
-              className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg transition-colors text-sm"
-            >
-              <span className="font-medium">Teamleden beheren</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            {pendingTimesheets.map((ts) => (
+              <Card
+                key={ts.id}
+                className="p-4 border-l-4 border-blue-500 hover:bg-blue-50 transition cursor-pointer"
+                onClick={() => navigate('/timesheet-approvals')}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Week {ts.weekNumber || 'N/A'} • {ts.totalRegularHours || 0}u uren
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Status: {ts.status || 'Pending'}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {/* Team Members */}
+      {teamMembers.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="h-6 w-6 text-green-600" />
+              Team Members ({teamMembers.length})
+            </h2>
             <button
-              onClick={() => window.location.href = '/admin/leave-approvals'}
-              className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 hover:bg-orange-100 text-orange-900 rounded-lg transition-colors text-sm"
+              onClick={() => navigate('/employees')}
+              className="text-sm text-green-600 hover:text-green-700 font-medium"
             >
-              <span className="font-medium">Verlofaanvragen</span>
-              <ArrowRight className="h-4 w-4" />
+              Alle Zien →
             </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {teamMembers.map((member) => (
+              <Card key={member.id} className="p-4 hover:shadow-md transition">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                    {member.personalInfo?.firstName?.[0] || 'E'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {member.personalInfo?.firstName || member.email}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {member.status === 'active' ? '✓ Actief' : 'Inactief'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
-            <button
-              onClick={() => window.location.href = '/timesheet-approvals'}
-              className="w-full flex items-center justify-between px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-lg transition-colors text-sm"
-            >
-              <span className="font-medium">Uren verwerken</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => window.location.href = '/admin/absence-management'}
-              className="w-full flex items-center justify-between px-4 py-3 bg-red-50 hover:bg-red-100 text-red-900 rounded-lg transition-colors text-sm"
-            >
-              <span className="font-medium">Verzuim beheren</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => window.location.href = '/settings'}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 rounded-lg transition-colors text-sm"
-            >
-              <span className="font-medium">Instellingen</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
+      {/* Status */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="p-6 border-l-4 border-green-500">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Status</h3>
+              <p className="text-sm text-gray-600 mt-1">✓ Alle systemen operationeel</p>
+            </div>
           </div>
         </Card>
-      </div>
 
-      {/* System Status - Mobile Card */}
-      <div className="px-4 sm:px-0">
-        <Card className="p-4 sm:p-6 border-l-4 border-green-500">
-          <div className="flex items-start space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-900">Systeem Status</h3>
-              <p className="text-xs text-gray-600 mt-1">
-                ✓ Alle systemen operationeel
-              </p>
+        <Card className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100">
+          <div className="flex items-start gap-3">
+            <TrendingUp className="h-6 w-6 text-indigo-600 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Performance</h3>
+              <p className="text-sm text-gray-600 mt-1">{stats.activeMembers}/{stats.totalTeam} team actief</p>
             </div>
           </div>
         </Card>
