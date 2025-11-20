@@ -17,6 +17,7 @@ import ProjectProduction from './pages/ProjectProduction';
 import ProjectStatistics from './pages/ProjectStatistics';
 // ✅ NEW ADMIN PAGES
 import AdminDashboard from './pages/AdminDashboard';
+import ManagerDashboard from './pages/ManagerDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminRoles from './pages/AdminRoles';
 import Login from './pages/Login';
