@@ -10,15 +10,14 @@ import {
   ChevronRight,
   Zap,
   HeartPulse,
-  Settings,
-  ArrowRight,
+  Target,
   TrendingUp,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
-import { getEmployees } from '../services/firebase';
+import { getEmployees, getPendingLeaveApprovals } from '../services/firebase';
 import { getPendingTimesheets } from '../services/timesheetService';
 
 const ManagerDashboard: React.FC = () => {
@@ -29,6 +28,7 @@ const ManagerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [pendingTimesheets, setPendingTimesheets] = useState<any[]>([]);
+  const [pendingLeaveRequests, setPendingLeaveRequests] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalTeam: 0,
     activeMembers: 0,
@@ -53,12 +53,16 @@ const ManagerDashboard: React.FC = () => {
       const timesheets = await getPendingTimesheets(user.uid, selectedCompany.id);
       setPendingTimesheets(timesheets.slice(0, 5));
 
+      // Get pending leave approvals
+      const leaveRequests = await getPendingLeaveApprovals(selectedCompany.id, user.uid);
+      setPendingLeaveRequests(leaveRequests.slice(0, 5));
+
       // Calculate stats
       setStats({
         totalTeam: employees.length,
         activeMembers: employees.filter(e => e.status === 'active').length,
         pendingHours: timesheets.length,
-        pendingLeave: 0,
+        pendingLeave: leaveRequests.length,
       });
     } catch (error) {
       console.error('Error loading manager data:', error);
@@ -79,8 +83,10 @@ const ManagerDashboard: React.FC = () => {
     );
   }
 
+  const totalPending = stats.pendingHours + stats.pendingLeave;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-24 sm:pb-0">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-8 text-white shadow-lg">
         <div className="flex items-start justify-between mb-6">
@@ -118,23 +124,23 @@ const ManagerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Pending Items Alert */}
-      {(pendingTimesheets.length > 0 || stats.pendingLeave > 0) && (
+      {/* Pending Alert */}
+      {totalPending > 0 && (
         <div className="bg-orange-50 border-l-4 border-orange-500 p-6 rounded-lg">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-4">
             <Bell className="h-6 w-6 text-orange-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-orange-900">
-                {pendingTimesheets.length + stats.pendingLeave} Items Wachten
+              <h3 className="text-lg font-bold text-orange-900">
+                {totalPending} Items Wachten op Actie
               </h3>
-              <p className="text-sm text-orange-800 mt-1">
-                {pendingTimesheets.length} uren ter goedkeuring • {stats.pendingLeave} verlofaanvragen
+              <p className="text-sm text-orange-800 mt-2">
+                {stats.pendingHours} uren ter goedkeuring • {stats.pendingLeave} verlofaanvragen
               </p>
-              <div className="flex gap-2 mt-3">
-                {pendingTimesheets.length > 0 && (
+              <div className="flex gap-3 mt-4">
+                {stats.pendingHours > 0 && (
                   <button
                     onClick={() => navigate('/timesheet-approvals')}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition"
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition"
                   >
                     Uren Goedkeuren
                   </button>
@@ -142,7 +148,7 @@ const ManagerDashboard: React.FC = () => {
                 {stats.pendingLeave > 0 && (
                   <button
                     onClick={() => navigate('/admin/leave-approvals')}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition"
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition"
                   >
                     Verlof Goedkeuren
                   </button>
@@ -200,18 +206,12 @@ const ManagerDashboard: React.FC = () => {
           ].map((action, index) => {
             const Icon = action.icon;
             return (
-              <button
-                key={index}
-                onClick={action.action}
-                className="group"
-              >
+              <button key={index} onClick={action.action} className="group">
                 <div
                   className={`relative overflow-hidden rounded-xl p-6 h-full bg-gradient-to-br ${action.bgGradient} text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 active:scale-95`}
                 >
                   <div className="flex flex-col items-center text-center h-full justify-center">
-                    <div
-                      className={`inline-flex p-4 ${action.iconBg} rounded-xl mb-3 group-hover:scale-110 transition-transform duration-200`}
-                    >
+                    <div className={`inline-flex p-4 ${action.iconBg} rounded-xl mb-3 group-hover:scale-110 transition-transform duration-200`}>
                       <Icon className={`h-6 w-6 ${action.iconColor}`} />
                     </div>
                     <h3 className="font-bold text-sm mb-1">{action.title}</h3>
@@ -234,12 +234,12 @@ const ManagerDashboard: React.FC = () => {
             </h2>
             <button
               onClick={() => navigate('/timesheet-approvals')}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
             >
-              Alle Zien →
+              Alle Bekijken →
             </button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {pendingTimesheets.map((ts) => (
               <Card
                 key={ts.id}
@@ -249,10 +249,47 @@ const ManagerDashboard: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-900">
-                      Week {ts.weekNumber || 'N/A'} • {ts.totalRegularHours || 0}u uren
+                      Week {ts.weekNumber || 'N/A'} — {ts.totalRegularHours || 0}u uren
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">Status: {ts.status || 'Wachting'}</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pending Leave Requests */}
+      {pendingLeaveRequests.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="h-6 w-6 text-purple-600" />
+              Verlofaanvragen ({pendingLeaveRequests.length})
+            </h2>
+            <button
+              onClick={() => navigate('/admin/leave-approvals')}
+              className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
+            >
+              Alle Bekijken →
+            </button>
+          </div>
+          <div className="space-y-3">
+            {pendingLeaveRequests.map((leave) => (
+              <Card
+                key={leave.id}
+                className="p-4 border-l-4 border-purple-500 hover:bg-purple-50 transition cursor-pointer"
+                onClick={() => navigate('/admin/leave-approvals')}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {leave.employeeName || 'Werknemer'} — {leave.reason || 'Verlof'}
                     </p>
                     <p className="text-xs text-gray-600 mt-1">
-                      Status: {ts.status || 'Pending'}
+                      {leave.startDate ? new Date(leave.startDate).toLocaleDateString('nl-NL') : 'N/A'}
                     </p>
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400" />
@@ -263,33 +300,33 @@ const ManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Team Members */}
+      {/* Team Members Grid */}
       {teamMembers.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Users className="h-6 w-6 text-green-600" />
-              Team Members ({teamMembers.length})
+              Team ({teamMembers.length})
             </h2>
             <button
               onClick={() => navigate('/employees')}
-              className="text-sm text-green-600 hover:text-green-700 font-medium"
+              className="text-sm text-green-600 hover:text-green-700 font-semibold"
             >
               Alle Zien →
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {teamMembers.map((member) => (
-              <Card key={member.id} className="p-4 hover:shadow-md transition">
+              <Card key={member.id} className="p-4 hover:shadow-lg transition">
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                    {member.personalInfo?.firstName?.[0] || 'E'}
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+                    {member.personalInfo?.firstName?.[0]?.toUpperCase() || 'E'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {member.personalInfo?.firstName || member.email}
+                      {member.personalInfo?.firstName} {member.personalInfo?.lastName}
                     </p>
-                    <p className="text-xs text-gray-600 mt-0.5">
+                    <p className="text-xs text-gray-600 mt-1">
                       {member.status === 'active' ? '✓ Actief' : 'Inactief'}
                     </p>
                   </div>
@@ -300,13 +337,13 @@ const ManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Status */}
+      {/* Status Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="p-6 border-l-4 border-green-500">
           <div className="flex items-start gap-3">
             <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Status</h3>
+              <h3 className="text-lg font-bold text-gray-900">Status</h3>
               <p className="text-sm text-gray-600 mt-1">✓ Alle systemen operationeel</p>
             </div>
           </div>
@@ -316,8 +353,10 @@ const ManagerDashboard: React.FC = () => {
           <div className="flex items-start gap-3">
             <TrendingUp className="h-6 w-6 text-indigo-600 flex-shrink-0" />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Performance</h3>
-              <p className="text-sm text-gray-600 mt-1">{stats.activeMembers}/{stats.totalTeam} team actief</p>
+              <h3 className="text-lg font-bold text-gray-900">Team Performance</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {stats.activeMembers}/{stats.totalTeam} medewerkers actief
+              </p>
             </div>
           </div>
         </Card>
