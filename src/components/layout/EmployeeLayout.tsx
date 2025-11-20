@@ -137,7 +137,7 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 w-full md:w-auto mt-16 md:mt-0">
+        <main className="flex-1 w-full md:ml-80 mt-16 md:mt-0">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
             {children}
           </div>
