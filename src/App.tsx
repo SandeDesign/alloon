@@ -121,36 +121,36 @@ function App() {
                 )}
 
                 {/* ✅ MANAGER ROUTES */}
-                {userRole === 'manager' && (
-                  <Route
-                    path="/*"
-                    element={
-                      <Layout>
-                        <Routes>
-                          <Route index element={<Dashboard />} />
-                          <Route path="employees" element={<EmployeesNew />} />
-                          
-                          {/* Manager kan uren beheren */}
-                          <Route path="timesheets" element={<Timesheets />} />
-                          <Route path="timesheet-approvals" element={<TimesheetApprovals />} />
-                          
-                          {/* Manager kan verlof/verzuim goedkeuren */}
-                          <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
-                          <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
-                          
-                          {/* Manager kan exporteren */}
-                          <Route path="timesheet-export" element={<TimesheetExport />} />
-                          
-                          {/* Manager eigen loonstroken en instellingen */}
-                          <Route path="payslips" element={<Payslips />} />
-                          <Route path="settings" element={<Settings />} />
-                          
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </Layout>
-                    }
-                  />
-                )}
+{userRole === 'manager' && (
+  <Route
+    path="/*"
+    element={
+      <Layout>
+        <Routes>
+          <Route index element={<ManagerDashboard />} />  // ✅ NIEUW: <ManagerDashboard />
+          <Route path="employees" element={<EmployeesNew />} />
+          
+          {/* Manager kan uren beheren */}
+          <Route path="timesheets" element={<Timesheets />} />
+          <Route path="timesheet-approvals" element={<TimesheetApprovals />} />
+          
+          {/* Manager kan verlof/verzuim goedkeuren */}
+          <Route path="admin/leave-approvals" element={<AdminLeaveApprovals />} />
+          <Route path="admin/absence-management" element={<AdminAbsenceManagement />} />
+          
+          {/* Manager kan exporteren */}
+          <Route path="timesheet-export" element={<TimesheetExport />} />
+          
+          {/* Manager eigen loonstroken en instellingen */}
+          <Route path="payslips" element={<Payslips />} />
+          <Route path="settings" element={<Settings />} />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+    }
+  />
+)}
 
                 {/* ✅ EMPLOYEE ROUTES */}
                 {userRole === 'employee' && (
