@@ -198,11 +198,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Main useEffect - ONLY depends on auth values - runs ONCE on login
   useEffect(() => {
-    if (user && adminUserId && (userRole === 'admin' || userRole === 'employee')) {
-      loadData();
-    } else {
-      setLoading(false);
-    }
+    // ✅ NIEUW:
+if (user && adminUserId && (userRole === 'admin' || userRole === 'employee' || userRole === 'manager')) {
+  loadData();
+} else {
+  setLoading(false);
+}
   }, [user?.uid, adminUserId, userRole]); // ✅ FIXED: Only stable auth values
 
   // ✅ REFRESH ONLY recalculates dashboard stats WITHOUT reloading data or changing company
