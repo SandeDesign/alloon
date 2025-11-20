@@ -626,11 +626,25 @@ export const updateTimeEntry = async (id: string, userId: string, updates: Parti
 };
 
 // User Roles
-export const createUserRole = async (uid: string, role: 'admin' | 'employee', employeeId?: string): Promise<void> => {
+export const createUserRole = async (
+  uid: string, 
+  role: 'admin' | 'manager' | 'employee', 
+  employeeId?: string,
+  userData?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    assignedCompanyId?: string;
+  }
+): Promise<void> => {
   const roleData = convertToTimestamps({
     uid,
     role,
     employeeId: employeeId || null,
+    firstName: userData?.firstName || '',
+    lastName: userData?.lastName || '',
+    email: userData?.email || '',
+    ...(role === 'manager' && { assignedCompanyId: userData?.assignedCompanyId || null }),
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -690,11 +704,11 @@ export const createEmployeeAuthAccount = async (
     
     // Create user role for the new employee
     const employee = await getEmployee(employeeId, userId);
-await createUserRole(newUserId, 'employee', employeeId, {
-  firstName: employee?.personalInfo.firstName,
-  lastName: employee?.personalInfo.lastName,
-  email: employee?.personalInfo.contactInfo.email,
-});
+    await createUserRole(newUserId, 'employee', employeeId, {
+      firstName: employee?.personalInfo.firstName,
+      lastName: employee?.personalInfo.lastName,
+      email: employee?.personalInfo.contactInfo.email,
+    });
     
     return newUserId;
   } catch (error) {
