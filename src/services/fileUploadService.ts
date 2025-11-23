@@ -8,13 +8,14 @@ export const uploadFile = async (
 ): Promise<{ success: boolean; fileUrl: string }> => {
   const formData = new FormData();
 
-  // Create filename with folder structure: FLG-Administratie/CompanyName/FolderType/timestamp_filename
+  // Send folder path as separate field
+  const folderPath = `${BASE_FOLDER}/${companyName}/${folderType}`;
   const timestamp = Date.now();
-  const safeName = `${BASE_FOLDER}/${companyName}/${folderType}/${timestamp}_${file.name}`;
+  const fileName = `${timestamp}_${file.name}`;
 
-  // Rename file for folder structure
-  const renamedFile = new File([file], safeName, { type: file.type });
-  formData.append('file', renamedFile);
+  formData.append('file', file);
+  formData.append('folder', folderPath);
+  formData.append('filename', fileName);
 
   const response = await fetch(PROXY_URL, {
     method: 'POST',
@@ -34,6 +35,6 @@ export const uploadFile = async (
 
   return {
     success: true,
-    fileUrl: result.file,
+    fileUrl: result.url,
   };
 };
