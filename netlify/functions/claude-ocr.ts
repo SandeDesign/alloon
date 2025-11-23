@@ -39,15 +39,11 @@ const handler: Handler = async (event) => {
         max_tokens: 500,
         messages: [{
           role: 'user',
-          content: `Extract invoice data from this Dutch OCR text. Return ONLY valid JSON:
-{
-  "supplierName": "company name",
-  "invoiceNumber": "invoice number",
-  "invoiceDate": "YYYY-MM-DD",
-  "totalAmount": 123.45,
-  "subtotalExclVat": 102.02,
-  "vatAmount": 21.43
-}
+          content: `Extract invoice data from this Dutch OCR text.
+
+IMPORTANT: Return ONLY a JSON object, no explanations, no text before or after. Just the JSON:
+
+{"supplierName": "company name", "invoiceNumber": "invoice number", "invoiceDate": "YYYY-MM-DD", "totalAmount": 123.45, "subtotalExclVat": 102.02, "vatAmount": 21.43}
 
 OCR TEXT:
 ${ocrText}`
@@ -64,7 +60,22 @@ ${ocrText}`
     const data = await response.json() as any;
     const text = data.content[0].text;
     const clean = text.replace(/```json?\n?|\n?```/g, '').trim();
-    const invoiceData = JSON.parse(clean);
+
+    // Try to extract JSON from response
+    let invoiceData;
+    try {
+      // First try direct parse
+      invoiceData = JSON.parse(clean);
+    } catch {
+      // Try to find JSON object in text
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        invoiceData = JSON.parse(jsonMatch[0]);
+      } else {
+        console.error('No valid JSON in Claude response:', clean);
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Invalid JSON response from Claude' }) };
+      }
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, invoiceData }) };
   } catch (err: any) {
