@@ -73,10 +73,14 @@ export default function Timesheets() {
         setCurrentTimesheet(sheets[0]);
       } else {
         const weekDates = getWeekDates(selectedYear, selectedWeek);
+        // ✅ FIX: Gebruik employee.companyId (employer/Buddy) ipv selectedCompany.id
+        // Timesheets moeten altijd naar de employer gaan, niet naar het project
+        const employerCompanyId = employee.companyId || employee.payrollCompanyId || selectedCompany.id;
+
         const emptyEntries: TimesheetEntry[] = weekDates.map(date => ({
           userId: queryUserId,
           employeeId: effectiveEmployeeId,
-          companyId: selectedCompany.id,
+          companyId: employerCompanyId,
           branchId: employee.branchId,
           date,
           regularHours: 0,
@@ -93,7 +97,7 @@ export default function Timesheets() {
         const newTimesheet: WeeklyTimesheet = {
           userId: queryUserId,
           employeeId: effectiveEmployeeId,
-          companyId: selectedCompany.id,
+          companyId: employerCompanyId,
           branchId: employee.branchId,
           weekNumber: selectedWeek,
           year: selectedYear,

@@ -56,53 +56,79 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
 
   const companyType = selectedCompany?.companyType as 'employer' | 'project' | undefined; // ✅ NEW
 
-  // ✅ UPDATED: Menu with Statistieken voor beide company types
+  // ✅ NIEUW: Overzichtelijk menu per rol
   const menuCategories: MenuCategory[] = [
+    // ═══════════════════════════════════════════════════════════════
+    // ADMIN - EMPLOYER (Personeel beheer)
+    // ═══════════════════════════════════════════════════════════════
     {
-      title: 'HR Beheer',
-      icon: Activity,
+      title: 'Personeel',
+      icon: Users,
       items: [
-        { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-emerald-600' },
-        { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'], color: 'text-amber-600' },
-        { name: 'Uren Beheren', href: '/timesheet-approvals', icon: Clock, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-blue-600' },
-        { name: 'Verlof Beheren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-rose-600' },
-        { name: 'Ziekte Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-red-600' },
+        { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin'], companyTypes: ['employer'], color: 'text-emerald-600' },
+        { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], companyTypes: ['employer'], color: 'text-blue-600' },
+        { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], companyTypes: ['employer'], color: 'text-rose-600' },
+        { name: 'Ziekte Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], companyTypes: ['employer'], color: 'text-red-600' },
       ]
     },
+    // ═══════════════════════════════════════════════════════════════
+    // FACTURATIE
+    // ═══════════════════════════════════════════════════════════════
     {
-      title: 'Financieel',
+      title: 'Facturatie',
       icon: Receipt,
       items: [
-        { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-indigo-600' },
-        { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-green-600' },
-        { name: 'Inkoopbonnen', href: '/incoming-invoices-stats', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-purple-600' },
-        { name: 'Facturen Uploaden', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-orange-600' },
+        { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin', 'manager'], companyTypes: ['employer', 'project'], color: 'text-indigo-600' },
+        { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin', 'manager'], companyTypes: ['employer', 'project'], color: 'text-green-600' },
+        { name: 'Inkoop Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin', 'manager'], companyTypes: ['employer', 'project'], color: 'text-orange-600' },
       ]
     },
+    // ═══════════════════════════════════════════════════════════════
+    // PROJECT COMPANY
+    // ═══════════════════════════════════════════════════════════════
     {
       title: 'Project',
       icon: Factory,
       items: [
-        { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin'], companyTypes: ['project'], color: 'text-cyan-600' },
-        { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-purple-600' },
+        { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin', 'manager'], companyTypes: ['project'], color: 'text-cyan-600' },
+        { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['project'], color: 'text-purple-600' },
       ]
     },
+    // ═══════════════════════════════════════════════════════════════
+    // EMPLOYEE - Mijn zaken
+    // ═══════════════════════════════════════════════════════════════
+    {
+      title: 'Mijn Zaken',
+      icon: Activity,
+      items: [
+        { name: 'Mijn Uren', href: '/timesheets', icon: Clock, roles: ['employee', 'manager'], companyTypes: ['employer'], color: 'text-amber-600' },
+        { name: 'Mijn Verlof', href: '/leave', icon: Calendar, roles: ['employee'], companyTypes: ['employer'], color: 'text-rose-600' },
+        { name: 'Mijn Declaraties', href: '/expenses', icon: Receipt, roles: ['employee'], companyTypes: ['employer'], color: 'text-green-600' },
+        { name: 'Mijn Loonstroken', href: '/payslips', icon: FileText, roles: ['employee'], companyTypes: ['employer'], color: 'text-teal-600' },
+      ]
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // DATA & EXPORTS
+    // ═══════════════════════════════════════════════════════════════
     {
       title: 'Data & Exports',
       icon: TrendingUp,
       items: [
-        { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin', 'manager'], companyTypes: ['employer'], color: 'text-cyan-600' },
+        { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], companyTypes: ['employer'], color: 'text-cyan-600' },
+        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin'], companyTypes: ['employer'], color: 'text-teal-600' },
         { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], companyTypes: ['employer'], color: 'text-fuchsia-600' },
       ]
     },
+    // ═══════════════════════════════════════════════════════════════
+    // SYSTEEM
+    // ═══════════════════════════════════════════════════════════════
     {
       title: 'Systeem',
       icon: Settings,
       items: [
         { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], companyTypes: ['employer'], color: 'text-blue-600' },
-        { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'], color: 'text-teal-600' },
         { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], companyTypes: ['employer'], color: 'text-slate-600' },
-        { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'], color: 'text-gray-600' },
+        { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'manager', 'employee'], companyTypes: ['employer', 'project'], color: 'text-gray-600' },
       ]
     }
   ];
@@ -142,10 +168,10 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
           <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-gray-50">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-xl">A</span>
+                <span className="text-white font-bold text-xl">F</span>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-gray-900">AlloonApp</h2>
+                <h2 className="text-sm font-bold text-gray-900">FLG-Administratie</h2>
                 <p className="text-xs text-gray-500 truncate">{selectedCompany?.name || 'Menu'}</p>
               </div>
             </div>

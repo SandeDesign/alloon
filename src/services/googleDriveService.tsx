@@ -307,8 +307,8 @@ export const uploadInvoiceToDrive = async (
     // Create folder structure in Drive
     console.log('Creating folder structure...');
     
-    const alloonFolderId = await findOrCreateFolder('Alloon', token);
-    const companyFolderId = await findOrCreateFolder(companyName, token, alloonFolderId);
+    const flgFolderId = await findOrCreateFolder('FLG-Administratie', token);
+    const companyFolderId = await findOrCreateFolder(companyName, token, flgFolderId);
     
     // Create category folders
     const inkoopFolderId = await findOrCreateFolder('Inkoop', token, companyFolderId);

@@ -304,7 +304,7 @@ export const PayslipPDFTemplate: React.FC<PayslipPDFTemplateProps> = ({ data }) 
 
       {/* Footer */}
       <Text style={styles.footer}>
-        Deze loonstrook is gegenereerd door AlloonApp - {new Date().toLocaleDateString('nl-NL')}
+        Deze loonstrook is gegenereerd door FLG-Administratie - {new Date().toLocaleDateString('nl-NL')}
       </Text>
     </Page>
   </Document>

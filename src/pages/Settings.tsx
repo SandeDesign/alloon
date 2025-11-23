@@ -152,7 +152,7 @@ const Settings: React.FC = () => {
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <p className="text-sm text-blue-800">
-                    AlloonApp gebruikt een licht, professioneel thema gebaseerd op Material Design principes voor optimale leesbaarheid en gebruiksvriendelijkheid.
+                    FLG-Administratie gebruikt een licht, professioneel thema gebaseerd op Material Design principes voor optimale leesbaarheid en gebruiksvriendelijkheid.
                   </p>
                 </div>
               </div>
@@ -294,7 +294,7 @@ const Settings: React.FC = () => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
                   <strong>Mappenstructuur:</strong>
                   <div className="mt-2 text-xs font-mono">
-                    Alloon/<br />
+                    FLG-Administratie/<br />
                     └── Bedrijfsnaam/<br />
                     &nbsp;&nbsp;&nbsp;&nbsp;├── Inkomende Facturen<br />
                     &nbsp;&nbsp;&nbsp;&nbsp;├── Uitgaande Facturen<br />

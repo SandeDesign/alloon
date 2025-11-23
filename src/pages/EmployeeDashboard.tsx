@@ -128,7 +128,7 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   const getUserEmail = () => {
-    return user?.email || 'geen-email@alloonapp.com';
+    return user?.email || 'geen-email@flg-administratie.nl';
   };
 
   const getGreeting = () => {
@@ -196,7 +196,7 @@ const EmployeeDashboard: React.FC = () => {
             </h1>
             <p className="text-blue-100 flex items-center gap-2">
               <Briefcase className="h-4 w-4" />
-              {selectedCompany?.name || 'AlloonApp'}
+              {selectedCompany?.name || 'FLG-Administratie'}
             </p>
             {employeeData?.personalInfo?.firstName && (
               <p className="text-blue-200 text-sm mt-2">

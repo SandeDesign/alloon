@@ -40,39 +40,58 @@ export interface NavigationItem {
   color?: string;
 }
 
-// ✅ UPDATED: Navigation with company type filtering + Statistieken
+// ✅ NIEUW: Overzichtelijk menu per rol en bedrijfstype
 export const navigation: NavigationItem[] = [
-  // ✅ DASHBOARD - SOLO (NO SECTION)
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  
-  // PERSONEEL SECTION (employer only)
-  { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin', 'manager'], companyTypes: ['employer'] },
-  { name: 'Urenregistratie', href: '/timesheets', icon: Clock, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer'] },
-  { name: 'Uren Beheren', href: '/timesheet-approvals', icon: Clock, roles: ['admin', 'manager'], companyTypes: ['employer'] },
-  { name: 'Verlof Beheren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin', 'manager'], companyTypes: ['employer'] },
-  { name: 'Ziekte Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin', 'manager'], companyTypes: ['employer'] },
-  
-  // FACTURATIE SECTION (both)
-  { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Inkoopbonnen', href: '/incoming-invoices-stats', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  { name: 'Facturen Uploaden', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  
-  // PROJECT COMPANY SPECIFIC
-  { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin'], companyTypes: ['project'] },
-  
-  // STATISTIEKEN (both)
-  { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'] },
-  
-  // DATA & EXPORTS SECTION (employer only)
-  { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin', 'manager'], companyTypes: ['employer'] },
+  // ═══════════════════════════════════════════════════════════════
+  // DASHBOARD - Iedereen
+  // ═══════════════════════════════════════════════════════════════
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['admin', 'manager', 'employee'], companyTypes: ['employer', 'project'] },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ADMIN - EMPLOYER (Buddy BV / Loonmaatschappij)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Personeel
+  { name: 'Werknemers', href: '/employees', icon: Users, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Uren Goedkeuren', href: '/timesheet-approvals', icon: Clock, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Verlof Goedkeuren', href: '/admin/leave-approvals', icon: Calendar, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Ziekte Beheren', href: '/admin/absence-management', icon: HeartPulse, roles: ['admin'], companyTypes: ['employer'] },
+
+  // Facturatie (Admin - Employer)
+  { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Inkoop Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer'] },
+
+  // Exports & Data (Admin - Employer)
+  { name: 'Uren Export', href: '/timesheet-export', icon: Download, roles: ['admin'], companyTypes: ['employer'] },
+  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin'], companyTypes: ['employer'] },
   { name: 'Drive Bestanden', href: '/drive-files', icon: FolderOpen, roles: ['admin'], companyTypes: ['employer'] },
-  
-  // SYSTEEM SECTION
+
+  // Systeem (Admin - Employer)
   { name: 'Bedrijven', href: '/companies', icon: Building2, roles: ['admin'], companyTypes: ['employer'] },
-  { name: 'Loonstroken', href: '/payslips', icon: FileText, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'] },
   { name: 'Audit Log', href: '/audit-log', icon: Shield, roles: ['admin'], companyTypes: ['employer'] },
-  { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'employee', 'manager'], companyTypes: ['employer', 'project'] },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ADMIN - PROJECT (Werkmaatschappij)
+  // ═══════════════════════════════════════════════════════════════
+  { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin', 'manager'], companyTypes: ['project'] },
+  { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin', 'manager'], companyTypes: ['project'] },
+  { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin', 'manager'], companyTypes: ['project'] },
+  { name: 'Inkoop Facturen', href: '/incoming-invoices', icon: Upload, roles: ['admin', 'manager'], companyTypes: ['project'] },
+  { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['project'] },
+
+  // ═══════════════════════════════════════════════════════════════
+  // EMPLOYEE - Alleen eigen zaken
+  // ═══════════════════════════════════════════════════════════════
+  { name: 'Mijn Uren', href: '/timesheets', icon: Clock, roles: ['employee', 'manager'], companyTypes: ['employer'] },
+  { name: 'Mijn Verlof', href: '/leave', icon: Calendar, roles: ['employee'], companyTypes: ['employer'] },
+  { name: 'Mijn Declaraties', href: '/expenses', icon: Receipt, roles: ['employee'], companyTypes: ['employer'] },
+  { name: 'Mijn Loonstroken', href: '/payslips', icon: FileText, roles: ['employee'], companyTypes: ['employer'] },
+
+  // ═══════════════════════════════════════════════════════════════
+  // INSTELLINGEN - Iedereen
+  // ═══════════════════════════════════════════════════════════════
+  { name: 'Instellingen', href: '/settings', icon: Settings, roles: ['admin', 'manager', 'employee'], companyTypes: ['employer', 'project'] },
 ];
 
 interface Section {
@@ -236,11 +255,11 @@ const Sidebar: React.FC = () => {
       {/* ✅ HEADER - GROTER LOGO - DUNNER VAK */}
       <div className="flex h-24 items-center justify-center border-b border-gray-100 px-4 bg-gradient-to-r from-slate-50 to-gray-50 relative">
         {!collapsed && (
-          <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-32 w-auto drop-shadow-sm" />
+          <img src="/Logo-groot.png" alt="FLG-Administratie Logo" className="h-32 w-auto drop-shadow-sm" />
         )}
         {collapsed && (
           <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-2xl">A</span>
+            <span className="text-white font-bold text-2xl">F</span>
           </div>
         )}
         
