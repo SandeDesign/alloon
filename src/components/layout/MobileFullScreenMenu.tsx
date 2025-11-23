@@ -73,8 +73,8 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
       title: 'Financieel',
       icon: Receipt,
       items: [
-        { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-indigo-600' },
-        { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-green-600' },
+        { name: 'Relaties', href: '/invoice-relations', icon: UserCheck, roles: ['admin', 'manager'], companyTypes: ['employer', 'project'], color: 'text-indigo-600' },
+        { name: 'Verkoop Facturen', href: '/outgoing-invoices', icon: Send, roles: ['admin', 'manager'], companyTypes: ['employer', 'project'], color: 'text-green-600' },
         { name: 'Inkoopbonnen', href: '/incoming-invoices-stats', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-purple-600' },
         { name: 'Facturen Uploaden', href: '/incoming-invoices', icon: Upload, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-orange-600' },
       ]
@@ -83,7 +83,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
       title: 'Project',
       icon: Factory,
       items: [
-        { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin'], companyTypes: ['project'], color: 'text-cyan-600' },
+        { name: 'Productie', href: '/project-production', icon: Factory, roles: ['admin', 'manager'], companyTypes: ['project'], color: 'text-cyan-600' },
         { name: 'Statistieken', href: '/project-statistics', icon: BarChart3, roles: ['admin'], companyTypes: ['employer', 'project'], color: 'text-purple-600' },
       ]
     },
