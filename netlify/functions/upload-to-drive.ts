@@ -21,45 +21,21 @@ const handler: Handler = async (event) => {
   }
 
   try {
-    // Get private key from env
-    const rawKey = process.env.GOOGLE_DRIVE_PRIVATE_KEY;
-    if (!rawKey) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'GOOGLE_DRIVE_PRIVATE_KEY not configured' }) };
+    // Get base64-encoded service account JSON from env
+    // This is the ONLY reliable way - see: https://stackoverflow.com/questions/74131595
+    const base64ServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
+    if (!base64ServiceAccount) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'GOOGLE_SERVICE_ACCOUNT_BASE64 not configured' }) };
     }
 
-    // Debug: log raw key info
-    console.log('Raw key length:', rawKey.length);
-    console.log('Has literal backslash-n:', rawKey.includes('\\n'));
-    console.log('Has actual newlines:', rawKey.includes('\n'));
+    // Decode and parse the full service account JSON
+    const serviceAccount = JSON.parse(Buffer.from(base64ServiceAccount, 'base64').toString('utf-8'));
 
-    // Fix newlines - handle both cases
-    let privateKey = rawKey;
-
-    // Case 1: literal \n strings (from JSON copy-paste)
-    if (privateKey.includes('\\n')) {
-      privateKey = privateKey.replace(/\\n/g, '\n');
-    }
-
-    // Case 2: ensure key has proper structure
-    // Remove any carriage returns
-    privateKey = privateKey.replace(/\r/g, '');
-
-    // Ensure there's a newline after BEGIN and before END
-    if (!privateKey.match(/-----BEGIN PRIVATE KEY-----\n/)) {
-      privateKey = privateKey.replace(/-----BEGIN PRIVATE KEY-----\s*/, '-----BEGIN PRIVATE KEY-----\n');
-    }
-    if (!privateKey.match(/\n-----END PRIVATE KEY-----/)) {
-      privateKey = privateKey.replace(/\s*-----END PRIVATE KEY-----/, '\n-----END PRIVATE KEY-----');
-    }
-
-    console.log('Processed key starts:', privateKey.substring(0, 60));
-    console.log('Processed key has newlines:', (privateKey.match(/\n/g) || []).length);
-
-    // Create auth
+    // Create auth with the decoded credentials
     const auth = new google.auth.JWT(
-      'firebase-adminsdk-fbsvc@alloon.iam.gserviceaccount.com',
+      serviceAccount.client_email,
       undefined,
-      privateKey,
+      serviceAccount.private_key,
       ['https://www.googleapis.com/auth/drive.file']
     );
 
