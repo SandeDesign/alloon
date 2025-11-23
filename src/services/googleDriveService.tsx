@@ -1,228 +1,151 @@
-import { db } from '../lib/firebase';
-import { doc, setDoc, getDoc, Timestamp, addDoc, collection } from 'firebase/firestore';
+import { auth } from '../lib/firebase';
 
-const CLIENT_ID = '896567545879-t7ps2toen24v8nrjn5ulf59esnjg1hok.apps.googleusercontent.com';
-const REDIRECT_URI = window.location.origin;
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+// Cloud Function URL (update after deployment)
+const CLOUD_FUNCTION_URL = 'https://europe-west1-alloon.cloudfunctions.net';
 
-let accessToken: string | null = null;
+/**
+ * Upload a file to Google Drive via Cloud Function
+ * Uses Service Account - no per-user OAuth needed!
+ */
+export const uploadInvoiceToDrive = async (
+  file: File,
+  companyId: string,
+  companyName: string,
+  userId: string,
+  userEmail?: string,
+  metadata?: {
+    supplierName?: string;
+    invoiceNumber?: string;
+    amount?: number;
+    vatAmount?: number;
+    totalAmount?: number;
+  },
+  ocrData?: any
+): Promise<{
+  invoiceId: string;
+  driveFileId: string;
+  driveWebLink: string;
+}> => {
+  try {
+    console.log(`Uploading: ${file.name} for ${companyName}`);
 
+    // Get Firebase Auth token
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Not authenticated');
+    }
+
+    const idToken = await currentUser.getIdToken();
+
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('companyId', companyId);
+    formData.append('companyName', companyName);
+    formData.append('folderType', 'Inkoop');
+    formData.append('metadata', JSON.stringify({
+      supplierName: ocrData?.supplierName || metadata?.supplierName || 'Onbekend',
+      invoiceNumber: ocrData?.invoiceNumber || metadata?.invoiceNumber || `INV-${Date.now()}`,
+      subtotal: ocrData?.subtotal || metadata?.amount || 0,
+      vatAmount: ocrData?.vatAmount || metadata?.vatAmount || 0,
+      totalAmount: ocrData?.totalInclVat || metadata?.totalAmount || 0,
+      ocrConfidence: ocrData?.confidence || 0,
+    }));
+
+    // Call Cloud Function
+    const response = await fetch(`${CLOUD_FUNCTION_URL}/uploadToDrive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(errorData.message || errorData.error || 'Upload failed');
+    }
+
+    const result = await response.json();
+    console.log(`✓ Upload complete: ${result.driveWebLink}`);
+
+    return {
+      invoiceId: result.invoiceId,
+      driveFileId: result.driveFileId,
+      driveWebLink: result.driveWebLink,
+    };
+
+  } catch (error) {
+    console.error('Error uploading invoice to Drive:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if Google Drive connection is working
+ * (Service Account is always connected - just verify the Cloud Function works)
+ */
+export const checkDriveConnection = async (): Promise<{
+  connected: boolean;
+  message: string;
+  files?: string[];
+}> => {
+  try {
+    const response = await fetch(`${CLOUD_FUNCTION_URL}/driveHealthCheck`);
+    const data = await response.json();
+
+    return {
+      connected: data.success,
+      message: data.message || 'Connected',
+      files: data.filesInRoot,
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      message: 'Could not connect to Cloud Function',
+    };
+  }
+};
+
+// ============================================
+// LEGACY FUNCTIONS - Kept for backward compatibility
+// These are no longer needed with Service Account
+// ============================================
+
+/** @deprecated No longer needed - Service Account handles auth */
 export const requestGoogleDriveToken = async (userEmail?: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.append('client_id', CLIENT_ID);
-    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
-    authUrl.searchParams.append('response_type', 'token');
-    authUrl.searchParams.append('scope', SCOPES.join(' '));
-    authUrl.searchParams.append('prompt', 'consent');
-    
-    if (userEmail) {
-      authUrl.searchParams.append('login_hint', userEmail);
-    }
-
-    const width = 500;
-    const height = 600;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-
-    const popup = window.open(
-      authUrl.toString(),
-      'google_auth',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-
-    if (!popup) {
-      reject(new Error('Popup blocked'));
-      return;
-    }
-
-    const checkPopup = setInterval(() => {
-      try {
-        if (!popup.closed) {
-          const popupUrl = popup.location.href;
-          if (popupUrl.includes('access_token=')) {
-            const urlParams = new URLSearchParams(popupUrl.split('#')[1]);
-            const token = urlParams.get('access_token');
-            
-            if (token) {
-              accessToken = token;
-              clearInterval(checkPopup);
-              popup.close();
-              resolve(token);
-            }
-          }
-        } else {
-          clearInterval(checkPopup);
-          reject(new Error('Popup closed by user'));
-        }
-      } catch (e) {
-        // Cross-origin error, normal
-      }
-    }, 500);
-
-    setTimeout(() => {
-      clearInterval(checkPopup);
-      if (!popup.closed) popup.close();
-      reject(new Error('Google auth timeout'));
-    }, 600000);
-  });
+  console.warn('requestGoogleDriveToken is deprecated - using Service Account');
+  return 'service-account-token';
 };
 
+/** @deprecated No longer needed - Service Account handles auth */
 export const silentRefreshGoogleToken = async (userId: string, userEmail?: string): Promise<string | null> => {
-  try {
-    const token = await getGoogleDriveToken(userId);
-    
-    if (token) {
-      return token;
-    }
-
-    console.log('Token expired, refreshing...');
-    
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.append('client_id', CLIENT_ID);
-    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
-    authUrl.searchParams.append('response_type', 'token');
-    authUrl.searchParams.append('scope', SCOPES.join(' '));
-    authUrl.searchParams.append('prompt', '');
-    
-    if (userEmail) {
-      authUrl.searchParams.append('login_hint', userEmail);
-    }
-
-    return new Promise((resolve) => {
-      const popup = window.open(
-        authUrl.toString(),
-        'google_silent_refresh',
-        'width=1,height=1,left=-9999,top=-9999'
-      );
-
-      if (!popup) {
-        resolve(null);
-        return;
-      }
-
-      const checkPopup = setInterval(() => {
-        try {
-          if (!popup.closed) {
-            const popupUrl = popup.location.href;
-            if (popupUrl.includes('access_token=')) {
-              const urlParams = new URLSearchParams(popupUrl.split('#')[1]);
-              const newToken = urlParams.get('access_token');
-              
-              if (newToken) {
-                accessToken = newToken;
-                clearInterval(checkPopup);
-                popup.close();
-                saveGoogleDriveToken(userId, newToken).catch(() => {});
-                resolve(newToken);
-              }
-            }
-          } else {
-            clearInterval(checkPopup);
-            resolve(null);
-          }
-        } catch (e) {
-          // Cross-origin, normal
-        }
-      }, 500);
-
-      setTimeout(() => {
-        clearInterval(checkPopup);
-        if (!popup.closed) popup.close();
-        resolve(null);
-      }, 30000);
-    });
-  } catch (error) {
-    console.error('Silent refresh error:', error);
-    return null;
-  }
+  console.warn('silentRefreshGoogleToken is deprecated - using Service Account');
+  return 'service-account-token';
 };
 
+/** @deprecated No longer needed - Service Account handles auth */
 export const saveGoogleDriveToken = async (userId: string, token: string) => {
-  try {
-    await setDoc(doc(db, 'userGoogleDriveTokens', userId), {
-      token,
-      createdAt: Timestamp.fromDate(new Date()),
-      expiresAt: Timestamp.fromDate(new Date(Date.now() + 3600000)),
-    });
-  } catch (error) {
-    console.error('Error saving token:', error);
-    throw new Error('Kon token niet opslaan');
-  }
+  console.warn('saveGoogleDriveToken is deprecated - using Service Account');
 };
 
+/** @deprecated No longer needed - Service Account handles auth */
 export const getGoogleDriveToken = async (userId: string): Promise<string | null> => {
-  try {
-    const docSnap = await getDoc(doc(db, 'userGoogleDriveTokens', userId));
-    
-    if (!docSnap.exists()) return null;
-
-    const data = docSnap.data();
-    const expiresAt = data.expiresAt.toDate();
-
-    if (new Date() > expiresAt) {
-      return null;
-    }
-
-    return data.token;
-  } catch (error) {
-    console.error('Error getting token:', error);
-    return null;
-  }
+  console.warn('getGoogleDriveToken is deprecated - using Service Account');
+  return 'service-account-token';
 };
 
+/** @deprecated Use Cloud Function instead */
 export const findOrCreateFolder = async (
   folderName: string,
   token: string,
   parentFolderId?: string
 ): Promise<string> => {
-  const query_str = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${
-    parentFolderId ? ` and '${parentFolderId}' in parents` : ''
-  }`;
-
-  const searchResponse = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query_str)}&spaces=drive&pageSize=10&fields=files(id,name)`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  const searchData = await searchResponse.json();
-
-  if (searchData.files && searchData.files.length > 0) {
-    console.log(`✓ Folder found: ${folderName} (${searchData.files[0].id})`);
-    return searchData.files[0].id;
-  }
-
-  console.log(`→ Creating folder: ${folderName}`);
-
-  const metadata = {
-    name: folderName,
-    mimeType: 'application/vnd.google-apps.folder',
-    ...(parentFolderId && { parents: [parentFolderId] }),
-  };
-
-  const createResponse = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(metadata),
-  });
-
-  const createData = await createResponse.json();
-
-  if (!createData.id) {
-    throw new Error('Failed to create folder');
-  }
-
-  console.log(`✓ Folder created: ${folderName} (${createData.id})`);
-  return createData.id;
+  console.warn('findOrCreateFolder is deprecated - Cloud Function handles folders');
+  return 'handled-by-cloud-function';
 };
 
+/** @deprecated Use Cloud Function instead */
 export const uploadFileToDrive = async (
   file: File,
   folderId: string,
@@ -234,130 +157,6 @@ export const uploadFileToDrive = async (
   downloadLink: string;
   name: string;
 }> => {
-  const formData = new FormData();
-
-  const metadata = {
-    name: fileName || file.name,
-    parents: [folderId],
-  };
-
-  formData.append(
-    'metadata',
-    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-  );
-  formData.append('file', file);
-
-  const response = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    try {
-      const errorJson = JSON.parse(errorText);
-      throw new Error(errorJson.error?.message || 'Upload failed');
-    } catch (e) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-  }
-
-  const data = await response.json();
-
-  return {
-    fileId: data.id,
-    webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
-    downloadLink: `https://drive.google.com/file/d/${data.id}/view`,
-    name: data.name,
-  };
-};
-
-export const uploadInvoiceToDrive = async (
-  file: File,
-  companyId: string,
-  companyName: string,
-  userId: string,
-  userEmail?: string,
-  metadata?: {
-    supplierName?: string;
-    invoiceNumber?: string;
-    amount?: number;
-  },
-  ocrData?: any
-): Promise<{
-  invoiceId: string;
-  driveFileId: string;
-  driveWebLink: string;
-}> => {
-  try {
-    console.log(`Uploading: ${file.name} for ${companyName}`);
-    
-    let token = await silentRefreshGoogleToken(userId, userEmail);
-    
-    if (!token) {
-      throw new Error('Google Drive not connected. Please connect in Settings.');
-    }
-
-    // Create folder structure in Drive
-    console.log('Creating folder structure...');
-    
-    const flgFolderId = await findOrCreateFolder('FLG-Administratie', token);
-    const companyFolderId = await findOrCreateFolder(companyName, token, flgFolderId);
-    
-    // Create category folders
-    const inkoopFolderId = await findOrCreateFolder('Inkoop', token, companyFolderId);
-    const verkoopFolderId = await findOrCreateFolder('Verkoop', token, companyFolderId);
-    const productieFolderId = await findOrCreateFolder('Productie', token, companyFolderId);
-
-    console.log('Uploading file...');
-
-    // Upload file
-    const uploadResult = await uploadFileToDrive(
-      file,
-      inkoopFolderId,
-      token,
-      `${metadata?.invoiceNumber || 'INV'}-${Date.now()}.${file.name.split('.').pop()}`
-    );
-
-    console.log(`✓ Upload complete: ${uploadResult.webViewLink}`);
-
-    // Save to Firestore - OCR data only
-    const now = new Date();
-    const invoiceData = {
-      userId,
-      companyId,
-      supplierName: ocrData?.supplierName || metadata?.supplierName || 'Onbekend',
-      invoiceNumber: ocrData?.invoiceNumber || metadata?.invoiceNumber || `INV-${Date.now()}`,
-      subtotal: ocrData?.subtotal || 0,
-      vatAmount: ocrData?.vatAmount || 0,
-      totalAmount: ocrData?.totalInclVat || 0,
-      invoiceDate: Timestamp.fromDate(ocrData?.invoiceDate || now),
-      dueDate: Timestamp.fromDate(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)),
-      status: 'pending',
-      driveFileId: uploadResult.fileId,
-      driveWebLink: uploadResult.webViewLink,
-      ocrData: ocrData || null,
-      ocrConfidence: ocrData?.confidence || 0,
-      createdAt: Timestamp.fromDate(now),
-      updatedAt: Timestamp.fromDate(now)
-    };
-
-    const docRef = await addDoc(collection(db, 'incomingInvoices'), invoiceData);
-    console.log(`✓ OCR data saved to Firestore: ${docRef.id}`);
-
-    return {
-      invoiceId: docRef.id,
-      driveFileId: uploadResult.fileId,
-      driveWebLink: uploadResult.webViewLink,
-    };
-  } catch (error) {
-    console.error('Error uploading invoice to Drive:', error);
-    throw error;
-  }
+  console.warn('uploadFileToDrive is deprecated - use uploadInvoiceToDrive');
+  throw new Error('Use uploadInvoiceToDrive instead');
 };
