@@ -106,7 +106,7 @@ const GoogleDriveSettings: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
             <strong>Mappenstructuur:</strong>
             <div className="mt-1 text-xs font-mono">
-              Alloon/<br />
+              FLG-Administratie/<br />
               └── Bedrijfsnaam/<br />
               &nbsp;&nbsp;&nbsp;&nbsp;├── Inkomende Facturen<br />
               &nbsp;&nbsp;&nbsp;&nbsp;├── Uitgaande Facturen<br />

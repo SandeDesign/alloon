@@ -41,7 +41,7 @@ const Login: React.FC = () => {
             <Calculator className="h-12 w-12 text-blue-600" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
-            Welkom bij AlloonApp
+            Welkom bij FLG-Administratie
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Log in om je loonadministratie te beheren

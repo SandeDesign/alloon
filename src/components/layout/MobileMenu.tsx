@@ -122,7 +122,7 @@ export const MobileFullScreenMenu: React.FC<MobileFullScreenMenuProps> = ({ isOp
               <Users className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900">AlloonApp</h1>
+              <h1 className="text-lg font-bold text-gray-900">FLG-Administratie</h1>
               <p className="text-xs text-gray-500">Loonadministratie</p>
             </div>
           </div>

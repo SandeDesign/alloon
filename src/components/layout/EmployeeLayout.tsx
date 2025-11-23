@@ -52,7 +52,7 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 z-50">
-        <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-8 w-auto" />
+        <img src="/Logo-groot.png" alt="FLG-Administratie Logo" className="h-8 w-auto" />
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -74,9 +74,9 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
         >
           {/* Logo */}
           <div className="hidden md:flex items-center gap-3 px-6 py-6 border-b border-gray-200 flex-shrink-0">
-            <img src="/Logo-groot.png" alt="AlloonApp Logo" className="h-10 w-auto" />
+            <img src="/Logo-groot.png" alt="FLG-Administratie Logo" className="h-10 w-auto" />
             <div>
-              <h1 className="text-lg font-bold text-gray-900">AlloonApp</h1>
+              <h1 className="text-lg font-bold text-gray-900">FLG-Administratie</h1>
               <p className="text-xs text-gray-500">{selectedCompany?.name || 'Dashboard'}</p>
             </div>
           </div>
