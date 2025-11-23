@@ -538,47 +538,65 @@ const Sidebar: React.FC = () => {
 
         )}
 
- 
 
-        {/* Sections */}
 
-        {sections.map((section) => (
+        {/* Manager: Simple flat list without sections */}
 
-          <div key={section.title} className="space-y-1">
+        {userRole === 'manager' ? (
 
-            <SectionHeader
+          <div className="space-y-1 pt-2">
 
-              title={section.title}
+            {filteredNavigation.filter(i => i.name !== 'Dashboard').map((item) => (
 
-              icon={section.icon}
+              <NavItem key={item.name} item={item} collapsed={collapsed} />
 
-              collapsed={collapsed}
-
-              isExpanded={expandedSections.includes(section.title)}
-
-              onToggle={() => toggleSection(section.title)}
-
-            />
-
- 
-
-            {(collapsed || expandedSections.includes(section.title)) && (
-
-              <div className="space-y-1">
-
-                {section.items.map((item) => (
-
-                  <NavItem key={item.name} item={item} collapsed={collapsed} />
-
-                ))}
-
-              </div>
-
-            )}
+            ))}
 
           </div>
 
-        ))}
+        ) : (
+
+          /* Admin/Employee: Sections with dropdowns */
+
+          sections.map((section) => (
+
+            <div key={section.title} className="space-y-1">
+
+              <SectionHeader
+
+                title={section.title}
+
+                icon={section.icon}
+
+                collapsed={collapsed}
+
+                isExpanded={expandedSections.includes(section.title)}
+
+                onToggle={() => toggleSection(section.title)}
+
+              />
+
+
+
+              {(collapsed || expandedSections.includes(section.title)) && (
+
+                <div className="space-y-1">
+
+                  {section.items.map((item) => (
+
+                    <NavItem key={item.name} item={item} collapsed={collapsed} />
+
+                  ))}
+
+                </div>
+
+              )}
+
+            </div>
+
+          ))
+
+        )}
 
       </nav>
 

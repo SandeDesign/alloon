@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Calendar, HeartPulse, Receipt, Clock, Menu, X, Home } from 'lucide-react';
+import { User, LogOut, Calendar, HeartPulse, Receipt, Clock, Menu, X, Home, Settings } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApp } from '../../contexts/AppContext';
@@ -18,11 +18,18 @@ const navigation = [
   { name: 'Uren', href: '/employee-dashboard/timesheets', icon: Clock },
 ];
 
+// Mobile bottom nav - 4 main items
+const bottomNavItems = [
+  { name: 'Home', href: '/employee-dashboard', icon: Home },
+  { name: 'Uren', href: '/employee-dashboard/timesheets', icon: Clock },
+  { name: 'Verlof', href: '/employee-dashboard/leave', icon: Calendar },
+  { name: 'Profiel', href: '/settings', icon: Settings },
+];
+
 const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
   const { user, signOut, currentEmployeeId } = useAuth();
   const { selectedCompany } = useApp();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [employeeData, setEmployeeData] = useState<any>(null);
 
@@ -66,7 +73,7 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
       </div>
 
       <div className="flex h-screen md:h-auto md:min-h-screen">
-        {/* Sidebar */}
+        {/* Desktop Sidebar */}
         <div
           className={`fixed md:fixed left-0 top-16 md:top-0 h-[calc(100vh-64px)] md:h-screen w-80 bg-white border-r border-gray-200 flex flex-col transition-all duration-300 z-50 md:z-0 overflow-hidden shadow-lg md:shadow-none ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -137,12 +144,43 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 w-full md:ml-80 mt-16 md:mt-0">
+        <main className="flex-1 w-full md:ml-80 mt-16 md:mt-0 pb-24 md:pb-0">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
             {children}
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40">
+        <div className="bg-white/95 backdrop-blur-xl border-t border-gray-200 shadow-2xl">
+          <div className="flex justify-around items-center px-2 py-3">
+            {bottomNavItems.map(({ href, icon: Icon, name }) => {
+              const isActive = location.pathname === href;
+              return (
+                <NavLink
+                  key={href}
+                  to={href}
+                  className="flex flex-col items-center justify-center flex-1 transition-all duration-300"
+                >
+                  <div className={`p-3 rounded-2xl transition-all duration-300 ${
+                    isActive
+                      ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg'
+                      : 'bg-gray-100/50 text-gray-600'
+                  }`}>
+                    <Icon size={20} strokeWidth={2.2} />
+                  </div>
+                  <span className={`text-xs font-semibold mt-1.5 ${
+                    isActive ? 'text-gray-900' : 'text-gray-600'
+                  }`}>
+                    {name}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
     </div>
   );
 };
