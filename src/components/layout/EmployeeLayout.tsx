@@ -83,7 +83,7 @@ const EmployeeLayout: React.FC<EmployeeLayoutProps> = ({ children }) => {
           <div className="hidden md:flex items-center gap-3 px-6 py-6 border-b border-gray-200 flex-shrink-0">
             <img src="/Logo_1.png" alt="FLG-Administratie Logo" className="h-8 w-auto" />
             <div>
-              <h1 className="text-lg font-bold text-gray-900">FLG-Administratie</h1>
+              <h1 className="text-lg font-bold text-gray-900">Administratie</h1>
               <p className="text-xs text-gray-500">{selectedCompany?.name || 'Dashboard'}</p>
             </div>
           </div>
