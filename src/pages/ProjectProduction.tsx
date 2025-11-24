@@ -420,13 +420,13 @@ const ProjectProduction: React.FC = () => {
           companyId: entry.companyId,
           employeeId: entry.employeeId,
           userId: entry.userId,
-          createdAt: Timestamp.fromDate(entry.createdAt),
-          updatedAt: Timestamp.fromDate(entry.updatedAt)
+          createdAt: Timestamp.fromDate(entry.createdAt instanceof Date ? entry.createdAt : new Date()),
+          updatedAt: Timestamp.fromDate(entry.updatedAt instanceof Date ? entry.updatedAt : new Date())
         })),
         status: 'draft',
         totalHours: productionData.totalHours,
         totalEntries: productionData.totalEntries,
-        createdAt: Timestamp.fromDate(productionData.createdAt),
+        createdAt: Timestamp.fromDate(productionData.createdAt instanceof Date ? productionData.createdAt : new Date()),
         updatedAt: Timestamp.fromDate(new Date())
       };
 

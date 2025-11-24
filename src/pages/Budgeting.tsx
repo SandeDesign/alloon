@@ -409,21 +409,19 @@ const Budgeting: React.FC = () => {
     return projections;
   };
 
-  // Export to PDF (simple HTML-based)
-  const handleExport = async () => {
+  // Export to HTML file (downloadable)
+  const handleExport = () => {
     const projections = generateProjections();
+    const companyName = selectedCompany?.name || 'Bedrijf';
+    const dateStr = new Date().toLocaleDateString('nl-NL');
+    const fileName = `Financiele-Projectie-${companyName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.html`;
 
-    const exportWindow = window.open('', '_blank');
-    if (!exportWindow) {
-      showError('Export mislukt', 'Pop-up werd geblokkeerd');
-      return;
-    }
-
-    const html = `
-<!DOCTYPE html>
-<html>
+    const html = `<!DOCTYPE html>
+<html lang="nl">
 <head>
-  <title>Financiële Projectie - ${selectedCompany?.name}</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financiële Projectie - ${companyName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -431,7 +429,24 @@ const Budgeting: React.FC = () => {
       padding: 40px;
       color: #1a1a1a;
       background: white;
+      max-width: 1200px;
+      margin: 0 auto;
     }
+    .print-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .print-btn:hover { background: #4338ca; }
     .header {
       text-align: center;
       margin-bottom: 40px;
@@ -473,6 +488,20 @@ const Budgeting: React.FC = () => {
     .projection-row { background: #f9fafb; }
     .positive { color: #059669; }
     .negative { color: #dc2626; }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .metric-card {
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric-card .value { font-size: 24px; font-weight: 700; color: #1a1a1a; }
+    .metric-card .label { font-size: 12px; color: #666; margin-top: 4px; }
     .footer {
       margin-top: 40px;
       padding-top: 20px;
@@ -482,15 +511,21 @@ const Budgeting: React.FC = () => {
       font-size: 12px;
     }
     @media print {
+      .print-btn { display: none; }
       body { padding: 20px; }
-      .no-print { display: none; }
+    }
+    @media (max-width: 768px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
+  <button class="print-btn" onclick="window.print()">Print / PDF</button>
+
   <div class="header">
-    <h1>${selectedCompany?.name}</h1>
-    <p>Financiële Projectie & Begroting | Gegenereerd op ${new Date().toLocaleDateString('nl-NL')}</p>
+    <h1>${companyName}</h1>
+    <p>Financiële Projectie & Begroting | Gegenereerd op ${dateStr}</p>
   </div>
 
   <div class="summary-grid">
@@ -509,6 +544,28 @@ const Budgeting: React.FC = () => {
   </div>
 
   <div class="section">
+    <h2>Kerngetallen</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="value">${formatCurrency(weightedMonthlyIncome * 12)}</div>
+        <div class="label">ARR (Gewogen)</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">${formatCurrency(monthlyIncome)}</div>
+        <div class="label">MRR (Max)</div>
+      </div>
+      <div class="metric-card">
+        <div class="value" style="color: ${yearlyProfit >= 0 ? '#059669' : '#dc2626'}">${yearlyIncome > 0 ? ((yearlyProfit / yearlyIncome) * 100).toFixed(1) : 0}%</div>
+        <div class="label">Winstmarge</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">${activeIncomeItems.length}</div>
+        <div class="label">Inkomstenbronnen</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
     <h2>Meerjarenprojectie</h2>
     <table>
       <thead>
@@ -517,6 +574,7 @@ const Budgeting: React.FC = () => {
           <th>Inkomsten</th>
           <th>Kosten</th>
           <th>Resultaat</th>
+          <th>Marge</th>
         </tr>
       </thead>
       <tbody>
@@ -526,12 +584,14 @@ const Budgeting: React.FC = () => {
             <td class="positive">${formatCurrency(p.income)}</td>
             <td class="negative">${formatCurrency(p.costs)}</td>
             <td class="${p.profit >= 0 ? 'positive' : 'negative'}">${formatCurrency(p.profit)}</td>
+            <td class="${p.profit >= 0 ? 'positive' : 'negative'}">${p.income > 0 ? ((p.profit / p.income) * 100).toFixed(1) : 0}%</td>
           </tr>
         `).join('')}
       </tbody>
     </table>
   </div>
 
+  ${activeIncomeItems.length > 0 ? `
   <div class="section">
     <h2>Inkomstenbronnen (${activeIncomeItems.length})</h2>
     <table>
@@ -557,7 +617,9 @@ const Budgeting: React.FC = () => {
       </tbody>
     </table>
   </div>
+  ` : ''}
 
+  ${activeCostItems.length > 0 ? `
   <div class="section">
     <h2>Kostenstructuur (${activeCostItems.length})</h2>
     <table>
@@ -581,6 +643,7 @@ const Budgeting: React.FC = () => {
       </tbody>
     </table>
   </div>
+  ` : ''}
 
   ${showActualData && (actualYTDIncome > 0 || actualYTDCosts > 0) ? `
   <div class="section">
@@ -616,17 +679,21 @@ const Budgeting: React.FC = () => {
     <p>Dit document is automatisch gegenereerd en bevat financiële projecties gebaseerd op ingevoerde begrotingsdata.</p>
     <p>Gewogen inkomsten zijn gecorrigeerd voor zekerheid: Bevestigd (100%), Waarschijnlijk (75%), Potentieel (50%), Speculatief (25%)</p>
   </div>
-
-  <script>
-    window.onload = function() { window.print(); }
-  </script>
 </body>
-</html>
-    `;
+</html>`;
 
-    exportWindow.document.write(html);
-    exportWindow.document.close();
-    success('Export gereed', 'Print dialoog wordt geopend');
+    // Create downloadable file
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    success('Gedownload', `${fileName} is gedownload. Open het bestand en klik op "Print / PDF" voor een PDF.`);
   };
 
   if (!selectedCompany) {
