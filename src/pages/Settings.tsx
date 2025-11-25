@@ -96,9 +96,9 @@ const Settings: React.FC = () => {
       }
 
       if (result.alreadyExists) {
-        toast.info('Account bestaat al', `${coAdminEmail} heeft al een account`);
+        success('Account bestaat al', `${coAdminEmail} heeft al een bestaand account`);
       } else {
-        toast.success('Account aangemaakt!', `Er is een account aangemaakt voor ${coAdminEmail} met wachtwoord: DeInstallatie1234!!`);
+        success('Account aangemaakt!', `Er is een account aangemaakt voor ${coAdminEmail} met wachtwoord: DeInstallatie1234!!`);
       }
 
       // Add to co-admin list
