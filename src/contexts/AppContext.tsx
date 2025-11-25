@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Company, Employee, Branch, DashboardStats } from '../types';
-import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings, getUserRole, getCompanyById, getPrimaryAdminForCoAdmin } from '../services/firebase';
+import { getCompanies, getEmployees, getBranches, getPendingLeaveApprovals, getUserSettings, getUserRole, getCompanyById } from '../services/firebase';
 import { getPendingExpenses } from '../services/firebase';
 import { getPayrollCalculations } from '../services/payrollService';
 import { getPendingTimesheets } from '../services/timesheetService';
@@ -188,32 +188,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         // ✅ ADMIN/EMPLOYEE: Load all companies
-        // First check if this admin is a co-admin for someone else
-        let effectiveAdminUserId = adminUserId;
-
-        if (userRole === 'admin' && user?.email) {
-          console.log('Checking if admin is co-admin for another user');
-          const primaryAdminUserId = await getPrimaryAdminForCoAdmin(user.email);
-          if (primaryAdminUserId) {
-            console.log('User is co-admin for primary admin:', primaryAdminUserId);
-            effectiveAdminUserId = primaryAdminUserId;
-          } else {
-            console.log('User is primary admin, loading own companies');
-          }
-        }
-
+        // Note: For co-admins, adminUserId is already set to primary admin's UID in AuthContext
         const [companies, employees, branches] = await Promise.all([
-          getCompanies(effectiveAdminUserId),
-          getEmployees(effectiveAdminUserId),
-          getBranches(effectiveAdminUserId),
+          getCompanies(adminUserId),
+          getEmployees(adminUserId),
+          getBranches(adminUserId),
         ]);
 
         companiesData = companies;
         employeesData = employees;
         branchesData = branches;
 
-        // ✅ NIEUW: Set queryUserId for admins/employees (use effective admin user ID)
-        setQueryUserId(effectiveAdminUserId);
+        // ✅ NIEUW: Set queryUserId for admins/employees
+        setQueryUserId(adminUserId);
       }
 
       console.log('Loaded companies:', companiesData.length);
@@ -229,18 +216,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (userRole === 'admin') {
         try {
-          // Use queryUserId which is the effective admin (primary admin for co-admins)
-          const userSettings = await getUserSettings(queryUserId || adminUserId);
+          // Note: adminUserId is already the primary admin's UID for co-admins
+          const userSettings = await getUserSettings(adminUserId);
           defaultCompanyId = userSettings?.defaultCompanyId || null;
         } catch (error) {
           console.error('Error loading user settings:', error);
         }
       }
 
-      // Fallback: check localStorage (use queryUserId for co-admins)
+      // Fallback: check localStorage
       if (!defaultCompanyId) {
-        const storageKey = `defaultCompany_${queryUserId || adminUserId}`;
-        const storedDefault = localStorage.getItem(storageKey);
+        const storedDefault = localStorage.getItem(`defaultCompany_${adminUserId}`);
         defaultCompanyId = storedDefault || null;
       }
 
