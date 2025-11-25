@@ -7,6 +7,8 @@ import {
   Lock,
   Camera,
   Check,
+  UserPlus,
+  X as XIcon,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
@@ -36,6 +38,10 @@ const Settings: React.FC = () => {
   const [profilePhotoBase64, setProfilePhotoBase64] = useState<string>('');
   const [photoPreview, setPhotoPreview] = useState<string>('');
 
+  // Co-admin state
+  const [coAdminEmail, setCoAdminEmail] = useState('');
+  const [coAdmins, setCoAdmins] = useState<string[]>([]);
+
   useEffect(() => {
     if (user && userRole === 'admin' && activeTab === 'company') {
       loadDefaultCompany();
@@ -55,8 +61,54 @@ const Settings: React.FC = () => {
     try {
       const settings = await getUserSettings(user.uid);
       setSelectedDefaultCompanyId(settings?.defaultCompanyId || '');
+      setCoAdmins(settings?.coAdminEmails || []);
     } catch (error) {
       console.error('Error loading default company:', error);
+    }
+  };
+
+  const handleAddCoAdmin = async () => {
+    if (!user || !coAdminEmail) return;
+
+    if (!coAdminEmail.includes('@')) {
+      showError('Ongeldig e-mailadres', 'Voer een geldig e-mailadres in');
+      return;
+    }
+
+    if (coAdmins.includes(coAdminEmail)) {
+      showError('Al toegevoegd', 'Deze gebruiker is al een co-admin');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const newCoAdmins = [...coAdmins, coAdminEmail];
+      await saveUserSettings(user.uid, { coAdminEmails: newCoAdmins });
+      setCoAdmins(newCoAdmins);
+      setCoAdminEmail('');
+      success('Co-admin toegevoegd', `${coAdminEmail} heeft nu toegang tot al je bedrijven`);
+    } catch (error) {
+      console.error('Error adding co-admin:', error);
+      showError('Fout bij toevoegen', 'Kon co-admin niet toevoegen');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveCoAdmin = async (email: string) => {
+    if (!user) return;
+
+    try {
+      setSaving(true);
+      const newCoAdmins = coAdmins.filter(e => e !== email);
+      await saveUserSettings(user.uid, { coAdminEmails: newCoAdmins });
+      setCoAdmins(newCoAdmins);
+      success('Co-admin verwijderd', `${email} heeft geen toegang meer`);
+    } catch (error) {
+      console.error('Error removing co-admin:', error);
+      showError('Fout bij verwijderen', 'Kon co-admin niet verwijderen');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -452,6 +504,81 @@ const Settings: React.FC = () => {
                 >
                   Standaard bedrijf opslaan
                 </Button>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-primary-600" />
+                Co-Admins Beheren
+              </h2>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Voeg andere gebruikers toe die toegang hebben tot <strong>al jouw bedrijven</strong> met dezelfde rechten als jij.
+                </p>
+
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="email"
+                      value={coAdminEmail}
+                      onChange={(e) => setCoAdminEmail(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddCoAdmin()}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="email@voorbeeld.nl"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleAddCoAdmin}
+                    disabled={saving || !coAdminEmail}
+                    size="sm"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Toevoegen
+                  </Button>
+                </div>
+
+                {coAdmins.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Huidige co-admins:</p>
+                    {coAdmins.map((email) => (
+                      <div
+                        key={email}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-900">{email}</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveCoAdmin(email)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          disabled={saving}
+                          title="Verwijderen"
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {coAdmins.length === 0 && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">
+                      Nog geen co-admins toegevoegd
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-800">
+                    <strong>Let op:</strong> Co-admins krijgen volledige toegang tot al je bedrijven, werknemers en financiële gegevens. Voeg alleen vertrouwde personen toe.
+                  </p>
+                </div>
               </div>
             </div>
           </Card>
