@@ -45,7 +45,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentEmployeeId(roleData?.employeeId || null);
 
           if (roleData?.role === 'admin') {
-  setAdminUserId(user.uid);
+  // Check if this admin is a co-admin for someone else
+  if (user.email) {
+    const primaryAdminUserId = await getPrimaryAdminForCoAdmin(user.email);
+    if (primaryAdminUserId) {
+      console.log('[AuthContext] Co-admin detected, using primary admin UID:', primaryAdminUserId);
+      setAdminUserId(primaryAdminUserId);
+    } else {
+      console.log('[AuthContext] Primary admin, using own UID');
+      setAdminUserId(user.uid);
+    }
+  } else {
+    setAdminUserId(user.uid);
+  }
 } else if (roleData?.role === 'manager') {
   // Manager krijgt hun eigenuid, zodat ze hun bedrijf kunnen laden
   setAdminUserId(user.uid);
