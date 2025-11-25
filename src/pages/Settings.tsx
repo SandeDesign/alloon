@@ -98,6 +98,25 @@ const Settings: React.FC = () => {
       if (result.alreadyExists) {
         success('Account bestaat al', `${coAdminEmail} heeft al een bestaand account`);
       } else {
+        // Create Firestore user document for new account
+        if (result.uid) {
+          try {
+            console.log('Creating Firestore user document for UID:', result.uid);
+
+            // Create user settings document
+            await saveUserSettings(result.uid, {
+              email: coAdminEmail,
+              role: 'admin',
+              createdAt: new Date(),
+              defaultCompanyId: companies.length > 0 ? companies[0].id : undefined,
+            });
+
+            console.log('Firestore user document created successfully');
+          } catch (firestoreError) {
+            console.error('Error creating Firestore document:', firestoreError);
+            showError('Waarschuwing', 'Account aangemaakt maar kon gebruikersprofiel niet initialiseren');
+          }
+        }
         success('Account aangemaakt!', `Er is een account aangemaakt voor ${coAdminEmail} met wachtwoord: DeInstallatie1234!!`);
       }
 
